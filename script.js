@@ -1,24 +1,85 @@
 const grid = document.querySelector('#course-grid');
 const money = value => new Intl.NumberFormat('ru-RU').format(value);
-function renderCourses(filter = 'all') {
-  grid.replaceChildren();
-  schoolContent.courses.filter(c => filter === 'all' || c.category === filter).forEach((course, index) => {
-    const card = document.createElement('article'); card.className = `course-card ${course.category}`;
-    const top = document.createElement('div'); top.className = 'course-top'; top.textContent = course.tag;
-    const visual = document.createElement('div'); visual.className = 'course-visual';
-    const image = document.createElement('img'); image.src = course.image; image.alt = ''; image.width = 720; image.height = 480; image.loading = 'lazy'; image.decoding = 'async'; visual.append(image);
-    const title = document.createElement('h3'); title.textContent = course.name;
-    if (course.subtitle) { const subtitle = document.createElement('span'); subtitle.className = 'course-subtitle'; subtitle.textContent = course.subtitle; title.append(subtitle); }
-    const description = document.createElement('p'); description.textContent = course.description;
-    const list = document.createElement('ul'); list.className = 'course-details';
-    course.skills.forEach(skill => { const li = document.createElement('li'); li.textContent = skill; list.append(li); });
-    const bottom = document.createElement('div'); bottom.className = 'course-bottom';
-    const cost = document.createElement('div'); cost.className = 'course-price';
-    const amount = document.createElement('strong'); amount.textContent = `${money(course.price)} сум`;
-    const period = document.createElement('span'); period.textContent = 'в месяц'; cost.append(amount,period);
-    const link = document.createElement('a'); link.href = course.target || '#prices'; link.textContent = '↗'; link.setAttribute('aria-label', `Подробнее: ${course.name}${course.subtitle ? ' ' + course.subtitle : ''}`);
-    bottom.append(cost, link); card.style.setProperty('--card-delay', `${Math.min(index, 5) * 35}ms`); card.append(top,title,visual,description,list,bottom); grid.append(card);
+const courseStatus = document.createElement('p');
+courseStatus.id = 'course-filter-status';
+courseStatus.className = 'sr-only';
+courseStatus.setAttribute('role', 'status');
+courseStatus.setAttribute('aria-live', 'polite');
+courseStatus.setAttribute('aria-atomic', 'true');
+grid.after(courseStatus);
+
+function renderCourses(filter = 'all', announcementLabel = '') {
+  const courses = schoolContent.courses.filter(course => filter === 'all' || course.category === filter);
+  const fragment = document.createDocumentFragment();
+
+  courses.forEach((course, index) => {
+    const card = document.createElement('article');
+    card.className = `course-card ${course.category}`;
+    card.style.setProperty('--card-delay', `${Math.min(index, 5) * 35}ms`);
+
+    const title = document.createElement('h3');
+    title.textContent = course.name;
+    if (course.subtitle) {
+      const subtitle = document.createElement('span');
+      subtitle.className = 'course-subtitle';
+      subtitle.textContent = course.subtitle;
+      title.append(subtitle);
+    }
+
+    const visual = document.createElement('div');
+    visual.className = 'course-visual';
+    const image = document.createElement('img');
+    image.src = course.image;
+    image.alt = '';
+    image.width = 720;
+    image.height = 480;
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    visual.append(image);
+
+    const description = document.createElement('p');
+    description.textContent = course.description;
+
+    const more = document.createElement('details');
+    more.className = 'course-more';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Программа курса';
+    const indicator = document.createElement('span');
+    indicator.setAttribute('aria-hidden', 'true');
+    indicator.textContent = '+';
+    summary.append(indicator);
+    const list = document.createElement('ul');
+    list.className = 'course-details';
+    course.skills.forEach(skill => {
+      const item = document.createElement('li');
+      item.textContent = skill;
+      list.append(item);
+    });
+    more.append(summary, list);
+
+    const bottom = document.createElement('div');
+    bottom.className = 'course-bottom';
+    const cost = document.createElement('div');
+    cost.className = 'course-price';
+    const amount = document.createElement('strong');
+    amount.textContent = `${money(course.price)} сум`;
+    const period = document.createElement('span');
+    period.textContent = 'в месяц';
+    cost.append(amount, period);
+    const link = document.createElement('a');
+    link.href = course.target || '#prices';
+    link.textContent = '↗';
+    link.setAttribute('aria-label', `Подробнее: ${[course.name, course.subtitle].filter(Boolean).join(' ')}`);
+
+    bottom.append(cost, link);
+    card.append(title, visual, description, more, bottom);
+    fragment.append(card);
   });
+
+  grid.replaceChildren(fragment);
+  if (announcementLabel) {
+    courseStatus.textContent = `${announcementLabel}. Показано программ: ${courses.length}.`;
+  }
 }
 renderCourses();
 const priceRows = document.querySelector('#price-rows');
@@ -34,8 +95,13 @@ schoolContent.courses.forEach((course,index) => {
   row.append(title,price); priceRows.append(row);
 });
 
-document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => {
-  document.querySelectorAll('[data-filter]').forEach(item => { item.classList.toggle('active', item === button); item.setAttribute('aria-pressed', String(item === button)); }); renderCourses(button.dataset.filter);
+const filterButtons = [...document.querySelectorAll('[data-filter]')];
+filterButtons.forEach(button => button.addEventListener('click', () => {
+  filterButtons.forEach(item => {
+    item.classList.toggle('active', item === button);
+    item.setAttribute('aria-pressed', String(item === button));
+  });
+  renderCourses(button.dataset.filter, button.textContent.trim());
 }));
 document.querySelectorAll('[data-location]').forEach(button => button.addEventListener('click', () => {
   document.querySelectorAll('[data-location]').forEach(item => { item.classList.toggle('active', item === button); item.setAttribute('aria-pressed', String(item === button)); });
