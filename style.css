@@ -2980,7 +2980,7 @@ details,
 
 .clubs-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 25px;
 }
 
@@ -3351,49 +3351,9 @@ h2,
   margin-block: 10px;
 }
 
-.mock-panel {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 22px;
-  margin-top: 20px;
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-card);
-  backdrop-filter: blur(16px);
-}
-
-.mock-mark {
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  flex-shrink: 0;
-  border-radius: var(--radius-control);
-  background: #e9cb7630;
-  color: #97711f;
-  font-size: 25px;
-  font-weight: 700;
-  letter-spacing: -1px;
-}
-
-.mock-copy {
-  flex: 1;
-}
-
-.mock-copy h3 {
-  margin: 0 0 6px;
-  font-size: 20px;
-}
-
-.mock-copy p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.75;
-  color: var(--muted);
-}
-
 .mock-frequency {
+  display: inline-flex;
+  margin-top: 16px;
   padding: 9px 13px;
   border-radius: 30px;
   background: #e9cb7624;
@@ -3492,10 +3452,6 @@ footer {
   --surface-border: #ffffff16;
 }
 
-[data-theme="dark"] .mock-mark {
-  color: #dfbb67;
-}
-
 @media (min-width: 1001px) and (max-width: 1150px) {
   .header > .small { display: none; }
 }
@@ -3561,10 +3517,6 @@ footer {
   .teacher { width: 250px; flex-basis: 250px; }
   .portrait { height: 240px; }
   .club-copy { padding: 20px; }
-  .mock-panel { padding: 18px; gap: 14px; flex-wrap: wrap; }
-  .mock-mark { width: 44px; height: 44px; font-size: 22px; }
-  .mock-copy { flex-basis: calc(100% - 60px); }
-  .mock-frequency { margin-left: 58px; }
   .clubs-bottom p { order: initial; flex-basis: 100%; }
   .branch-map { min-height: 240px; }
   .reveal { translate: 0 6px; }

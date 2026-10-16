@@ -11,7 +11,7 @@
     <script>
       try{const t=localStorage.getItem('stanford-theme');document.documentElement.dataset.theme=t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}catch{document.documentElement.dataset.theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
     </script>
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
   </head>
   <body>
     <a class="skip" href="#main">
@@ -526,14 +526,17 @@
               <p>Смотри фильмы на английском, разбирай выражения и обсуждай сюжет.</p>
             </div>
           </article>
-        </div>
-        <div class="mock-panel">
-          <span class="mock-mark" aria-hidden="true">02</span>
-          <div class="mock-copy">
-            <h3>Mock test</h3>
-            <p>Пробные тесты два раза в неделю. Проверь знания и оцени готовность к экзамену.</p>
-          </div>
-          <span class="mock-frequency">2 раза в неделю</span>
+          <article class="club-card">
+            <div class="club-visual">
+              <img src="assets/clubs/mock-test.jpg" width="800" height="533" loading="lazy" decoding="async" alt="Материалы для пробного теста с логотипом Stanford">
+            </div>
+            <div class="club-copy">
+              <span class="club-category">ПРОБНЫЕ ТЕСТЫ</span>
+              <h3>Mock test</h3>
+              <p>Проверь знания и оцени готовность к экзамену.</p>
+              <span class="mock-frequency">2 раза в неделю</span>
+            </div>
+          </article>
         </div>
         <div class="clubs-bottom">
           <p>Точные даты Speaking Club, Movie Club и mock-тестов уточняй у администратора.</p>
