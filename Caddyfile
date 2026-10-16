@@ -1,0 +1,19 @@
+{
+	admin off
+	persist_config off
+	auto_https off
+}
+
+:{$PORT:8080} {
+	root * /srv
+	encode zstd gzip
+
+	header X-Content-Type-Options nosniff
+	header Referrer-Policy strict-origin-when-cross-origin
+
+	@mutable path / /index.html /content.js /script.js /style.css
+	header @mutable Cache-Control no-cache
+
+	respond /healthz "ok" 200
+	file_server
+}

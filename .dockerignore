@@ -1,0 +1,16 @@
+**
+!Dockerfile
+!Caddyfile
+!index.html
+!content.js
+!script.js
+!style.css
+!assets/
+!assets/**
+
+assets/courses/*.png
+assets/courses/IMAGE_PROMPTS.md
+assets/clubs/*.png
+assets/clubs/*PROMPT*.md
+**/*.zip
+**/*.rar
