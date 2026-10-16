@@ -8,6 +8,11 @@
   --accent: #ffb703;
   --muted: #767a72;
   --border: #242a2015;
+  --radius-card: 22px;
+  --radius-control: 14px;
+  --surface: linear-gradient(135deg, #ffffff85, #ffffff38);
+  --surface-border: #ffffffb0;
+  --ease: cubic-bezier(.2, .7, .2, 1);
 }
 
 * {
@@ -2431,7 +2436,7 @@ body {
 }
 
 .course-card:hover {
-  translate: 0 -4px;
+  translate: 0 -2px;
   box-shadow: inset 0 1px 0 #ffffffa0,0 18px 40px #2531180a;
 }
 
@@ -2470,7 +2475,7 @@ body {
 }
 
 .course-details {
-  margin-top: auto;
+  margin-top: 12px;
 }
 
 .course-bottom {
@@ -2513,8 +2518,8 @@ details,
 
 .reveal {
   opacity: 0;
-  translate: 0 15px;
-  transition: opacity .6s ease,translate .6s ease;
+  translate: 0 8px;
+  transition: opacity .4s var(--ease),translate .4s var(--ease);
 }
 
 .reveal.is-revealed {
@@ -2968,7 +2973,7 @@ details,
   }
 }
 
-/* Sunday clubs. */
+/* Clubs and practice. */
 .clubs-section {
   padding-top: 18px;
 }
@@ -2991,7 +2996,7 @@ details,
 }
 
 .club-card:hover {
-  translate: 0 -4px;
+  translate: 0 -2px;
   box-shadow: 0 20px 45px #2531180c;
 }
 
@@ -3046,16 +3051,6 @@ details,
   flex-wrap: wrap;
 }
 
-.club-day {
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.club-day span {
-  color: #b38b28;
-  margin-right: 7px;
-}
-
 .clubs-bottom p {
   font-size: 10px;
   color: var(--muted);
@@ -3067,10 +3062,6 @@ details,
   background: linear-gradient(135deg, #ffffff09, #ffffff03);
   border-color: #ffffff13;
   box-shadow: inset 0 1px 0 #ffffff07, 0 15px 40px #0001;
-}
-
-[data-theme="dark"] .club-day span {
-  color: #dfbb67;
 }
 
 @media (max-width: 700px) {
@@ -3105,4 +3096,481 @@ details,
   .club-card:hover .club-visual img {
     scale: 1;
   }
+}
+
+/* Shared proportions and surfaces across the landing page. */
+.wrap {
+  max-width: 1240px;
+  padding-inline: clamp(20px, 3.4vw, 40px);
+}
+
+.header {
+  position: relative;
+  z-index: 20;
+  height: 88px;
+  padding-inline: 24px;
+  border-radius: var(--radius-card);
+}
+
+.skip {
+  z-index: 110;
+}
+
+.header .brand {
+  width: 108px;
+}
+
+nav {
+  gap: clamp(14px, 1.8vw, 24px);
+  white-space: nowrap;
+}
+
+nav a {
+  position: relative;
+}
+
+nav a::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  scale: 0 1;
+  transform-origin: left;
+  transition: scale .2s var(--ease);
+}
+
+nav a:is(:hover, :focus-visible, [aria-current])::after {
+  scale: 1 1;
+}
+
+.button {
+  padding: 15px 21px;
+  border-radius: var(--radius-control);
+}
+
+.hero {
+  min-height: 480px;
+  padding-block: 32px 40px;
+  gap: 32px;
+}
+
+.hero h1 {
+  font-size: clamp(36px, 4.25vw, 57px);
+  letter-spacing: -.055em;
+  margin-block: 22px;
+  text-wrap: balance;
+}
+
+.hero-scene {
+  height: 320px;
+}
+
+.actions {
+  margin-top: 24px;
+}
+
+.quick-nav a {
+  padding-block: 17px;
+}
+
+.quick-nav small {
+  margin-top: 5px;
+}
+
+.section,
+.section:is(.clubs-section, .exam-section, .pricing-section, .faq) {
+  padding-block: 52px;
+}
+
+.section-top {
+  margin-bottom: 24px;
+  gap: 24px;
+}
+
+h2,
+.section-top h2,
+.about-layout h2,
+.method-panel h2 {
+  font-size: clamp(30px, 3.2vw, 38px);
+  line-height: 1.2;
+  letter-spacing: -.045em;
+  margin-top: 12px;
+}
+
+.section-top > p {
+  max-width: 34ch;
+  margin-bottom: 2px;
+}
+
+.about-layout {
+  gap: 40px;
+}
+
+.about-facts {
+  margin-top: 18px;
+  padding-top: 14px;
+}
+
+.about-facts strong {
+  font-size: 36px;
+}
+
+.benefits-grid {
+  gap: 22px;
+  margin-top: 28px;
+}
+
+.benefits-grid article {
+  padding-top: 16px;
+}
+
+.benefits-grid h3 {
+  margin-block: 10px;
+  font-size: 17px;
+}
+
+.courses-section {
+  border-radius: 28px;
+}
+
+.course-grid,
+.clubs-grid,
+.exam-grid {
+  gap: 20px;
+}
+
+.course-card,
+.club-card,
+.exam-panel,
+.branch-panel {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border-color: var(--surface-border);
+}
+
+.course-card {
+  padding: 20px;
+}
+
+.course-top {
+  min-height: 0;
+}
+
+.course-card h3 {
+  font-size: 22px;
+  line-height: 1.3;
+  margin-block: 12px;
+}
+
+.course-visual {
+  height: 150px;
+  margin-bottom: 14px;
+  border-radius: var(--radius-control);
+}
+
+.course-details {
+  margin: 10px 0 18px;
+}
+
+.course-details li {
+  padding-block: 7px;
+}
+
+.course-bottom {
+  padding-top: 14px;
+}
+
+.method-panel {
+  grid-template-columns: .8fr 1.5fr;
+  gap: 36px;
+  padding: 32px;
+  border-radius: var(--radius-card);
+}
+
+.journey {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 20px;
+}
+
+.journey::before {
+  display: none;
+}
+
+.journey article {
+  margin: 0;
+  gap: 12px;
+}
+
+.journey article > span {
+  width: 32px;
+  height: 32px;
+}
+
+.method-panel .journey h3 {
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 4px 0 7px;
+}
+
+.journey p {
+  line-height: 1.75;
+}
+
+.teacher {
+  width: 280px;
+  flex-basis: 280px;
+}
+
+.portrait {
+  height: 260px;
+  border-radius: var(--radius-card);
+}
+
+.teacher-info {
+  padding-block: 16px 6px;
+}
+
+.teacher-info > span {
+  top: 20px;
+}
+
+.teacher-info h3 {
+  font-size: 15px;
+  padding-right: 25px;
+}
+
+.club-copy {
+  padding: 22px;
+}
+
+.club-copy h3 {
+  font-size: 24px;
+  margin-block: 10px;
+}
+
+.mock-panel {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 22px;
+  margin-top: 20px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-card);
+  backdrop-filter: blur(16px);
+}
+
+.mock-mark {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  flex-shrink: 0;
+  border-radius: var(--radius-control);
+  background: #e9cb7630;
+  color: #97711f;
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.mock-copy {
+  flex: 1;
+}
+
+.mock-copy h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.mock-copy p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+.mock-frequency {
+  padding: 9px 13px;
+  border-radius: 30px;
+  background: #e9cb7624;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.clubs-bottom {
+  margin-top: 16px;
+}
+
+.clubs-bottom p {
+  font-size: 12px;
+}
+
+.exam-panel {
+  padding: 24px;
+}
+
+.exam-heading {
+  margin-bottom: 16px;
+}
+
+.exam-skills {
+  gap: 10px;
+  margin-block: 18px;
+}
+
+.exam-skills > div {
+  padding: 13px;
+  border-radius: var(--radius-control);
+}
+
+.branch-panel {
+  padding: 28px;
+}
+
+.branches button {
+  padding: 15px;
+  border-radius: var(--radius-control);
+}
+
+.branch-content {
+  margin-top: 22px;
+  gap: 24px;
+}
+
+.branch-map {
+  min-height: 270px;
+  border-radius: var(--radius-control);
+}
+
+details {
+  padding: 18px;
+  border-radius: var(--radius-control);
+  margin-bottom: 10px;
+}
+
+summary {
+  min-height: 24px;
+}
+
+summary b {
+  transition: transform .2s var(--ease);
+}
+
+details[open] > :not(summary) {
+  animation: detail-enter .24s var(--ease);
+}
+
+.question-mark {
+  display: none;
+}
+
+footer {
+  padding-top: 34px;
+  border-radius: 28px 28px 0 0;
+}
+
+.footer-main small {
+  margin-bottom: 18px;
+}
+
+.footer-main > div > a:not(.brand) {
+  margin-bottom: 13px;
+}
+
+@keyframes detail-enter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+[data-theme="dark"] {
+  --surface: linear-gradient(135deg, #ffffff09, #ffffff03);
+  --surface-border: #ffffff16;
+}
+
+[data-theme="dark"] .mock-mark {
+  color: #dfbb67;
+}
+
+@media (min-width: 1001px) and (max-width: 1150px) {
+  .header > .small { display: none; }
+}
+
+@media (max-width: 1000px) {
+  .method-panel { grid-template-columns: 1fr; gap: 28px; }
+  .method-panel > div > p { margin-block: 16px; }
+}
+
+@media (max-width: 900px) {
+  .header { gap: 14px; }
+  .header .theme-toggle { margin-left: auto; }
+  .menu {
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: #ffffff60;
+    color: var(--ink);
+  }
+  nav {
+    display: none;
+    position: absolute;
+    inset: calc(100% + 10px) 0 auto;
+    padding: 14px 20px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--surface-border);
+    background: #f5f5f0f5;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 15px 30px #0001;
+  }
+  nav.open { display: flex; flex-direction: column; gap: 0; animation: detail-enter .2s var(--ease); }
+  nav a { padding-block: 14px; }
+  nav a::after { bottom: 8px; }
+  [data-theme="dark"] nav { background: #242b23f5; }
+}
+
+@media (max-width: 700px) {
+  .header { height: 76px; padding-inline: 16px; }
+  .header .brand { width: 94px; }
+  .hero { min-height: 0; padding-block: 30px; gap: 24px; }
+  .hero h1 { font-size: clamp(34px, 8.4vw, 48px); }
+  .hero-scene { height: 220px; margin-top: 0; }
+  .quick-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .quick-nav a { padding: 14px 10px; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius-control); }
+  .quick-nav a + a { border-top: 1px solid var(--border); }
+  .quick-nav a > div { font-size: 11px; }
+  .quick-nav a > span, .quick-nav small { display: none; }
+  .quick-nav b { font-size: 15px; }
+  .section,
+  .section:is(.clubs-section, .exam-section, .pricing-section, .faq) { padding-block: 36px; }
+  .section-top { margin-bottom: 22px; }
+  .section-top > p { margin-top: 14px; max-width: none; }
+  .section-top > p br { display: none; }
+  .about-layout { gap: 8px; }
+  .benefits-grid { gap: 20px; margin-top: 24px; }
+  .method-panel, .branch-panel { padding: 22px; }
+  .journey { grid-template-columns: 1fr; gap: 18px; }
+  .course-card, .exam-panel { padding: 20px; }
+  .course-visual { height: 165px; }
+  .course-card h3 { font-size: 22px; }
+  .course-price strong { font-size: 21px; }
+  .teacher { width: 250px; flex-basis: 250px; }
+  .portrait { height: 240px; }
+  .club-copy { padding: 20px; }
+  .mock-panel { padding: 18px; gap: 14px; flex-wrap: wrap; }
+  .mock-mark { width: 44px; height: 44px; font-size: 22px; }
+  .mock-copy { flex-basis: calc(100% - 60px); }
+  .mock-frequency { margin-left: 58px; }
+  .clubs-bottom p { order: initial; flex-basis: 100%; }
+  .branch-map { min-height: 240px; }
+  .reveal { translate: 0 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { translate: none; }
+  .teacher { width: auto; }
 }

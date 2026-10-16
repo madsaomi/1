@@ -44,10 +44,46 @@ document.querySelectorAll('[data-location]').forEach(button => button.addEventLi
   document.querySelector('#map-selection').textContent = `Филиал 0${Number(button.dataset.location)+1}`;
 }));
 const menu = document.querySelector('.menu');
-function closeMenu(){menu.setAttribute('aria-expanded','false');document.querySelector('nav').classList.remove('open');}
-menu.addEventListener('click', () => { const open = menu.getAttribute('aria-expanded') !== 'true'; menu.setAttribute('aria-expanded', String(open)); document.querySelector('nav').classList.toggle('open',open); });
-document.querySelectorAll('nav a').forEach(link => link.addEventListener('click',closeMenu));
-document.addEventListener('keydown', event => {if(event.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true'){closeMenu();menu.focus();}});
+const navigation = document.querySelector('#navigation');
+const menuViewport = matchMedia('(max-width: 900px)');
+function setMenu(open) {
+  menu.setAttribute('aria-expanded', String(open));
+  menu.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+  menu.textContent = open ? '×' : '☰';
+  navigation.classList.toggle('open', open);
+}
+function closeMenu() { setMenu(false); }
+menu.addEventListener('click', event => {
+  const open = menu.getAttribute('aria-expanded') !== 'true';
+  setMenu(open);
+  if (open && event.detail === 0) navigation.querySelector('a')?.focus();
+});
+navigation.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
+document.addEventListener('pointerdown', event => {
+  if (!navigation.contains(event.target) && !menu.contains(event.target)) closeMenu();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true') {
+    closeMenu();
+    menu.focus();
+  }
+});
+menuViewport.addEventListener('change', closeMenu);
+
+// Mark the section currently being read in the main navigation.
+const sectionLinks = [...navigation.querySelectorAll('a[href^="#"]')];
+const navigationObserver = new IntersectionObserver(entries => {
+  const current = entries.find(entry => entry.isIntersecting);
+  if (!current) return;
+  sectionLinks.forEach(link => {
+    if (link.hash === `#${current.target.id}`) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  });
+}, { rootMargin: '-12% 0px -65% 0px', threshold: 0 });
+sectionLinks.forEach(link => {
+  const section = document.querySelector(link.hash);
+  if (section) navigationObserver.observe(section);
+});
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 // Apply themes; storage is optional in file previews and restricted browsers.
