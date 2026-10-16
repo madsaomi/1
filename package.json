@@ -1,0 +1,9 @@
+{
+  "name": "stanford-language-center",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static Stanford Language Center landing page",
+  "scripts": {
+    "check": "node --check script.js && node --check content.js"
+  }
+}

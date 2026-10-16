@@ -1,0 +1,26 @@
+# Local tools and operating-system files
+node_modules/
+coverage/
+.cache/
+.vscode/
+.idea/
+.codex/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# Local environment and private configuration
+.env
+.env.*
+!.env.example
+
+# Source artwork, preview captures and archives
+brand-source/
+preview/
+assets/courses/*.png
+assets/courses/IMAGE_PROMPTS.md
+assets/clubs/*.png
+assets/clubs/IMAGE_PROMPTS.md
+*.zip
+*.rar
