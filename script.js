@@ -138,17 +138,32 @@ menuViewport.addEventListener('change', closeMenu);
 
 // Mark the section currently being read in the main navigation.
 const sectionLinks = [...navigation.querySelectorAll('a[href^="#"]')];
-const navigationObserver = new IntersectionObserver(entries => {
-  const current = entries.find(entry => entry.isIntersecting);
-  if (!current) return;
+let navigationObserver;
+let navigationResizeFrame = 0;
+function observeNavigation() {
+  navigationObserver?.disconnect();
+  const top = Math.round(window.innerHeight * .12);
+  const bottom = Math.round(window.innerHeight * .65);
+  navigationObserver = new IntersectionObserver(entries => {
+    const current = entries.find(entry => entry.isIntersecting);
+    if (!current) return;
+    sectionLinks.forEach(link => {
+      if (link.hash === `#${current.target.id}`) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+  }, { rootMargin: `-${top}px 0px -${bottom}px 0px`, threshold: 0 });
   sectionLinks.forEach(link => {
-    if (link.hash === `#${current.target.id}`) link.setAttribute('aria-current', 'location');
-    else link.removeAttribute('aria-current');
+    const section = document.querySelector(link.hash);
+    if (section) navigationObserver.observe(section);
   });
-}, { rootMargin: '-12% 0px -65% 0px', threshold: 0 });
-sectionLinks.forEach(link => {
-  const section = document.querySelector(link.hash);
-  if (section) navigationObserver.observe(section);
+}
+observeNavigation();
+window.addEventListener('resize', () => {
+  if (navigationResizeFrame) return;
+  navigationResizeFrame = requestAnimationFrame(() => {
+    navigationResizeFrame = 0;
+    observeNavigation();
+  });
 });
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
