@@ -1,6 +1,6 @@
 # PLAN-032 — Проверка накопленных изменений и push
 
-Дата: 2026-10-27. Автор: Codex. Статус: ПРОВЕРЕНО, COMMIT/PUSH ГОТОВИТСЯ; GITHUB DNS НЕДОСТУПЕН. Владелец явно разрешил проверку и push.
+Дата: 2026-10-27. Автор: Codex. Статус: ПРОВЕРЕНО И ЗАКОММИЧЕНО; PUSH НЕ УДАЛСЯ — GITHUB DNS НЕДОСТУПЕН. Владелец явно разрешил проверку и push.
 
 ## 1. Цель и контекст
 Проверить накопленные изменения Stanford и отправить в существующий origin/main без force. Не заявлять пройденную browser-приемку: прежний отказ локального доступа сохраняется. Все48тестов уже проходят, но pre-push review обнаружил release blocker: Dockerfile ожидает theme-init.js/robots.txt, а существующий default-deny .dockerignore не включает их в build context.
@@ -21,7 +21,8 @@
 - [x] Исправить build-context blocker и git hygiene, описать BUG-022 и проверить точный diff.
 - [x] Проверить HTML/палитру,49тестов, syntax/build/current, Python compile/integrity, наличие секретов в кандидате commit; проверить доступность Docker/Caddy без установки.
 - [x] Подготовить staged-набор, проверить чистый экспорт с LF и отсутствие артефактов; попытки чтения remote main завершились DNS-ошибкой.
-- [ ] Сохранить отчет/историю, выполнить обычный push origin main; подтвердить remote SHA и проверить CI при доступности.
+- [x] Сохранить отчет/уникальную историю08 и commit ba2f5a6 с182файлами; выполнить обычный push origin main (exit1 DNS).
+- [ ] После восстановления DNS подтвердить успешный push/remote SHA/CI. Не считать текущую попытку отправкой.
 
 ## 4. Риски и откат
 Default-deny Docker context должен соответствовать root COPY. Разрешены толькоtheme-init.js/robots.txt, остальное сохраняется побайтно. Существующие protected Dockerfile/Caddyfile/Railway/content не менять; новый тест .dockerignore сравнивает с исходным baseline плюс строго заданный минимальный diff. Не затирать чужие commits или рабочие изменения, не force-push, не обходить denied browser. Не публиковать .env/ключи, .playwright-mcp и __pycache__. При расходящемся main безопасно согласовать историю без reset/force. Откат опубликованной версии — отдельный revert commit, только при необходимости; не делать автоматически.
