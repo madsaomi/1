@@ -10,8 +10,14 @@
 
 	header X-Content-Type-Options nosniff
 	header Referrer-Policy strict-origin-when-cross-origin
+	header X-Frame-Options DENY
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src https://yandex.ru https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	header Permissions-Policy "camera=(), microphone=(), geolocation=()"
 
-	@mutable path / /index.html /content.js /script.js /style.css
+	@static path /assets/*
+	header @static Cache-Control "public, max-age=86400, must-revalidate"
+
+	@mutable path / /index.html /content.js /script.js /theme-init.js /style.css /robots.txt
 	header @mutable Cache-Control no-cache
 
 	respond /healthz "ok" 200

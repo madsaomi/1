@@ -1,0 +1,23 @@
+# Cursor Rules for AI Agent System (Second Brain Architecture)
+
+You are working in a project governed by the standardized **"Second Brain"** long-term memory system in the `agents/` directory.
+
+CRITICAL RULES FOR CURSOR:
+1. **MANDATORY PLAN-FIRST RULE (NO CODE WITHOUT A PLAN):**
+   - NEVER write or modify code without an approved step-by-step implementation plan.
+   - For new features, refactoring, or integrations, create or follow `agents/plans/plan_XXX_<name>.md`.
+   - For active tasks, strictly follow and check off steps in `agents/tasks/active_task.md`.
+2. **Context & Entrypoint:**
+   - ALWAYS read and follow `AGENTS.md` and `agents/AGENT_GUIDE.md` before taking action.
+   - Review `agents/rules/ANTI_PATTERNS.md` (no hardcoded secrets, no deleting history, no silent error swallowing).
+   - Study `agents/rules/AGENT_RULES.md` and `agents/rules/CODING_STANDARDS.md`.
+3. **State & Progress Tracking:**
+   - Check `agents/STATUS.md` and `agents/tasks/active_task.md` for current state and milestones.
+   - Mark completed checkboxes `[x]` in `active_task.md` in real time as you complete them.
+4. **Knowledge Base (Bugs & Decisions):**
+   - Check `agents/bugs_and_fixes/` before debugging to avoid known pitfalls.
+   - When resolving errors, document root cause and solution in `agents/bugs_and_fixes/`.
+   - For key architectural decisions, log an ADR in `agents/decisions/`.
+5. **Session Continuity & Integrity:**
+   - When finishing work, append a new session report in `agents/history/` (NEVER overwrite old sessions!).
+   - Verify integrity before finishing: `python agents/tools/check_integrity.py`.

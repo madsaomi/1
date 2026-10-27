@@ -9,6 +9,9 @@ coverage/
 Thumbs.db
 desktop.ini
 *.log
+__pycache__/
+*.py[cod]
+.playwright-mcp/
 
 # Local environment and private configuration
 .env

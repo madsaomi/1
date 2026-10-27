@@ -1,0 +1,18 @@
+# Windsurf (Cascade) Rules for AI Agent System
+
+This workspace operates under the standardized **"Second Brain"** architecture in the `agents/` directory.
+
+CRITICAL INSTRUCTIONS:
+1. **PLAN-FIRST PRINCIPLE (MANDATORY):**
+   - NEVER generate or modify code without a detailed implementation plan.
+   - Plans must reside in `agents/plans/` (following `agents/templates/template_plan.md`) or be broken down into atomic steps in `agents/tasks/active_task.md`.
+   - Do not write code until the plan, affected files, risks, and verification steps are established.
+2. **Context First:**
+   - Always read `AGENTS.md` and `agents/AGENT_GUIDE.md` before starting any task.
+   - Review `agents/rules/ANTI_PATTERNS.md` to avoid common traps (hardcoded secrets, unhandled exceptions, breaking existing functionality).
+3. **Execution & Tracking:**
+   - Track work in real-time in `agents/tasks/active_task.md` by marking checkboxes `[x]`.
+   - Before troubleshooting, check `agents/bugs_and_fixes/` for known solutions. Document any newly encountered issues and their fixes there.
+4. **Wrap-up:**
+   - Append session logs to `agents/history/` upon task completion (never overwrite previous logs).
+   - Validate structure by running `python agents/tools/check_integrity.py`.

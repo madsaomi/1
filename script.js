@@ -1,258 +1,256 @@
-const grid = document.querySelector('#course-grid');
+// Progressive enhancement: programs and prices remain available without JavaScript.
+const content = window.schoolContent;
 const money = value => new Intl.NumberFormat('ru-RU').format(value);
-const courseStatus = document.createElement('p');
-courseStatus.id = 'course-filter-status';
-courseStatus.className = 'sr-only';
-courseStatus.setAttribute('role', 'status');
-courseStatus.setAttribute('aria-live', 'polite');
-courseStatus.setAttribute('aria-atomic', 'true');
-grid.after(courseStatus);
-
-function renderCourses(filter = 'all', announcementLabel = '') {
-  const courses = schoolContent.courses.filter(course => filter === 'all' || course.category === filter);
-  const fragment = document.createDocumentFragment();
-
-  courses.forEach((course, index) => {
-    const card = document.createElement('article');
-    card.className = `course-card ${course.category}`;
-    card.style.setProperty('--card-delay', `${Math.min(index, 5) * 35}ms`);
-
-    const title = document.createElement('h3');
-    title.textContent = course.name;
-    if (course.subtitle) {
-      const subtitle = document.createElement('span');
-      subtitle.className = 'course-subtitle';
-      subtitle.textContent = course.subtitle;
-      title.append(subtitle);
-    }
-
-    const visual = document.createElement('div');
-    visual.className = 'course-visual';
-    const image = document.createElement('img');
-    image.src = course.image;
-    image.alt = '';
-    image.width = 720;
-    image.height = 480;
-    image.loading = 'lazy';
-    image.decoding = 'async';
-    visual.append(image);
-
-    const description = document.createElement('p');
-    description.textContent = course.description;
-
-    const more = document.createElement('details');
-    more.className = 'course-more';
-    const summary = document.createElement('summary');
-    summary.textContent = 'Программа курса';
-    const indicator = document.createElement('span');
-    indicator.setAttribute('aria-hidden', 'true');
-    indicator.textContent = '+';
-    summary.append(indicator);
-    const list = document.createElement('ul');
-    list.className = 'course-details';
-    course.skills.forEach(skill => {
-      const item = document.createElement('li');
-      item.textContent = skill;
-      list.append(item);
-    });
-    more.append(summary, list);
-
-    const bottom = document.createElement('div');
-    bottom.className = 'course-bottom';
-    const cost = document.createElement('div');
-    cost.className = 'course-price';
-    const amount = document.createElement('strong');
-    amount.textContent = `${money(course.price)} сум`;
-    const period = document.createElement('span');
-    period.textContent = 'в месяц';
-    cost.append(amount, period);
-    const link = document.createElement('a');
-    link.href = course.target || '#prices';
-    link.textContent = '↗';
-    link.setAttribute('aria-label', `Подробнее: ${[course.name, course.subtitle].filter(Boolean).join(' ')}`);
-
-    bottom.append(cost, link);
-    card.append(title, visual, description, more, bottom);
-    fragment.append(card);
+const filters = [...document.querySelectorAll('[data-filter]')];
+const cards = [...document.querySelectorAll('[data-course-id]')];
+const courseStatus = document.querySelector('#course-filter-status');
+const resetFilter = document.querySelector('#reset-filter');
+function filterCourses(category, label) {
+  let count = 0;
+  cards.forEach(card => {
+    card.hidden = category !== 'all' && card.dataset.category !== category;
+    if (!card.hidden) count++;
   });
-
-  grid.replaceChildren(fragment);
-  if (announcementLabel) {
-    courseStatus.textContent = `${announcementLabel}. Показано программ: ${courses.length}.`;
-  }
+  filters.forEach(button => {
+    const active = button.dataset.filter === category;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  courseStatus.textContent = `${label}. Программ: ${count}.`;
+  resetFilter.hidden = category === "all";
 }
-renderCourses();
-const priceRows = document.querySelector('#price-rows');
-schoolContent.courses.forEach((course,index) => {
-  const row = document.createElement('tr');
-  const title = document.createElement('th'); title.scope = 'row'; title.textContent = [course.name,course.subtitle].filter(Boolean).join(' ');
-  const price = document.createElement('td');
-  const amount = document.createElement('span'); amount.textContent = money(course.price); price.append(amount);
-  if (course.specialPrice) {
-    const hint = document.createElement('button'); hint.type = 'button'; hint.className = 'price-info'; hint.dataset.discount = String(index); hint.textContent = 'ⓘ';
-    hint.setAttribute('aria-label', `Скидки: ${title.textContent}`); hint.setAttribute('aria-describedby','discount-tooltip'); hint.setAttribute('aria-expanded','false'); price.append(hint);
-  }
-  row.append(title,price); priceRows.append(row);
+resetFilter.addEventListener('click', () => {
+  filterCourses('all', 'Все программы');
+  filters.find(button => button.dataset.filter === 'all')?.focus();
 });
+filters.forEach(button => button.addEventListener('click', () => filterCourses(button.dataset.filter, button.dataset.filterLabel || button.textContent.trim())));
+document.querySelectorAll('[data-goal]').forEach(link => link.addEventListener('click', () => {
+  const filter = filters.find(button => button.dataset.filter === link.dataset.goal);
+  if (filter) filterCourses(filter.dataset.filter, filter.dataset.filterLabel || filter.textContent.trim());
+}));
 
-const filterButtons = [...document.querySelectorAll('[data-filter]')];
-filterButtons.forEach(button => button.addEventListener('click', () => {
-  filterButtons.forEach(item => {
-    item.classList.toggle('active', item === button);
-    item.setAttribute('aria-pressed', String(item === button));
-  });
-  renderCourses(button.dataset.filter, button.textContent.trim());
-}));
-document.querySelectorAll('[data-location]').forEach(button => button.addEventListener('click', () => {
-  document.querySelectorAll('[data-location]').forEach(item => { item.classList.toggle('active', item === button); item.setAttribute('aria-pressed', String(item === button)); });
-  document.querySelector('#branch-name').textContent = `Филиал 0${Number(button.dataset.location)+1}`;
-  document.querySelector('#location-detail').textContent = schoolContent.locations[Number(button.dataset.location)];
-  document.querySelector('#map-selection').textContent = `Филиал 0${Number(button.dataset.location)+1}`;
-}));
 const menu = document.querySelector('.menu');
 const navigation = document.querySelector('#navigation');
-const menuViewport = matchMedia('(max-width: 900px)');
-function setMenu(open) {
-  menu.setAttribute('aria-expanded', String(open));
-  menu.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
-  menu.textContent = open ? '×' : '☰';
-  navigation.classList.toggle('open', open);
+const menuViewport = matchMedia('(max-width: 1050px)');
+function closeMenu() {
+  menu.setAttribute('aria-expanded', 'false');
+  menu.setAttribute('aria-label', 'Открыть меню');
+  navigation.classList.remove('open');
 }
-function closeMenu() { setMenu(false); }
 menu.addEventListener('click', event => {
-  const open = menu.getAttribute('aria-expanded') !== 'true';
-  setMenu(open);
-  if (open && event.detail === 0) navigation.querySelector('a')?.focus();
+  if (menu.getAttribute('aria-expanded') === 'true') return closeMenu();
+  menu.setAttribute('aria-expanded', 'true');
+  menu.setAttribute('aria-label', 'Закрыть меню');
+  navigation.classList.add('open');
+  if (event.detail === 0) navigation.querySelector('a')?.focus();
 });
 navigation.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
+navigation.addEventListener('focusout', event => {
+  if (!navigation.contains(event.relatedTarget) && !menu.contains(event.relatedTarget)) closeMenu();
+});
 document.addEventListener('pointerdown', event => {
   if (!navigation.contains(event.target) && !menu.contains(event.target)) closeMenu();
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true') {
-    closeMenu();
-    menu.focus();
-  }
+  if (event.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true') { closeMenu(); menu.focus(); }
 });
 menuViewport.addEventListener('change', closeMenu);
 
-// Mark the section currently being read in the main navigation.
-const sectionLinks = [...navigation.querySelectorAll('a[href^="#"]')];
-let navigationObserver;
-let navigationResizeFrame = 0;
-function observeNavigation() {
-  navigationObserver?.disconnect();
-  const top = Math.round(window.innerHeight * .12);
-  const bottom = Math.round(window.innerHeight * .65);
-  navigationObserver = new IntersectionObserver(entries => {
-    const current = entries.find(entry => entry.isIntersecting);
-    if (!current) return;
-    sectionLinks.forEach(link => {
-      if (link.hash === `#${current.target.id}`) link.setAttribute('aria-current', 'location');
-      else link.removeAttribute('aria-current');
-    });
-  }, { rootMargin: `-${top}px 0px -${bottom}px 0px`, threshold: 0 });
-  sectionLinks.forEach(link => {
-    const section = document.querySelector(link.hash);
-    if (section) navigationObserver.observe(section);
-  });
-}
-observeNavigation();
-window.addEventListener('resize', () => {
-  if (navigationResizeFrame) return;
-  navigationResizeFrame = requestAnimationFrame(() => {
-    navigationResizeFrame = 0;
-    observeNavigation();
-  });
-});
-
-const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-// Apply themes; storage is optional in file previews and restricted browsers.
 const themeButton = document.querySelector('#theme-toggle');
 const systemTheme = matchMedia('(prefers-color-scheme: dark)');
-let themeChoice = null;
-try { const stored = localStorage.getItem('stanford-theme'); if (stored === 'dark' || stored === 'light') themeChoice = stored; } catch {}
+let themeChoice;
+try { themeChoice = localStorage.getItem('stanford-theme'); } catch { /* Settings are optional. */ }
+if (!['light', 'dark'].includes(themeChoice)) themeChoice = null;
 function setTheme(dark) {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   themeButton.setAttribute('aria-pressed', String(dark));
   themeButton.setAttribute('aria-label', dark ? 'Включить светлую тему' : 'Включить тёмную тему');
-  themeButton.textContent = dark ? '☀' : '◐';
 }
 setTheme(themeChoice ? themeChoice === 'dark' : systemTheme.matches);
 themeButton.addEventListener('click', () => {
-  const dark = document.documentElement.dataset.theme !== 'dark';
-  themeChoice = dark ? 'dark' : 'light'; setTheme(dark);
-  try { localStorage.setItem('stanford-theme', themeChoice); } catch {}
+  themeChoice = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  setTheme(themeChoice === 'dark');
+  try { localStorage.setItem('stanford-theme', themeChoice); } catch { /* Keep the current session choice. */ }
 });
 systemTheme.addEventListener('change', () => { if (!themeChoice) setTheme(systemTheme.matches); });
-// A translated track loops without exposing any manual horizontal scrolling.
-const viewport = document.querySelector('.team-viewport');
-const track = document.querySelector('.team-grid');
-const originals = [...track.children];
-let teamVisible = false;
-function syncTeam() { viewport.classList.toggle('in-view', teamVisible && !document.hidden && !reduced.matches); }
-function measureTeam() {
-  track.querySelectorAll('[data-clone]').forEach(card => card.remove());
-  track.classList.toggle('can-loop', !reduced.matches);
-  if (!reduced.matches && originals.length) {
-    const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
-    const distance = originals.at(-1).offsetLeft + originals.at(-1).offsetWidth - originals[0].offsetLeft + gap;
-    if (distance > 0) {
-      track.style.setProperty('--loop-distance', `${-distance}px`);
-      track.style.setProperty('--loop-duration', `${distance / 25}s`);
-      const copies = Math.ceil(viewport.clientWidth / distance) + 1;
-      for (let i=0; i<copies; i++) originals.forEach(card => {
-        const clone=card.cloneNode(true); clone.dataset.clone='true'; clone.setAttribute('aria-hidden','true'); clone.inert=true; track.append(clone);
-      });
-    }
+
+const branchMap = document.querySelector('#branch-map');
+const mapStatus = document.querySelector('#map-status');
+const locationButtons = [...document.querySelectorAll('[data-map-location]')];
+const providerButtons = [...document.querySelectorAll('button[data-map-provider]')];
+let selectedLocation = locationButtons.find(button => button.getAttribute('aria-pressed') === 'true');
+let mapProvider = branchMap?.dataset.mapProvider || 'yandex';
+function updateBranchMap(location, provider) {
+  if (!branchMap || !location || !locationButtons.includes(location)) return;
+  selectedLocation = location;
+  mapProvider = provider === 'google' && location.dataset.mapGoogleSrc ? 'google' : 'yandex';
+  const src = mapProvider === 'google' ? location.dataset.mapGoogleSrc : location.dataset.mapSrc;
+  if (branchMap.getAttribute('src') !== src) branchMap.src = src;
+  branchMap.title = location.dataset.mapTitle;
+  branchMap.dataset.mapProvider = mapProvider;
+  locationButtons.forEach(item => item.setAttribute('aria-pressed', String(item === location)));
+  providerButtons.forEach(item => {
+    item.setAttribute('aria-pressed', String(item.dataset.mapProvider === mapProvider));
+    item.disabled = item.dataset.mapProvider === 'google' && !location.dataset.mapGoogleSrc;
+  });
+  if (mapStatus) mapStatus.textContent = location.dataset.mapLabel;
+}
+locationButtons.forEach(button => button.addEventListener('click', () => {
+  if (!branchMap) return;
+  updateBranchMap(button, mapProvider);
+  if (mapStatus && matchMedia('(max-width: 760px)').matches) {
+    mapStatus.focus({ preventScroll: true });
+    mapStatus.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
-  syncTeam();
-}
-new ResizeObserver(measureTeam).observe(viewport);
-new IntersectionObserver(entries => {teamVisible=entries[0].isIntersecting;syncTeam();},{threshold:.01}).observe(viewport);
-document.addEventListener('visibilitychange',syncTeam);
-reduced.addEventListener('change',measureTeam);
-measureTeam();
+}));
+providerButtons.forEach(button => button.addEventListener('click', () => {
+  if (!button.disabled) updateBranchMap(selectedLocation, button.dataset.mapProvider);
+}));
 
-// A shared tooltip remains outside the scrolling table so it cannot be clipped.
-const tooltip=document.querySelector('#discount-tooltip');
-let activeHint=null,hideTimer=0;
-function hideDiscount(){clearTimeout(hideTimer); if(activeHint)activeHint.setAttribute('aria-expanded','false');activeHint=null;tooltip.hidden=true;}
-function placeDiscount(){
-  if(!activeHint)return;
-  const box=activeHint.getBoundingClientRect();
-  if(box.bottom<0||box.top>window.innerHeight){hideDiscount();return;}
-  tooltip.style.width=`${Math.min(340,window.innerWidth-32)}px`;
-  const left=Math.max(16,Math.min(box.right-tooltip.offsetWidth,window.innerWidth-tooltip.offsetWidth-16));
-  const below=box.bottom+10;
-  const top=below+tooltip.offsetHeight<window.innerHeight-16 ? below : Math.max(16,box.top-tooltip.offsetHeight-10);
-  tooltip.style.left=`${left}px`;tooltip.style.top=`${top}px`;
+const dialog = document.querySelector('#enroll-modal');
+const courseSelect = document.querySelector('#contact-course');
+const modalBody = document.querySelector('.modal-body');
+let dialogTrigger;
+let previousOverflow = '';
+function appendExternalIcon(link) {
+  const icon = document.createElement('span');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = '<svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6 M10 14 21 3 M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>';
+  link.append(icon);
 }
-function showDiscount(button){
-  clearTimeout(hideTimer);if(activeHint&&activeHint!==button)activeHint.setAttribute('aria-expanded','false');activeHint=button;
-  tooltip.replaceChildren();
-  const title=document.createElement('strong');title.textContent='Скидки на обучение';tooltip.append(title);
-  const intro=document.createElement('p');intro.textContent='При записи на два курса или обучении двух человек из одной семьи.';tooltip.append(intro);
-  const courses=button.dataset.discount==='all'?schoolContent.courses.filter(c=>c.specialPrice):[schoolContent.courses[Number(button.dataset.discount)]];
-  const list=document.createElement('ul');courses.forEach(course=>{const li=document.createElement('li');li.textContent=`${[course.name,course.subtitle].filter(Boolean).join(' ')} — ${money(course.specialPrice)} сум/месяц`;list.append(li);});tooltip.append(list);
-  const note=document.createElement('p');note.className='tooltip-note';note.textContent='На IELTS, SAT и немецкий скидка не распространяется.';tooltip.append(note);
-  tooltip.hidden=false;button.setAttribute('aria-expanded','true');placeDiscount();
+function updateCourseSummary() {
+  const course = content.courses.find(item => item.id === courseSelect.value);
+  const summary = document.querySelector('#selected-course');
+  summary.replaceChildren();
+  if (!course) return;
+  const title = document.createElement('h3');
+  title.textContent = [course.name, course.subtitle].filter(Boolean).join(' ');
+  const description = document.createElement('p'); description.textContent = course.description;
+  const price = document.createElement('div');
+  price.className = 'dialog-pricing';
+  const prices = document.createElement('dl');
+  prices.className = 'dialog-prices';
+  function addPrice(label, amount) {
+    const row = document.createElement('div');
+    const caption = document.createElement('dt'); caption.textContent = label;
+    const value = document.createElement('dd'); value.textContent = `${money(amount)} сум`;
+    const period = document.createElement('span'); period.textContent = 'в месяц';
+    value.append(period);
+    row.append(caption, value);
+    prices.append(row);
+  }
+  addPrice('Обычная цена', course.price);
+  if (course.specialPrice) addPrice('Семья / два курса', course.specialPrice);
+  price.append(prices);
+  if (course.specialPrice) {
+    const conditions = document.createElement('p');
+    conditions.className = 'dialog-price-note';
+    conditions.textContent = 'Специальная цена — для семьи или записи на два курса. Условия и итоговую стоимость подтвердите перед оплатой.';
+    price.append(conditions);
+  }
+  const skills = document.createElement('ul');
+  skills.setAttribute('aria-label', 'В программе курса');
+  course.skills.forEach(skill => { const item = document.createElement('li'); item.textContent = skill; skills.append(item); });
+  const catalogLink = document.createElement('a');
+  catalogLink.className = 'link dialog-catalog-link';
+  catalogLink.href = `#course-${course.id}`;
+  catalogLink.dataset.revealCourse = course.id;
+  catalogLink.textContent = 'К карточке программы';
+  appendExternalIcon(catalogLink);
+  summary.append(title, description, price, skills, catalogLink);
+  if (course.category === 'exam') {
+    const examLink = document.createElement('a');
+    examLink.className = 'link dialog-exam-link';
+    examLink.href = course.target;
+    examLink.dataset.examDetails = course.id;
+    examLink.textContent = `О подготовке к ${course.name}`;
+    appendExternalIcon(examLink);
+    summary.append(examLink);
+  }
+  modalBody.scrollTop = 0;
 }
-function scheduleHide(){clearTimeout(hideTimer);hideTimer=setTimeout(()=>{if(tooltip.matches(':hover')||(activeHint===document.activeElement&&activeHint?.matches(':focus-visible')))return;hideDiscount();},180);}
-document.querySelectorAll('[data-discount]').forEach(button=>{
-  button.addEventListener('pointerenter',event=>{if(event.pointerType==='mouse')showDiscount(button);});
-  button.addEventListener('pointerleave',event=>{if(event.pointerType==='mouse')scheduleHide();});
-  button.addEventListener('focus',()=>showDiscount(button));
-  button.addEventListener('blur',scheduleHide);
-  button.addEventListener('click',()=>showDiscount(button));
+function openModal(courseId, trigger) {
+  if (typeof dialog.showModal !== 'function') { location.hash = 'prices'; return; }
+  closeMenu();
+  if (content.courses.some(course => course.id === courseId)) courseSelect.value = courseId;
+  updateCourseSummary();
+  dialogTrigger = trigger;
+  previousOverflow = document.body.style.overflow;
+  dialog.showModal();
+  document.body.style.overflow = 'hidden';
+  modalBody.scrollTop = 0;
+  courseSelect.focus({ preventScroll: true });
+}
+function closeDialogForNavigation() {
+  if (dialog.open) { dialogTrigger = null; dialog.close(); }
+}
+function revealExam(courseId) {
+  const course = content.courses.find(item => item.id === courseId && item.category === 'exam');
+  if (!course) return false;
+  const panel = document.querySelector(course.target);
+  if (!panel) return false;
+  closeDialogForNavigation();
+  const details = panel.querySelector('details');
+  if (details) details.open = true;
+  panel.focus({ preventScroll: true });
+  return true;
+}
+function revealCourse(courseId) {
+  const card = cards.find(item => item.dataset.courseId === courseId);
+  if (!card) return false;
+  closeDialogForNavigation();
+  filterCourses('all', 'Все программы');
+  card.focus({ preventScroll: true });
+  return true;
+}
+function revealCourseFromHash() {
+  const match = (window.location?.hash || '').match(/^#course-([a-z0-9-]+)$/);
+  if (match && revealCourse(match[1])) cards.find(card => card.dataset.courseId === match[1]).scrollIntoView({ block: 'start' });
+}
+window.addEventListener('hashchange', revealCourseFromHash);
+
+document.addEventListener('click', event => {
+  const examLink = event.target.closest('[data-exam-details]');
+  if (examLink) { revealExam(examLink.dataset.examDetails); return; }
+  const catalogLink = event.target.closest('[data-reveal-course]');
+  if (catalogLink) { revealCourse(catalogLink.dataset.revealCourse); return; }
+  const trigger = event.target.closest('.open-enroll-btn, [data-open-course]');
+  if (!trigger) return;
+  event.preventDefault();
+  openModal(trigger.dataset.openCourse, trigger);
 });
-tooltip.addEventListener('pointerenter',()=>clearTimeout(hideTimer));tooltip.addEventListener('pointerleave',scheduleHide);
-document.addEventListener('keydown',event=>{if(event.key==='Escape')hideDiscount();});
-document.addEventListener('click',event=>{if(activeHint&&!activeHint.contains(event.target)&&!tooltip.contains(event.target))hideDiscount();});
-window.addEventListener('resize',placeDiscount);window.addEventListener('scroll',placeDiscount,{passive:true,capture:true});
+courseSelect.addEventListener('change', updateCourseSummary);
+document.querySelector('#modal-close').addEventListener('click', () => dialog.close());
+dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+dialog.addEventListener('close', () => {
+  document.body.style.overflow = previousOverflow;
+  if (dialogTrigger?.isConnected) dialogTrigger.focus();
+});
 
-// Restrained entrance transitions, skipped for reduced-motion preferences.
-if(!reduced.matches){
- const revealObserver=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('is-revealed');revealObserver.unobserve(entry.target);}}),{threshold:.04});
- document.querySelectorAll('main>section.section').forEach(section=>{section.classList.add('reveal');revealObserver.observe(section);});
+filterCourses("all", "Все программы");
+revealCourseFromHash();
+
+// Expose enhancement-only controls only after successful initialization.
+document.documentElement.dataset.enhanced = "true";
+
+// Presentation only: the content remains visible without observer support.
+function setupReveal() {
+  if (typeof IntersectionObserver === 'undefined' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const sections = [...document.querySelectorAll('[data-reveal]')];
+  if (!sections.length) return;
+  let observer;
+  try {
+    observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-revealed');
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: .08 });
+    sections.forEach(section => observer.observe(section));
+  } catch (error) {
+    observer?.disconnect();
+    console.warn('Section animation unavailable; content remains visible.', error);
+  }
 }
+setupReveal();

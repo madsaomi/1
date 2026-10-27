@@ -4,7 +4,9 @@
 !index.html
 !content.js
 !script.js
+!theme-init.js
 !style.css
+!robots.txt
 !assets/
 !assets/**
 

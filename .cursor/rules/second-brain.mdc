@@ -1,0 +1,23 @@
+---
+description: Second Brain development rules and Plan-First engineering protocol
+globs: *
+alwaysApply: true
+---
+
+# Second Brain Engineering Rules
+
+This repository strictly adheres to the standardized **Second Brain** long-term memory system located in `agents/`.
+
+## Critical Protocols:
+1. **Plan-First (Mandatory):**
+   - NEVER write or edit code without an approved step-by-step implementation plan in `agents/plans/` or a detailed checklist in `agents/tasks/active_task.md`.
+2. **Context & Entrypoint:**
+   - Always study `AGENTS.md` and `agents/AGENT_GUIDE.md` first.
+   - Strictly follow prohibitions in `agents/rules/ANTI_PATTERNS.md`.
+3. **Execution:**
+   - Check off steps `[x]` in `agents/tasks/active_task.md` as they are completed.
+   - Consult and update `agents/bugs_and_fixes/` for errors and resolutions.
+   - Log key architectural choices in `agents/decisions/`.
+4. **Session Finish:**
+   - Run `python agents/tools/check_integrity.py` to ensure system health.
+   - Save session summary to `agents/history/` without overwriting earlier logs.

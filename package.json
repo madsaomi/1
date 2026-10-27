@@ -4,6 +4,8 @@
   "private": true,
   "description": "Static Stanford Language Center landing page",
   "scripts": {
-    "check": "node --check script.js && node --check content.js"
+    "build": "node build.mjs",
+    "test": "node --test",
+    "check": "node --check script.js && node --check content.js && node --check theme-init.js && node build.mjs --check && node --test && python tests/validate_html.py"
   }
 }
