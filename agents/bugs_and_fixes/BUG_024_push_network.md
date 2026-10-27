@@ -1,6 +1,6 @@
 # BUG-024 — DNS GitHub недоступен из Git
 
-Дата: 2026-10-27. Автор: Codex. Статус: ВНЕШНЕЕ ОГРАНИЧЕНИЕ, PLAN-032.
+Дата: 2026-10-27. Автор: Codex. Статус: СНЯТО ПРИ ПОВТОРЕ — PUSH УСПЕШЕН, PLAN-032.
 
 ## Симптом
 `git ls-remote origin refs/heads/main` в sandbox и при разрешенном require_escalated завершился: `fatal: unable to access 'https://github.com/madsaomi/1.git/': Could not resolve host: github.com`. Python getaddrinfo github.com/api.github.com возвращает11001. GitHub connector get_repo также недоступен: Unknown tool github.get_repo.
@@ -14,4 +14,6 @@
 Фактический результат: commit ba2f5a6 создан; `git push origin main` с require_escalated завершился exit1, тем же Could not resolve host github.com. Сайт и проверки сохранены локально, удаленная публикация не подтверждена. `git add` сначала не мог создать .git/index.lock в sandbox; разрешенный escalated-запуск успешно подготовил index, это отдельное ограничение записи .git, не причина DNS.
 
 ## Дополнительные события
+По повторному запросу владельца push завершился exit0 (c6aa4ad..0ac979a main→main). Отдельный ls-remote подтвердил0ac979ab26ccf8d398e4257a61145083ef99139e. DNS/proxy/remote/credentials не изменялись. Ранее описанные отказы сохраняются как история; текущий push подтвержден, CI/деплой отдельно.
+
 Первая попытка заменить deployment runbook одним apply_patch Delete+Add того же пути была атомарно отклонена как duplicate target; исправлена обычной записью уже прочитанного документа. Secret-scan нашел5credential-URL в отрицательных test fixtures; это тестовые значения для проверки запрета URL credentials, не реальные доступы.

@@ -5,7 +5,8 @@
 - [x] Исправить доказанный Docker context blocker и исключить локальные артефакты из Git.
 - [x] Пройти полные доступные проверки, секреты/staged diff и чистый Git-export; попытка сверки remote уперлась в DNS.
 - [x] Сохранить отчет/историю, подготовить локальный commit ba2f5a6 (182файла).
-- [ ] Подтвердить push origin main/remote SHA/CI: фактический push завершился exit1, Could not resolve host github.com; повторить после восстановления сети.
+- [x] Повторить push origin main: exit0, оба коммита отправлены; remote SHA0ac979ab26ccf8d398e4257a61145083ef99139e подтвержден ls-remote.
+- [ ] Подтвердить CI/Railway после публикации; browser-приемка остается отдельной открытой задачей.
 
 ---
 
