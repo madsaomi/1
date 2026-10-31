@@ -1,6 +1,6 @@
 # Карта кодовой базы — Stanford Language Center
 
-Последнее обновление: 2026-10-27, Codex, PLAN-032.
+Последнее обновление: 2026-10-31, ZCode, PLAN-033.
 
 ## Архитектура
 Статический HTML/CSS/Vanilla JS. `content.js` → `node build.mjs` → готовые курсы/цены/контакты в `index.html`. `script.js` фильтрует HTML, а не создает основное содержание. API/БД и автоматической доставки заявок нет: владелец выбрал прямую связь.
@@ -19,7 +19,7 @@
 | Caddyfile, Dockerfile, railway.json | Статическая раздача, CSP, кэш, healthcheck и контейнер | CI docker build |
 | robots.txt | Разрешение обхода | Проверка деплоя |
 | package.json, .github/workflows/integrity.yml | Проверки приложения и Second Brain, сборка Docker | npm run check |
-| assets/ | Исходные изображения; english.jpg — натюрморт hero, CSS grayscale/multiply поверх фирменного желтого | Проверка путей |
+| assets/ | Исходные изображения; english.jpg — натюрморт hero, CSS grayscale/multiply поверх фирменного желтого; favicon.svg — фавикон по брендбуку (плашка #FFB703 + знак S #070707), stanford-icon.svg — знак в шапке | Проверка путей |
 | assets/fonts/ | Локальные Inter Latin/Cyrillic WOFF2, OFL и provenance; не npm-зависимость | WOFF2/name/fvar/cmap, test |
 | agents/, brain.py | Память проекта | python brain.py check |
 
@@ -27,6 +27,7 @@
 Расписание, квиз, отзывы, сравнение, floating island, фиктивные биографии/карта/адреса/телефоны, частичная локализация, карусель и копирование заявки. Вместо заглушек опубликованы подтвержденные владельцем контакты (verified=true) и реальные карты филиалов. Данные посетителей не запрашиваются.
 
 ## Границы готовности
+Актуально PLAN-033: фирменный чёрный владельца #070707 применен через токены style.css (--ink, --button-ink, --focus, --dark-panel в светлой теме; --paper в темной), нейтральные серые не тронуты. Добавлен assets/favicon.svg по стр. 11 брендбука (жёлтая плашка + чёрный S), link rel=icon переключен, знак в шапке stanford-icon.svg не менялся — он побайтово совпадает с Icon.svg из папки бренда. Полный лого (Logo final.svg) не подключался: текст в нем зависит от MinionPro и развалится без шрифта; шапка воспроизводит лого-блок живым текстом. Контраст измененных пар посчитан вручную — минимум 6.51:1, все ≥4.5:1; python validate_html.py PASS. Node в среде сессии недоступен: npm run check/49 тестов/build --check здесь НЕ запускались, требуется прогон в среде с Node 22+. Шрифты брендбука Minion Pro/Proxima Nova не внедрялись (коммерческие, нужен лицензионный файл) — вопрос открыт у владельца.
 Повтор PLAN-032: push origin/main успешен, remote0ac979ab26ccf8d398e4257a61145083ef99139e независимо подтвержден ls-remote. Оба проверенных коммита доставлены, runtime не менялся. Описанный ниже DNS-блок относится к предыдущей попытке. CI/Railway и визуальная приемка остаются отдельными проверками.
 Актуально PLAN-032:49/49проверок проходят на чистом Git index export с LF. .dockerignore разрешает2файла существующего COPY; Dockerfile/Caddyfile/Railway не изменялись в этом проходе. Git ignores локальные browser/Python артефакты, не удаляя их. Baseline content/config неизменен; protected-test разрешает только LF/CRLF эквивалентность и2документированных context-additions. Push разрешен владельцем, но DNS GitHub недоступен в обоих режимах Git и connector Unknown tool. Не заявлять отправку/CI/деплой без remote-подтверждения; runtime browser/Docker приемка остается открытой.
 Актуально PLAN-031: только presentation HTML/CSS/build; script.js/theme-init.js не менялись. Статус фильтра sr-only, карточки flex-column с одинаковыми min-height title/description на2колонках, skills16+декоративные SVG, footerauto. Ритм секций64/96, opaque шапка и offset anchors включая .map-status/#discounts, marker hero, карточки практики и ограниченный прайс.48тестов сохраняют исходный baseline контента/configs и AA. Все6публичных Google/Яндекс embed просмотрены через Playwright, сетевые DNS-сбои были временными. Это не проверка страницы сайта, ее CSP и переключения провайдеров. Реальная375/768/1440 light/dark матрица остается открытой по прежнему ограничению localfile; обход через localhost/новый MCP не выполнялся. Последующие записи — история прежних планов.
