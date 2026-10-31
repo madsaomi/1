@@ -160,7 +160,7 @@ window.schoolContent = {
     ]
   },
   "site": {
-    "url": "",
+    "url": "https://1-production-8f16.up.railway.app",
     "city": "Нукус"
   }
 };
