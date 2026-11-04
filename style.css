@@ -173,39 +173,35 @@ html:not([data-enhanced]) .header { position: relative; }
 .practice-list article { min-width: 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
 .practice-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: var(--space-3); border-radius: var(--radius-control); background: var(--brand); color: var(--button-ink); }
 .practice-icon--label { font-size: var(--text-14); font-weight: 600; letter-spacing: .02em; }
-/* Пример-блок преподавателей: бесконечная карусель, пауза на hover/focus, статичная сетка при reduced motion. */
-.team-list { display: block; overflow: hidden; }
-.team-track { display: flex; width: max-content; animation: team-marquee 36s linear infinite; }
-.team-track > article { width: min(320px, 80vw); margin-right: var(--space-2); flex-shrink: 0; }
-.team-list:hover .team-track, .team-list:focus-within .team-track { animation-play-state: paused; }
-@keyframes team-marquee { to { transform: translateX(-50%); } }
-@media (prefers-reduced-motion: reduce) {
-  .team-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); overflow: visible; }
-  .team-track { display: contents; }
-  .team-track > article { width: auto; margin-right: 0; }
-  .team-track > article[aria-hidden="true"] { display: none; }
-}
-@media (min-width: 768px) and (prefers-reduced-motion: reduce) { .practice-list.team-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1024px) and (prefers-reduced-motion: reduce) { .practice-list.team-list { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-/* WCAG 2.2.2: переключатель без JS останавливает карусель и показывает ту же статичную сетку, что и reduced motion. */
-.team-pause { display: none; position: relative; place-items: center; width: 48px; height: 48px; margin: 0 0 var(--space-2) auto; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--transparent); cursor: pointer; transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease); }
-.team-pause:hover { border-color: var(--border-strong); background: var(--surface-hover); }
-.team-pause input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
-.team-pause .icon-play { display: none; }
-@supports selector(:has(*)) {
-  .team-pause { display: grid; }
-  .team-pause:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 4px; }
-  .team-pause:has(input:checked) .icon-pause { display: none; }
-  .team-pause:has(input:checked) .icon-play { display: inline-block; }
-  #teachers:has(#team-pause:checked) .team-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); overflow: visible; }
-  #teachers:has(#team-pause:checked) .team-track { display: contents; }
-  #teachers:has(#team-pause:checked) .team-track > article { width: auto; margin-right: 0; }
-  #teachers:has(#team-pause:checked) .team-track > article[aria-hidden="true"] { display: none; }
-}
-@media (min-width: 768px) { #teachers:has(#team-pause:checked) .practice-list.team-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1024px) { #teachers:has(#team-pause:checked) .practice-list.team-list { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (prefers-reduced-motion: reduce) { .team-pause { display: none; } }
 .practice-icon .icon { width: 24px; height: 24px; }
+/* PLAN-042: owner-approved placeholders on the main page, announced by the static demo banner. */
+.demo-banner { margin: 0; padding: var(--space-1) var(--space-2); background: var(--dark-panel); color: var(--on-dark); font-size: var(--text-14); text-align: center; }
+.demo-banner strong { color: var(--brand); }
+.demo-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); padding: var(--space-1); background: repeating-linear-gradient(135deg, #0000000d 0 12px, #00000000 12px 24px), var(--solid); color: var(--muted); text-align: center; }
+.demo-photo small { font-size: var(--text-14); }
+.demo-stats { margin-top: var(--space-2); }
+.demo-stats dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-radius: var(--radius-panel); background: var(--dark-panel); color: var(--on-dark); overflow: hidden; }
+.demo-stats div { display: flex; flex-direction: column-reverse; gap: var(--space-1); padding: var(--space-3); }
+.demo-stats dd { margin: 0; font-size: var(--text-32); font-weight: 700; letter-spacing: -.03em; color: var(--brand); }
+.demo-stats dt { font-size: var(--text-14); color: var(--on-dark-muted); }
+.demo-team { display: grid; gap: var(--space-2); }
+.demo-teacher { display: grid; grid-template-columns: 112px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.demo-portrait { aspect-ratio: 4 / 5; }
+.demo-portrait small { display: none; }
+.demo-teacher-body { padding: var(--space-2) var(--space-3) var(--space-3); }
+.demo-teacher h3 { font-size: var(--text-20); }
+.demo-teacher p { margin-top: var(--space-1); color: var(--muted); }
+.demo-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
+.demo-chips li { padding: 4px 12px; border: 1px solid var(--border-strong); border-radius: 999px; font-size: var(--text-14); }
+.demo-chips .demo-chip-key { border-color: var(--brand); background: var(--brand); color: var(--on-brand); font-weight: 600; }
+.demo-results-grid { display: grid; gap: var(--space-2); }
+.demo-result { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.demo-score { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-1); }
+.demo-score strong { font-size: var(--text-48); line-height: 1; letter-spacing: -.04em; }
+.demo-score span { padding: 2px 8px; border-radius: 8px; background: var(--brand); color: var(--on-brand); font-weight: 600; font-size: var(--text-14); }
+.demo-score small { color: var(--muted); font-size: var(--text-14); }
+.demo-result blockquote { margin: 0; color: var(--muted); }
+.demo-result-name { margin-top: auto; font-weight: 600; font-size: var(--text-14); }
 .practice-list h3 { margin-bottom: var(--space-2); font-size: var(--text-20); }
 .practice-list p { color: var(--muted); font-size: var(--text-16); }
 .exam-grid { display: grid; gap: var(--space-2); }
@@ -355,6 +351,13 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .about-layout { padding: var(--space-4); }
   .about-lead { max-width: 24ch; font-size: var(--text-32); }
   .practice-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+  .demo-stats dl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .demo-stats div + div { border-left: 1px solid #ffffff14; }
+  .demo-stats dd { font-size: var(--text-48); }
+  .demo-team { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+  .demo-teacher { display: block; }
+  .demo-portrait small { display: block; }
+  .demo-results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
   .why-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
   .why-list li { padding: var(--space-3); }
   .hero-description { font-size: var(--text-20); }
@@ -384,6 +387,7 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .why-list li { flex-direction: column; }
   .why-list .practice-icon { margin-bottom: var(--space-1); }
   .hero-programs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .demo-team { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .hero-program:nth-of-type(n) { border-top: 0; border-right: 1px solid var(--border); }
   .hero-program:last-of-type { border-right: 0; }
   .course-bottom { flex-direction: row; align-items: center; justify-content: space-between; }

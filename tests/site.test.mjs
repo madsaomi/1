@@ -387,23 +387,17 @@ test('public HTML has no invented biographies, contacts or unfinished translatio
   assert(!/style="/.test(html));
 });
 
-test('native modal, no lead-copy flow, and no automatic content motion beyond the sanctioned teachers marquee', () => {
+test('native modal, no lead-copy flow, and no automatic content motion', () => {
   assert(html.includes('<dialog '));
   assert(!html.includes('prepared-message'));
   const js = fs.readFileSync(new URL('../script.js', import.meta.url), 'utf8');
   assert(js.includes('dialog.showModal()'));
   assert(!/cloneNode|faculty-loop|pointermove|FormData|clipboard/.test(js));
   const css = fs.readFileSync(new URL('../style.css', import.meta.url), 'utf8');
-  // PLAN-035: the owner sanctioned exactly one infinite loop — the teachers marquee.
-  // It pauses on hover/focus and collapses to a static grid under reduced motion.
-  const lines = css.split('\n');
-  const marqueeLines = lines.filter(line => line.includes('team-marquee') && /\binfinite\b/.test(line));
-  const otherInfinite = lines.filter(line => /\binfinite\b/.test(line) && !line.includes('team-marquee'));
-  assert(marqueeLines.length === 1, 'The teachers marquee is the only sanctioned infinite animation');
-  assert(otherInfinite.length === 0, 'No other infinite animations are allowed');
-  // PLAN-037 (WCAG 2.2.2): touch users get a no-JS control that stops the marquee.
-  assert(/<input type="checkbox" id="team-pause" aria-label="[^"]+">/.test(html), 'The marquee needs a labelled pause control');
-  assert(css.includes('#teachers:has(#team-pause:checked) .team-track { display: contents; }'), 'Pausing must show the static grid');
+  // PLAN-042: the teachers marquee was replaced by static cards, so nothing loops.
+  assert(!/\binfinite\b/.test(css), 'No infinite animations are allowed');
+  // Owner-approved placeholders must always be announced to visitors.
+  if (/class="demo-(?:stats|team|results)"|class="demo-results-grid"/.test(html)) assert(html.includes('class="demo-banner"'), 'Placeholders require the demo banner');
 });
 
 test('theme initializes even when browser storage is blocked', () => {
