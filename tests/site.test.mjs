@@ -335,6 +335,20 @@ test('one lazy Google map has a static initial selection, accessible controls an
   // The Yandex widget shows ads: it is never embedded, and no provider switch is offered.
   assert(!/map-providers|data-map-provider|yandex\.ru\/map-widget/.test(output));
   assert(!/<script\b|<img\b|<embed\b/i.test(output));
+  // Branches without a photo show one tagged placeholder each; a provided photo replaces it.
+  const photoSlots = output.match(/<div class="location-photo location-photo-demo"[\s\S]*?<\/div>/g) || [];
+  assert.equal(photoSlots.length, contacts.locations.length);
+  for (const slot of photoSlots) assert(slot.includes('<span class="demo-tag">Пример</span>'));
+  const withPhoto = structuredClone(contacts);
+  withPhoto.locations[1].photo = 'assets/stanford-logo.webp';
+  const photoOutput = renderLocations(withPhoto);
+  assert.equal((photoOutput.match(/class="location-photo location-photo-demo"/g) || []).length, contacts.locations.length - 1);
+  assert(photoOutput.includes('<img class="location-photo" src="assets/stanford-logo.webp"'));
+  const badPhoto = structuredClone(data);
+  for (const photo of ['https://example.org/a.jpg', 'assets/missing.jpg', '../secret.png', 42]) {
+    badPhoto.contacts.locations[0].photo = photo;
+    assert.throws(() => validateContent(badPhoto), /branch photo/);
+  }
   const partial = structuredClone(contacts);
   delete partial.locations[0].googleEmbed;
   const partialOutput = renderLocations(partial);
@@ -397,7 +411,7 @@ test('native modal, no lead-copy flow, and no automatic content motion', () => {
   // PLAN-042: the teachers marquee was replaced by static cards, so nothing loops.
   assert(!/\binfinite\b/.test(css), 'No infinite animations are allowed');
   // Owner-approved placeholders must always be announced to visitors.
-  if (/class="demo-(?:stats|team|results)"|class="demo-results-grid"/.test(html)) assert(html.includes('class="demo-banner"'), 'Placeholders require the demo banner');
+  if (/class="demo-(?:stats|team|results)"|class="demo-results-grid"|location-photo-demo/.test(html)) assert(html.includes('class="demo-banner"'), 'Placeholders require the demo banner');
   // Each placeholder block is tagged where it appears, not only in the page banner.
   for (const block of ['demo-stats', 'teachers-title', 'results-title']) {
     if (!html.includes(block)) continue;

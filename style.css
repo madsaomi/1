@@ -277,6 +277,8 @@ details[open] > summary > .icon { transform: rotate(45deg); }
 .location-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(272px, 1fr); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; border-bottom: 1px solid var(--border); }
 .location-card { position: relative; display: flex; flex-direction: column; min-width: 0; padding: var(--space-2) var(--space-3) var(--space-1); border-right: 1px solid var(--border); scroll-snap-align: start; transition: background var(--duration) var(--ease); }
 .location-card:last-child { border-right: 0; }
+.location-photo { display: block; width: 100%; aspect-ratio: 16 / 9; margin-top: var(--space-2); border-radius: var(--radius-control); object-fit: cover; }
+.location-photo-demo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); border: 1px dashed var(--border-strong); background: var(--surface-hover); color: var(--muted); font-size: var(--text-14); }
 .location-card:has([aria-pressed="true"]) { background: var(--tint); }
 .location-card:has([aria-pressed="true"])::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--brand); }
 .location-card h4 { max-width: calc(100% - 24px); font-size: var(--text-16); }
@@ -399,6 +401,9 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .location-grid { grid-template-columns: 1fr; grid-auto-rows: 1fr; border-bottom: 0; border-right: 1px solid var(--border); }
   .location-card { padding: var(--space-3) var(--space-3) var(--space-1); border-right: 0; border-bottom: 1px solid var(--border); }
   .location-card:last-child { border-bottom: 0; }
+  /* Stacked beside the map, full 16:9 photos would stretch it; a compact strip keeps the map at a usable height. */
+  .location-photo { aspect-ratio: auto; height: 72px; }
+  .location-photo-demo { flex-direction: row; }
   .location-card:has([aria-pressed="true"])::before { inset: 0 auto 0 0; width: 3px; height: auto; }
 }
 /* Keep the existing JavaScript navigation breakpoint (1050px). */
