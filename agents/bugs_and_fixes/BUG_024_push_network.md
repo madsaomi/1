@@ -19,3 +19,4 @@
 Первая попытка заменить deployment runbook одним apply_patch Delete+Add того же пути была атомарно отклонена как duplicate target; исправлена обычной записью уже прочитанного документа. Secret-scan нашел5credential-URL в отрицательных test fixtures; это тестовые значения для проверки запрета URL credentials, не реальные доступы.
 
 2026-11-04 (Claude Code, PLAN-041): commit 9521e2f создан локально; `git push origin main` дважды завершился exit 128 «Could not resolve host: github.com». DNS/proxy/remote/credentials не менялись; ветка main впереди origin на коммит(ы), push повторить при восстановлении сети.
+Повтор по запросу владельца: push завершился успешно (cb848b2..d4a2d35 main -> main); сеть восстановилась, ничего не менялось.
