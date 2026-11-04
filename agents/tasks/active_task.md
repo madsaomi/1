@@ -4,7 +4,8 @@
 - [x] План зафиксирован; владелец оставляет блок-пример.
 - [x] Переключатель паузы (checkbox + :has, без JS), статичная сетка при паузе; v=51.
 - [x] Тесты (site.test.mjs, validate_html.py) + validate_html.py/check_integrity.py PASS; браузер 375/1440 OK.
-- [ ] Прогнать npm run check в CI (Node локально недоступен) после commit/push.
+- [x] Commit 4f4da7e, push origin/main (c962c5c..4f4da7e).
+- [ ] Подтвердить CI (npm run check, Docker build) для 4f4da7e.
 - [x] STATUS/история.
 
 ---
