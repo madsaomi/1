@@ -41,3 +41,5 @@ railway.json выбирает Dockerfile и /healthz, timeout60s, restart ON_FAI
 На разрешенном HTTP(S)-стенде проверить375/768/1440 обе темы, menu/dialog/focus, фильтры,3филиала×2провайдера, console/network, reduced motion/no-JS. Эти browser-пункты открыты;49локальныхтестов их не заменяют. Docker/Caddy в сессии PLAN-032 отсутствуют, реальная сборка ожидает CI.
 
 Для отката опубликованного изменения использовать отдельный согласованный revert commit. Не делать reset/force-push и не удалять Second Brain history.
+
+PLAN-039: карта филиалов — только Google embed; при приемке проверять 3 филиала × Google-карта и ссылки «Яндекс Карты» (переключателя провайдера больше нет).

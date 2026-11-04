@@ -5,7 +5,7 @@
 **Технологический стек:** HTML5, CSS3, JavaScript, Caddy, Docker, Railway  
 **Последнее обновление:** 2026-11-04
 **Ответственный агент:** Claude Code (Opus 5.5)
-**Текущая фаза:** PLAN-038 (дизайн по референсам Cambridge/Inter Nation/OpenLearning/Educo): главная кнопка «Бесплатный пробный урок», блок «Почему Stanford» из существующих фактов, крупнее hero на десктопе; style.css v=52; baseline перегенерирован с само-проверкой. Commit запушен в origin/main; Node-тесты проверяет CI. Ждём от владельца фото, цифры и реальных преподавателей. PLAN-037 (пауза карусели) запушен 4f4da7e. Прод: https://1-production-8f16.up.railway.app
+**Текущая фаза:** PLAN-039: встроенная карта — только Google (Яндекс-виджет с рекламой убран, «Яндекс Карты» остаются ссылками); «Почему Stanford» выровнен (заголовок «Второй преподаватель», равная высота карточек); style v=53, script v=41. npm run check 48/48 локально (portable Node 22). Запушено в origin/main. PLAN-038 — f0cee79. Демо с заглушками: preview/demo.html (не в git). Прод: https://1-production-8f16.up.railway.app
 
 ---
 

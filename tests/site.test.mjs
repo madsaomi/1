@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { readContent, validateContent, generate, renderContacts, renderLocations, mapWidgetURL, renderCourses, renderFilters, renderPrices, renderHero, escapeHTML } from '../build.mjs';
+import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderPrices, renderHero, escapeHTML } from '../build.mjs';
 
 const data = readContent();
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -238,21 +238,6 @@ test('map coordinates are optional, finite longitude/latitude pairs within geogr
   }
 });
 
-test('map widget URLs use only the approved iframe origin and numeric branch coordinates', () => {
-  const location = { ...contactFixture().locations[0], coordinates: [59.617, 42.47] };
-  const url = new URL(mapWidgetURL(location));
-  assert.equal(url.origin, 'https://yandex.ru');
-  assert.equal(url.pathname, '/map-widget/v1/');
-  assert.equal(url.username, '');
-  assert.equal(url.password, '');
-  assert.equal(url.hash, '');
-  assert.deepEqual([...url.searchParams.keys()].sort(), ['lang', 'll', 'pt', 'z']);
-  assert.equal(url.searchParams.get('ll'), location.coordinates.join(','));
-  assert.equal(url.searchParams.get('pt'), location.coordinates.join(','));
-  assert.equal(url.searchParams.get('z'), '16');
-  assert.equal(url.searchParams.get('lang'), 'ru_RU');
-});
-
 function htmlAttributes(tag) {
   return Object.fromEntries([...tag.matchAll(/\b([\w-]+)="([^"]*)"/g)].map(match => [match[1], match[2]]));
 }
@@ -284,11 +269,10 @@ test('Google embed URLs permit only the exact maps embed endpoint and one nonemp
   }
 });
 
-test('one lazy branch map has a static initial selection, accessible controls and escaped titles', () => {
+test('one lazy Google map has a static initial selection, accessible controls and escaped titles', () => {
   const contacts = structuredClone(data.contacts);
-  const locations = contacts.locations.filter(location => location.coordinates);
+  const locations = contacts.locations.filter(location => location.googleEmbed);
   assert(locations.length > 1, 'The published map must include the confirmed branches');
-  for (const location of locations) delete location.googleEmbed;
   locations[0].googleEmbed = googleEmbedFixture;
   locations[0].name = '<img src=x onerror="alert(1)">';
   locations[0].address = 'Адрес & <script>alert(1)</script>';
@@ -299,7 +283,7 @@ test('one lazy branch map has a static initial selection, accessible controls an
   assert.equal(frame.id, 'branch-map');
   assert(frame.class.split(/\s+/).includes('branch-map'));
   assert.equal(frame.src, escapeHTML(googleEmbedFixture));
-  assert.equal(frame['data-map-provider'], 'google');
+  assert.equal(frame['data-map-provider'], undefined);
   assert.equal(frame.title, escapeHTML(`Карта: ${locations[0].name}`));
   assert.equal(frame.loading, 'lazy');
   assert.equal(frame.width, '1100');
@@ -319,8 +303,7 @@ test('one lazy branch map has a static initial selection, accessible controls an
     assert.equal(button['aria-controls'], 'branch-map');
     assert.equal(button['aria-label'], escapeHTML(`Показать на карте: ${location.name}`));
     assert.equal(button['aria-pressed'], String(index === 0));
-    assert.equal(button['data-map-src'], escapeHTML(mapWidgetURL(location)));
-    assert.equal(button['data-map-google-src'], location.googleEmbed || '');
+    assert.equal(button['data-map-src'], escapeHTML(location.googleEmbed));
     assert.equal(button['data-map-title'], escapeHTML(`Карта: ${location.name}`));
     assert.equal(button['data-map-label'], escapeHTML(`${location.name} — ${location.address}`));
   }
@@ -330,29 +313,20 @@ test('one lazy branch map has a static initial selection, accessible controls an
   assert.equal(htmlAttributes(status[0]).tabindex, '-1');
   assert(status[1].includes(escapeHTML(locations[0].name)));
   assert(status[1].includes(escapeHTML(locations[0].address)));
-  const providerGroup = output.match(/<div\b[^>]*\bclass="map-providers"[^>]*>([\s\S]*?)<\/div>/);
-  assert(providerGroup);
-  assert.equal(htmlAttributes(providerGroup[0]).role, 'group');
-  const providers = (providerGroup[1].match(/<button\b[^>]*>/g) || []).map(htmlAttributes);
-  assert.deepEqual(providers.map(button => button['data-map-provider']).sort(), ['google', 'yandex']);
-  for (const button of providers) {
-    assert.equal(button.type, 'button');
-    assert.equal(button['aria-controls'], 'branch-map');
-    assert.equal(button['aria-pressed'], String(button['data-map-provider'] === 'google'));
-  }
-  const fallbackContacts = structuredClone(contacts);
-  delete fallbackContacts.locations[0].googleEmbed;
-  const fallback = renderLocations(fallbackContacts);
-  const fallbackFrame = htmlAttributes(fallback.match(/<iframe\b[^>]*>/)[0]);
-  assert.equal(fallbackFrame.src, escapeHTML(mapWidgetURL(fallbackContacts.locations[0])));
-  assert.equal(fallbackFrame['data-map-provider'], 'yandex');
-  const unavailableGoogle = fallback.match(/<button\b[^>]*\bdata-map-provider="google"[^>]*>/)[0];
-  assert.match(unavailableGoogle, /\bdisabled(?:\s|=|>)/);
+  // The Yandex widget shows ads: it is never embedded, and no provider switch is offered.
+  assert(!/map-providers|data-map-provider|yandex\.ru\/map-widget/.test(output));
   assert(!/<script\b|<img\b|<embed\b/i.test(output));
-  const withoutCoordinates = renderLocations(contactFixture());
-  assert(!/<iframe\b|data-map-location=/.test(withoutCoordinates));
-  for (const { url } of contactFixture().locations[0].maps) assert(withoutCoordinates.includes(`href="${url}"`));
+  const partial = structuredClone(contacts);
+  delete partial.locations[0].googleEmbed;
+  const partialOutput = renderLocations(partial);
+  assert(!partialOutput.includes(`data-map-location="${partial.locations[0].id}"`), 'A branch without a Google embed has no map selector');
+  assert(partialOutput.includes(`href="${partial.locations[0].maps[0].url}"`), 'Its map links remain');
+  assert.equal(htmlAttributes(partialOutput.match(/<iframe\b[^>]*>/)[0]).src, escapeHTML(partial.locations[1].googleEmbed));
+  const withoutEmbeds = renderLocations(contactFixture());
+  assert(!/<iframe\b|data-map-location=/.test(withoutEmbeds));
+  for (const { url } of contactFixture().locations[0].maps) assert(withoutEmbeds.includes(`href="${url}"`));
   assert.equal((html.match(/<iframe\b/g) || []).length, 1);
+  assert(html.includes('Яндекс Карты'), 'Yandex remains available as a link');
 });
 
 test('CSP permits the map iframe origin while retaining restrictions on parent-page connections', () => {
@@ -442,10 +416,10 @@ function runtime({ mapPresent = true, reducedMotion = false, viewportWidth = 144
   const dialog = element();
   dialog.showModal = function () { this.open = true; };
   dialog.close = function () { this.open = false; this.handlers.close(); };
-  const mapLocations = locations.filter(location => location.coordinates);
+  const mapLocations = locations.filter(location => location.googleEmbed);
   const mapButtons = mapLocations.map((location, index) => {
     const button = element({
-      mapLocation: location.id, mapSrc: mapWidgetURL(location), mapGoogleSrc: location.googleEmbed || '',
+      mapLocation: location.id, mapSrc: location.googleEmbed,
       mapTitle: `Карта: ${location.name}`, mapLabel: `${location.name} — ${location.address}`
     });
     button.attributes['aria-pressed'] = String(index === 0);
@@ -453,7 +427,6 @@ function runtime({ mapPresent = true, reducedMotion = false, viewportWidth = 144
     return button;
   });
   const mapFrame = element();
-  mapFrame.dataset.mapProvider = mapButtons[0]?.dataset.mapGoogleSrc ? 'google' : 'yandex';
   for (const key of ['src', 'title']) {
     Object.defineProperty(mapFrame, key, {
       get() { return this.getAttribute(key); },
@@ -461,18 +434,11 @@ function runtime({ mapPresent = true, reducedMotion = false, viewportWidth = 144
     });
   }
   if (mapButtons.length) {
-    mapFrame.attributes.src = mapButtons[0].dataset.mapGoogleSrc || mapButtons[0].dataset.mapSrc;
+    mapFrame.attributes.src = mapButtons[0].dataset.mapSrc;
     mapFrame.attributes.title = mapButtons[0].dataset.mapTitle;
   }
   const mapStatus = element();
   mapStatus.textContent = mapButtons[0]?.dataset.mapLabel || '';
-  const providerButtons = ['google', 'yandex'].map(mapProvider => {
-    const button = element({ mapProvider });
-    button.attributes['aria-pressed'] = String(mapProvider === mapFrame.dataset.mapProvider);
-    button.attributes['aria-controls'] = 'branch-map';
-    button.disabled = mapProvider === 'google' && !mapButtons[0]?.dataset.mapGoogleSrc;
-    return button;
-  });
   const nodes = {
     '#course-filter-status': element(), '.menu': element(), '#navigation': element(),
     '#theme-toggle': element(), '#enroll-modal': dialog, '#contact-course': select,
@@ -498,9 +464,6 @@ function runtime({ mapPresent = true, reducedMotion = false, viewportWidth = 144
       if (selector === '[data-filter]') return filters;
       if (selector === '[data-course-id]') return cards;
       if (selector === '[data-map-location]') return mapButtons;
-      if (selector === 'button[data-map-provider]') return providerButtons;
-      // The iframe also carries data-map-provider; a broad selector must include it.
-      if (selector === '[data-map-provider]') return [...providerButtons, ...(mapPresent ? [mapFrame] : [])];
       return [];
     },
     createElement: tag => Object.assign(element(), { tagName: tag.toUpperCase() }),
@@ -517,76 +480,41 @@ function runtime({ mapPresent = true, reducedMotion = false, viewportWidth = 144
   };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(new URL('../script.js', import.meta.url), 'utf8'), context);
-  return { context, cards, nodes, element, document, filters, mapButtons, mapFrame, providerButtons, navigationLinks, windowHandlers, documentHandlers };
+  return { context, cards, nodes, element, document, filters, mapButtons, mapFrame, navigationLinks, windowHandlers, documentHandlers };
 }
 
-test('branch and provider selection stay synchronized, preserve desktop focus and use the available fallback', () => {
-  const locations = structuredClone(data.contacts.locations);
-  assert(locations[0].googleEmbed && locations[2].googleEmbed);
-  delete locations[1].googleEmbed;
-  const { context, nodes, mapButtons, mapFrame, providerButtons, document, element } = runtime({ locations });
-  const google = providerButtons.find(button => button.dataset.mapProvider === 'google');
-  const yandex = providerButtons.find(button => button.dataset.mapProvider === 'yandex');
-  assert.equal(mapFrame.src, mapButtons[0].dataset.mapGoogleSrc);
-  assert.equal(mapFrame.dataset.mapProvider, 'google');
+test('branch selection switches the Google map, preserves desktop focus and ignores unknown buttons', () => {
+  const { context, nodes, mapButtons, mapFrame, document, element } = runtime();
+  const srcWrites = () => mapFrame.attributeWrites.filter(([name]) => name === 'src').length;
+  assert.equal(mapFrame.src, mapButtons[0].dataset.mapSrc);
+  assert.match(mapFrame.src, /^https:\/\/www\.google\.com\/maps\/embed\?pb=/);
   mapButtons[0].focus();
   mapButtons[0].handlers.click();
-  assert.equal(mapFrame.attributeWrites.filter(([name]) => name === 'src').length, 0);
+  assert.equal(srcWrites(), 0, 'Reselecting the shown branch must not reload the map');
   const status = nodes['#map-status'];
   assert.equal(document.activeElement, mapButtons[0]);
   assert.equal(status.focusCalls, 0);
   assert.equal(status.scrollCalls, 0);
-  yandex.focus();
-  yandex.handlers.click();
-  assert.equal(mapFrame.src, mapButtons[0].dataset.mapSrc);
-  assert.equal(mapFrame.dataset.mapProvider, 'yandex');
-  assert.equal(yandex.getAttribute('aria-pressed'), 'true');
-  assert.equal(google.getAttribute('aria-pressed'), 'false');
-  assert.equal(document.activeElement, yandex);
-  assert.equal(status.focusCalls, 0);
-  assert.equal(status.scrollCalls, 0);
-  const providerWrites = mapFrame.attributeWrites.filter(([name]) => name === 'src').length;
-  yandex.handlers.click();
-  assert.equal(mapFrame.attributeWrites.filter(([name]) => name === 'src').length, providerWrites);
-  google.handlers.click();
-  assert.equal(mapFrame.src, mapButtons[0].dataset.mapGoogleSrc);
-  assert.equal(mapFrame.dataset.mapProvider, 'google');
   const chosen = mapButtons[1];
   chosen.focus();
   chosen.handlers.click();
   assert.equal(mapFrame.src, chosen.dataset.mapSrc);
-  assert.equal(mapFrame.dataset.mapProvider, 'yandex');
-  assert.equal(google.disabled, true);
-  assert.equal(google.getAttribute('aria-pressed'), 'false');
-  assert.equal(yandex.getAttribute('aria-pressed'), 'true');
   assert.equal(mapFrame.title, chosen.dataset.mapTitle);
   assert.equal(status.textContent, chosen.dataset.mapLabel);
   assert.equal(document.activeElement, chosen);
   for (const button of mapButtons) assert.equal(button.getAttribute('aria-pressed'), String(button === chosen));
-  const writesAfterSelection = mapFrame.attributeWrites.filter(([name]) => name === 'src').length;
-  google.handlers.click();
-  assert.equal(mapFrame.src, chosen.dataset.mapSrc);
-  assert.equal(mapFrame.attributeWrites.filter(([name]) => name === 'src').length, writesAfterSelection);
+  const writesAfterSelection = srcWrites();
   chosen.handlers.click();
-  assert.equal(mapFrame.attributeWrites.filter(([name]) => name === 'src').length, writesAfterSelection);
+  assert.equal(srcWrites(), writesAfterSelection);
   const unrelated = element({ mapLocation: 'unknown', mapSrc: 'https://example.org/unsafe-map' });
-  context.updateBranchMap(unrelated, 'google');
+  context.updateBranchMap(unrelated);
   assert.equal(mapFrame.src, chosen.dataset.mapSrc);
   assert.equal(status.textContent, chosen.dataset.mapLabel);
-  assert.equal(mapFrame.attributeWrites.filter(([name]) => name === 'src').length, writesAfterSelection);
+  assert.equal(srcWrites(), writesAfterSelection);
   mapButtons[2].handlers.click();
   assert.equal(mapFrame.src, mapButtons[2].dataset.mapSrc);
-  assert.equal(mapFrame.dataset.mapProvider, 'yandex');
-  assert.equal(google.disabled, false);
-  google.focus();
-  google.handlers.click();
-  assert.equal(mapFrame.src, mapButtons[2].dataset.mapGoogleSrc);
-  assert.equal(mapFrame.dataset.mapProvider, 'google');
-  assert.equal(document.activeElement, google);
-  assert.equal(status.focusCalls, 0);
-  assert.equal(status.scrollCalls, 0);
   mapButtons[0].handlers.click();
-  assert.equal(mapFrame.src, mapButtons[0].dataset.mapGoogleSrc);
+  assert.equal(mapFrame.src, mapButtons[0].dataset.mapSrc);
   const withoutFrame = runtime({ mapPresent: false });
   assert.doesNotThrow(() => withoutFrame.mapButtons[1].handlers.click());
   assert.equal(withoutFrame.document.documentElement.dataset.enhanced, 'true');
@@ -600,10 +528,6 @@ test('branch and provider selection stay synchronized, preserve desktop focus an
   const mobileFocusCalls = mobile.nodes['#map-status'].focusCalls;
   mobile.mapButtons[1].handlers.click();
   assert.equal(mobile.mapFrame.attributeWrites.filter(([name]) => name === 'src').length, mobileWrites);
-  assert.equal(mobile.nodes['#map-status'].focusCalls, mobileFocusCalls + 1);
-  mobile.providerButtons[1].focus();
-  mobile.providerButtons[1].handlers.click();
-  assert.equal(mobile.document.activeElement, mobile.providerButtons[1]);
   assert.equal(mobile.nodes['#map-status'].focusCalls, mobileFocusCalls + 1);
   const motionReduced = runtime({ reducedMotion: true, viewportWidth: 390 });
   motionReduced.mapButtons[1].handlers.click();

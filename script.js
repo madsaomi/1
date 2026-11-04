@@ -77,34 +77,21 @@ systemTheme.addEventListener('change', () => { if (!themeChoice) setTheme(system
 const branchMap = document.querySelector('#branch-map');
 const mapStatus = document.querySelector('#map-status');
 const locationButtons = [...document.querySelectorAll('[data-map-location]')];
-const providerButtons = [...document.querySelectorAll('button[data-map-provider]')];
-let selectedLocation = locationButtons.find(button => button.getAttribute('aria-pressed') === 'true');
-let mapProvider = branchMap?.dataset.mapProvider || 'yandex';
-function updateBranchMap(location, provider) {
+function updateBranchMap(location) {
   if (!branchMap || !location || !locationButtons.includes(location)) return;
-  selectedLocation = location;
-  mapProvider = provider === 'google' && location.dataset.mapGoogleSrc ? 'google' : 'yandex';
-  const src = mapProvider === 'google' ? location.dataset.mapGoogleSrc : location.dataset.mapSrc;
+  const src = location.dataset.mapSrc;
   if (branchMap.getAttribute('src') !== src) branchMap.src = src;
   branchMap.title = location.dataset.mapTitle;
-  branchMap.dataset.mapProvider = mapProvider;
   locationButtons.forEach(item => item.setAttribute('aria-pressed', String(item === location)));
-  providerButtons.forEach(item => {
-    item.setAttribute('aria-pressed', String(item.dataset.mapProvider === mapProvider));
-    item.disabled = item.dataset.mapProvider === 'google' && !location.dataset.mapGoogleSrc;
-  });
   if (mapStatus) mapStatus.textContent = location.dataset.mapLabel;
 }
 locationButtons.forEach(button => button.addEventListener('click', () => {
   if (!branchMap) return;
-  updateBranchMap(button, mapProvider);
+  updateBranchMap(button);
   if (mapStatus && matchMedia('(max-width: 760px)').matches) {
     mapStatus.focus({ preventScroll: true });
     mapStatus.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
-}));
-providerButtons.forEach(button => button.addEventListener('click', () => {
-  if (!button.disabled) updateBranchMap(selectedLocation, button.dataset.mapProvider);
 }));
 
 const dialog = document.querySelector('#enroll-modal');

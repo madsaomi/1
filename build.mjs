@@ -87,25 +87,19 @@ export function renderContacts(contacts, { compact = false } = {}) {
   return `<div class="contact-channels">${groups.join('')}</div>${extras.length ? `<div class="contact-extras">${extras.join('')}</div>` : ''}`;
 }
 
-export function mapWidgetURL(location) {
-  const point = location.coordinates.join(',');
-  const params = new URLSearchParams({ ll: point, z: '16', pt: point, lang: 'ru_RU' });
-  return `https://yandex.ru/map-widget/v1/?${params}`;
-}
-
 export function renderLocations(contacts) {
   if (!contacts.verified || !contacts.locations?.length) return '';
   const providers = { google: 'Google Maps', yandex: 'Яндекс Карты' };
-  const first = contacts.locations.find(location => location.coordinates);
-  const provider = first?.googleEmbed ? 'google' : 'yandex';
+  // Only Google embeds are shown: the Yandex widget displays ads, so Yandex stays a link.
+  const first = contacts.locations.find(location => location.googleEmbed);
   const cards = contacts.locations.map(location => {
     const name = escapeHTML(location.name);
     const address = escapeHTML(location.address);
-    const select = location.coordinates ? `<button type="button" class="location-select" data-map-location="${escapeHTML(location.id)}" data-map-src="${escapeHTML(mapWidgetURL(location))}" data-map-google-src="${escapeHTML(location.googleEmbed || '')}" data-map-title="Карта: ${name}" data-map-label="${name} — ${address}" aria-label="Показать на карте: ${name}" aria-pressed="${location === first}" aria-controls="branch-map"><span class="sr-only">Показать на карте: ${name}</span>${svgIcon('arrow-right')}</button>` : '';
+    const select = location.googleEmbed ? `<button type="button" class="location-select" data-map-location="${escapeHTML(location.id)}" data-map-src="${escapeHTML(location.googleEmbed)}" data-map-title="Карта: ${name}" data-map-label="${name} — ${address}" aria-label="Показать на карте: ${name}" aria-pressed="${location === first}" aria-controls="branch-map"><span class="sr-only">Показать на карте: ${name}</span>${svgIcon('arrow-right')}</button>` : '';
     const links = location.maps.map(map => `<a href="${escapeHTML(map.url)}" target="_blank" rel="noopener noreferrer" aria-label="${providers[map.provider]}: ${name}, ${address}">${providers[map.provider]} ${svgIcon('external')}</a>`).join('');
     return `<article class="location-card"><h4>${name}</h4><p>${address}</p>${select}<div class="map-links">${links}</div></article>`;
   }).join('');
-  const map = first ? `<div class="branch-map-panel"><div class="map-toolbar"><p id="map-status" class="map-status" tabindex="-1" aria-live="polite">${escapeHTML(`${first.name} — ${first.address}`)}</p><div class="map-providers" role="group" aria-label="Сервис карты">${['google', 'yandex'].map(key => `<button type="button" data-map-provider="${key}" aria-controls="branch-map" aria-pressed="${provider === key}"${key === 'google' && !first.googleEmbed ? ' disabled' : ''}>${key === 'google' ? 'Google' : 'Яндекс'}</button>`).join('')}</div></div><iframe id="branch-map" class="branch-map" data-map-provider="${provider}" src="${escapeHTML(provider === 'google' ? first.googleEmbed : mapWidgetURL(first))}" title="${escapeHTML(`Карта: ${first.name}`)}" width="1100" height="360" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : '';
+  const map = first ? `<div class="branch-map-panel"><div class="map-toolbar"><p id="map-status" class="map-status" tabindex="-1" aria-live="polite">${escapeHTML(`${first.name} — ${first.address}`)}</p></div><iframe id="branch-map" class="branch-map" src="${escapeHTML(first.googleEmbed)}" title="${escapeHTML(`Карта: ${first.name}`)}" width="1100" height="360" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : '';
   return `<div class="contact-locations"><h3>Как добраться</h3><div class="location-map-layout"><div class="location-grid">${cards}</div>${map}</div></div>`;
 }
 
