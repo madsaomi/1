@@ -398,6 +398,12 @@ test('native modal, no lead-copy flow, and no automatic content motion', () => {
   assert(!/\binfinite\b/.test(css), 'No infinite animations are allowed');
   // Owner-approved placeholders must always be announced to visitors.
   if (/class="demo-(?:stats|team|results)"|class="demo-results-grid"/.test(html)) assert(html.includes('class="demo-banner"'), 'Placeholders require the demo banner');
+  // Each placeholder block is tagged where it appears, not only in the page banner.
+  for (const block of ['demo-stats', 'teachers-title', 'results-title']) {
+    if (!html.includes(block)) continue;
+    const start = html.indexOf(block);
+    assert(html.slice(start, start + 400).includes('class="demo-tag">Пример</span>'), `${block} needs its «Пример» tag`);
+  }
 });
 
 test('theme initializes even when browser storage is blocked', () => {

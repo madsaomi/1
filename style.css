@@ -175,8 +175,10 @@ html:not([data-enhanced]) .header { position: relative; }
 .practice-icon--label { font-size: var(--text-14); font-weight: 600; letter-spacing: .02em; }
 .practice-icon .icon { width: 24px; height: 24px; }
 /* PLAN-042: owner-approved placeholders on the main page, announced by the static demo banner. */
-.demo-banner { margin: 0; padding: var(--space-1) var(--space-2); background: var(--dark-panel); color: var(--on-dark); font-size: var(--text-14); text-align: center; }
-.demo-banner strong { color: var(--brand); }
+/* Quiet notice; each placeholder block carries its own «Пример» tag. */
+.demo-banner { margin: 0; padding: 4px var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface-hover); color: var(--muted); font-size: var(--text-14); text-align: center; }
+.demo-tag { display: inline-block; padding: 2px 8px; border: 1px dashed var(--border-strong); border-radius: 999px; color: var(--muted); font-size: var(--text-14); font-weight: 500; letter-spacing: 0; line-height: 1.5; vertical-align: middle; }
+.demo-stats > .demo-tag { display: block; width: max-content; margin: 0 0 var(--space-1) auto; }
 .demo-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); padding: var(--space-1); background: repeating-linear-gradient(135deg, #0000000d 0 12px, #00000000 12px 24px), var(--solid); color: var(--muted); text-align: center; }
 .demo-photo small { font-size: var(--text-14); }
 .demo-stats { margin-top: var(--space-2); }
