@@ -75,7 +75,6 @@ em { font-style: normal; }
 .header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); min-height: var(--header-height); padding-block: var(--space-2); background: var(--paper); border-bottom: 1px solid var(--border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 /* Extend the opaque surface across the viewport without widening the content grid. */
 .header::before { content: ''; position: absolute; z-index: -1; inset: 0; background: var(--paper); box-shadow: 0 0 0 100vmax var(--paper); clip-path: inset(0 -100vmax); pointer-events: none; }
-.header::after { content: ''; position: absolute; right: 0; bottom: -4px; left: 0; height: 3px; background: var(--brand); pointer-events: none; }
 .brand { display: inline-flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
 .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; background: var(--brand); border-radius: var(--radius-control); }
 .brand-mark img { width: 32px; height: 32px; object-fit: contain; filter: brightness(0); }
@@ -109,17 +108,14 @@ html:not([data-enhanced]) .header { position: relative; }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
 .hero-footnote { margin-top: var(--space-2); font-size: var(--text-14); color: var(--muted); }
 .hero-visual { display: flex; flex-direction: column; min-width: 0; margin: 0; overflow: hidden; border-radius: var(--radius-panel); background: var(--brand); }
-.hero .hero-visual { border: 2px solid var(--on-brand); }
-.hero .hero-visual figcaption { background: var(--on-brand); color: var(--brand); }
+/* PLAN-040: brand-book logo on a black panel; the yellow mark would vanish on the yellow hero. */
+.hero .hero-logo { display: grid; place-items: center; min-height: 200px; padding: var(--space-5) var(--space-4); background: var(--on-brand); }
+.hero-logo picture { display: contents; }
+.hero-logo img { width: min(100%, 320px); height: auto; }
 .hero .button { background: var(--on-brand); border-color: var(--on-brand); color: var(--brand); }
 .hero .button:hover { background: #000000; border-color: #000000; }
 .hero .text-link { padding: 10px 16px; border: 2px solid var(--on-brand); border-radius: var(--radius-control); color: var(--on-brand); font-weight: 600; }
 .hero :is(a, button):focus-visible { outline-color: var(--on-brand); }
-.hero-image-wrap { position: relative; flex: 1; min-height: 160px; aspect-ratio: 2 / 1; background: var(--brand); isolation: isolate; overflow: hidden; }
-.hero-image-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 60%; filter: grayscale(1); mix-blend-mode: multiply; }
-.hero-visual figcaption { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1); padding: var(--space-2); color: var(--button-ink); }
-.hero-visual figcaption > span { font-size: var(--text-20); font-weight: 600; letter-spacing: -.03em; }
-.hero-visual figcaption small { max-width: 20ch; font-size: var(--text-14); line-height: 1.5; text-align: right; }
 .directions { padding-bottom: var(--space-2); }
 .hero-programs { display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--border); border-radius: var(--radius-panel); overflow: hidden; background: var(--surface); }
 .hero-program { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; padding: var(--space-2); transition: background var(--duration) var(--ease); }
@@ -129,7 +125,7 @@ html:not([data-enhanced]) .header { position: relative; }
 .hero-program > span:first-child { min-width: 0; }
 .hero-program strong { display: block; font-size: var(--text-16); font-weight: 600; }
 .hero-program small { display: block; margin-top: var(--space-1); font-size: var(--text-14); color: var(--muted); }
-.hero-program-price { flex-shrink: 0; font-size: var(--text-20); font-weight: 600; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.hero-program-price { flex-shrink: 0; font-size: var(--text-16); font-weight: 600; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .hero-program-price small { margin-top: 0; font-weight: 400; }
 /* PLAN-038: преимущества из уже опубликованных фактов; Supporter выделен как главное отличие. */
 .why-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
@@ -138,9 +134,6 @@ html:not([data-enhanced]) .header { position: relative; }
 .why-list .practice-icon .icon { width: 24px; height: 24px; }
 .why-list h3 { margin-bottom: var(--space-1); font-size: var(--text-20); }
 .why-list p { color: var(--muted); font-size: var(--text-16); }
-.why-list .why-key { border-color: var(--brand); background: var(--brand); color: var(--on-brand); }
-.why-list .why-key p { color: var(--on-brand-muted); }
-.why-list .why-key .practice-icon { background: var(--on-brand); color: var(--brand); }
 .catalog-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
 .filters { display: none; flex-wrap: wrap; gap: var(--space-1); }
 [data-enhanced="true"] .filters { display: flex; }
@@ -247,8 +240,11 @@ details[open] > summary > .icon { transform: rotate(45deg); }
 .price-table tbody tr:last-child > * { border-bottom: 0; }
 .price-table tbody tr { transition: background var(--duration) var(--ease); }
 .price-table tbody tr:is(:hover, :focus-within) { background: var(--surface-hover); }
-.price-course-link { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 48px; font-weight: 500; overflow-wrap: anywhere; text-underline-offset: 4px; }
-.price-course-link > .icon { width: 16px; height: 16px; }
+/* Inline so the arrow follows the last word of a wrapped name instead of the column edge. */
+.price-course-link { display: inline; padding-block: var(--space-1); font-weight: 500; line-height: 1.5; text-underline-offset: 4px; }
+.price-course-link .nowrap { white-space: nowrap; }
+.price-course-link .icon { display: inline-block; width: 16px; height: 16px; margin-left: 4px; vertical-align: -3px; }
+.price-table tbody th { padding-block: var(--space-2); }
 .price-course-link:hover { text-decoration: underline; }
 .price-amount { font-size: var(--text-16); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .price-special { background: var(--transparent); }
@@ -346,14 +342,12 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .header { gap: var(--space-2); }
   h1 { font-size: var(--text-48); }
   .hero { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-block: var(--space-5); }
-  .hero-image-wrap { min-height: 240px; aspect-ratio: 4 / 3; }
-  .hero-visual figcaption { padding: var(--space-2) var(--space-3); }
   .hero-programs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-program { flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3); }
   .hero-program + .hero-program { border-top: 0; }
   .hero-program:nth-of-type(odd) { border-right: 1px solid var(--border); }
   .hero-program:nth-of-type(n + 3) { border-top: 1px solid var(--border); }
-  .hero-program-price { text-align: left; }
+  .hero-program-price { font-size: var(--text-20); text-align: left; }
   .course-grid, .exam-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
   .course-card h3 { min-height: var(--space-8); }
   .course-description { min-height: 96px; }

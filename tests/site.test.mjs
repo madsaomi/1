@@ -796,13 +796,18 @@ test('discount conditions are visible without a popup, disclosure or JavaScript'
   assert(!html.includes('discount-tooltip'));
 });
 
-test('hero starting prices use standard program prices and omit unavailable categories', () => {
+test('direction prices show standard prices without "от" and omit unavailable categories', () => {
   const english = data.courses.filter(course => course.name === 'General English');
   const output = renderHero(english);
   const lowestStandard = Math.min(...english.map(course => course.price));
   const lowestSpecial = Math.min(...english.map(course => course.specialPrice));
   assert(output.includes(new Intl.NumberFormat('ru-RU').format(lowestStandard)));
   assert(!output.includes(new Intl.NumberFormat('ru-RU').format(lowestSpecial)));
+  const highestStandard = Math.max(...english.map(course => course.price));
+  assert(output.includes(`${new Intl.NumberFormat('ru-RU').format(lowestStandard)} – ${new Intl.NumberFormat('ru-RU').format(highestStandard)}`), 'Differing prices show the full range');
+  assert(!/>от\s/.test(output), 'PLAN-040: no "от" before direction prices');
+  const single = renderHero(english.slice(0, 1));
+  assert(!single.includes(' – '), 'A single program shows one price');
   assert(output.includes('data-goal="languages"'));
   assert(!output.includes('data-goal="exam"'));
   assert.equal(renderHero([]), '');

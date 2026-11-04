@@ -122,13 +122,22 @@ export function renderHero(courses) {
   return groups.map(([category, title, description]) => {
     const programs = courses.filter(course => course.category === category);
     if (!programs.length) return '';
-    const minimum = Math.min(...programs.map(course => course.price));
-    return `<a class="hero-program" href="#courses" data-goal="${category}"><span><strong>${title}</strong><small>${description}</small></span><span class="hero-program-price">от ${money(minimum)}<small>сум / месяц</small></span></a>`;
+    const prices = programs.map(course => course.price);
+    const [minimum, maximum] = [Math.min(...prices), Math.max(...prices)];
+    // Without "от": one price, or the full range when programs differ.
+    const price = minimum === maximum ? money(minimum) : `${money(minimum)} – ${money(maximum)}`;
+    return `<a class="hero-program" href="#courses" data-goal="${category}"><span><strong>${title}</strong><small>${description}</small></span><span class="hero-program-price">${price}<small>сум / месяц</small></span></a>`;
   }).filter(Boolean).join('\n');
 }
 
 export function renderPrices(courses) {
-  return courses.map(course => `<tr><th scope="row"><a class="price-course-link" href="#course-${escapeHTML(course.id)}" data-reveal-course="${escapeHTML(course.id)}">${escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '))}${svgIcon('arrow-right')}</a></th><td class="price-amount"><span class="price-standard">${money(course.price)}</span></td><td class="price-amount">${course.specialPrice ? `<span class="price-special"><strong>${money(course.specialPrice)}</strong></span>` : '<span class="price-empty" aria-label="Специальная цена не предусмотрена">—</span>'}</td></tr>`).join('\n');
+  return courses.map(course => {
+    // Keep the arrow with the last word so a wrapped name never leaves it alone on a line.
+    const words = [course.name, course.subtitle].filter(Boolean).join(' ').split(' ');
+    const last = words.pop();
+    const label = `${words.length ? `${escapeHTML(words.join(' '))} ` : ''}<span class="nowrap">${escapeHTML(last)}${svgIcon('arrow-right')}</span>`;
+    return `<tr><th scope="row"><a class="price-course-link" href="#course-${escapeHTML(course.id)}" data-reveal-course="${escapeHTML(course.id)}">${label}</a></th><td class="price-amount"><span class="price-standard">${money(course.price)}</span></td><td class="price-amount">${course.specialPrice ? `<span class="price-special"><strong>${money(course.specialPrice)}</strong></span>` : '<span class="price-empty" aria-label="Специальная цена не предусмотрена">—</span>'}</td></tr>`;
+  }).join('\n');
 }
 
 export function renderFilters(courses) {
