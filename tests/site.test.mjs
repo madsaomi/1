@@ -408,6 +408,9 @@ test('native modal, no lead-copy flow, and no automatic content motion beyond th
   const otherInfinite = lines.filter(line => /\binfinite\b/.test(line) && !line.includes('team-marquee'));
   assert(marqueeLines.length === 1, 'The teachers marquee is the only sanctioned infinite animation');
   assert(otherInfinite.length === 0, 'No other infinite animations are allowed');
+  // PLAN-037 (WCAG 2.2.2): touch users get a no-JS control that stops the marquee.
+  assert(/<input type="checkbox" id="team-pause" aria-label="[^"]+">/.test(html), 'The marquee needs a labelled pause control');
+  assert(css.includes('#teachers:has(#team-pause:checked) .team-track { display: contents; }'), 'Pausing must show the static grid');
 });
 
 test('theme initializes even when browser storage is blocked', () => {
