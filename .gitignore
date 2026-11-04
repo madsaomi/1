@@ -20,7 +20,9 @@ __pycache__/
 
 # Source artwork, preview captures and archives
 brand-source/
-preview/
+# preview/ holds the owner demo (tracked, never in Docker); only captures stay local.
+preview/*.png
+preview/*.jpg
 assets/courses/*.png
 assets/courses/IMAGE_PROMPTS.md
 assets/clubs/*.png
