@@ -130,6 +130,19 @@ export function renderHero(courses) {
   }).filter(Boolean).join('\n');
 }
 
+export function renderCTA(contacts) {
+  const telegram = contacts.verified ? contacts.telegrams?.[0] : '';
+  const phone = contacts.verified ? contacts.phones?.[0] : '';
+  // The trial lesson goes straight to admissions in Telegram; unverified contacts keep the in-page fallback.
+  const trial = telegram
+    ? `<a class="button" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer" aria-label="Бесплатный пробный урок: написать в Telegram">Бесплатный пробный урок${svgIcon('external')}</a>`
+    : '<a class="button" href="#enroll">Бесплатный пробный урок</a>';
+  const note = telegram && phone
+    ? `Откроется Telegram. Или позвоните: <a href="tel:${escapeHTML(phone)}">${escapeHTML(displayPhone(phone))}</a>`
+    : 'Запись — по телефону или в Telegram.';
+  return `<div class="actions">${trial}<a class="text-link" href="#courses">Выбрать курс${svgIcon('arrow-right')}</a></div>\n<p class="hero-footnote">${note}</p>`;
+}
+
 export function renderPrices(courses) {
   return courses.map(course => {
     // Keep the arrow with the last word so a wrapped name never leaves it alone on a line.
@@ -159,6 +172,7 @@ export function generate(html, data) {
   validateContent(data);
   html = replaceBlock(html, 'COURSES', renderCourses(data.courses));
   html = replaceBlock(html, 'HERO', renderHero(data.courses));
+  html = replaceBlock(html, 'CTA', renderCTA(data.contacts));
   html = replaceBlock(html, 'PRICES', renderPrices(data.courses));
   html = replaceBlock(html, 'FILTERS', renderFilters(data.courses));
   html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts));

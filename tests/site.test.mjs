@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderPrices, renderHero, escapeHTML } from '../build.mjs';
+import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderPrices, renderHero, renderCTA, escapeHTML } from '../build.mjs';
 
 const data = readContent();
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -50,6 +50,25 @@ test('unverified contacts never produce actionable links', () => {
     assert(output.includes('Запись временно недоступна'));
   }
   assert.equal(renderLocations(contacts), '');
+  const cta = renderCTA(contacts);
+  assert(!/href="(?:https?:|tel:)/.test(cta), 'Unverified contacts keep the in-page trial link');
+  assert(cta.includes('href="#enroll"'));
+});
+
+test('trial lesson CTA opens the first admissions Telegram and offers the first phone', () => {
+  const contacts = contactFixture();
+  const cta = renderCTA(contacts);
+  const trial = htmlAttributes(cta.match(/<a\b[^>]*class="button"[^>]*>/)[0]);
+  assert.equal(trial.href, contacts.telegrams[0]);
+  assert.equal(trial.target, '_blank');
+  assert.equal(trial.rel, 'noopener noreferrer');
+  assert.match(trial['aria-label'], /Telegram/);
+  assert(cta.includes(`href="tel:${contacts.phones[0]}"`));
+  assert(cta.includes('href="#courses"'));
+  assert(!cta.includes(contacts.hrTelegram || 'no-hr'), 'HR never becomes the admissions CTA');
+  const published = html.split('<!-- CTA_START -->')[1].split('<!-- CTA_END -->')[0];
+  assert(published.includes(`href="${data.contacts.telegrams[0]}"`));
+  assert.equal(renderCTA({ ...contacts, telegrams: [] }).includes('href="#enroll"'), true, 'Without Telegram the trial stays in-page');
 });
 
 test('verified channels are constrained and require at least one usable channel', () => {
