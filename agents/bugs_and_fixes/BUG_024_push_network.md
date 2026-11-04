@@ -17,3 +17,5 @@
 По повторному запросу владельца push завершился exit0 (c6aa4ad..0ac979a main→main). Отдельный ls-remote подтвердил0ac979ab26ccf8d398e4257a61145083ef99139e. DNS/proxy/remote/credentials не изменялись. Ранее описанные отказы сохраняются как история; текущий push подтвержден, CI/деплой отдельно.
 
 Первая попытка заменить deployment runbook одним apply_patch Delete+Add того же пути была атомарно отклонена как duplicate target; исправлена обычной записью уже прочитанного документа. Secret-scan нашел5credential-URL в отрицательных test fixtures; это тестовые значения для проверки запрета URL credentials, не реальные доступы.
+
+2026-11-04 (Claude Code, PLAN-041): commit 9521e2f создан локально; `git push origin main` дважды завершился exit 128 «Could not resolve host: github.com». DNS/proxy/remote/credentials не менялись; ветка main впереди origin на коммит(ы), push повторить при восстановлении сети.
