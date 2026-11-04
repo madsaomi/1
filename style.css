@@ -179,17 +179,15 @@ html:not([data-enhanced]) .header { position: relative; }
 .demo-banner { margin: 0; padding: 4px var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface-hover); color: var(--muted); font-size: var(--text-14); text-align: center; }
 .demo-tag { display: inline-block; padding: 2px 8px; border: 1px dashed var(--border-strong); border-radius: 999px; color: var(--muted); font-size: var(--text-14); font-weight: 500; letter-spacing: 0; line-height: 1.5; vertical-align: middle; }
 .demo-stats > .demo-tag { display: block; width: max-content; margin: 0 0 var(--space-1) auto; }
-.demo-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); padding: var(--space-1); background: repeating-linear-gradient(135deg, #0000000d 0 12px, #00000000 12px 24px), var(--solid); color: var(--muted); text-align: center; }
-.demo-photo small { font-size: var(--text-14); }
 .demo-stats { margin-top: var(--space-2); }
 .demo-stats dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-radius: var(--radius-panel); background: var(--dark-panel); color: var(--on-dark); overflow: hidden; }
 .demo-stats div { display: flex; flex-direction: column-reverse; gap: var(--space-1); padding: var(--space-3); }
 .demo-stats dd { margin: 0; font-size: var(--text-32); font-weight: 700; letter-spacing: -.03em; color: var(--brand); }
 .demo-stats dt { font-size: var(--text-14); color: var(--on-dark-muted); }
-.demo-team { display: grid; gap: var(--space-2); }
+.demo-team { display: grid; grid-auto-rows: 1fr; gap: var(--space-2); }
 .demo-teacher { display: grid; grid-template-columns: 112px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
-.demo-portrait { aspect-ratio: 4 / 5; }
-.demo-portrait small { display: none; }
+/* Initials stand in for teacher photos until real portraits arrive. */
+.demo-initials { display: grid; place-items: center; aspect-ratio: 4 / 5; background: var(--brand); color: var(--on-brand); font-size: var(--text-32); font-weight: 700; letter-spacing: -.02em; }
 .demo-teacher-body { padding: var(--space-2) var(--space-3) var(--space-3); }
 .demo-teacher h3 { font-size: var(--text-20); }
 .demo-teacher p { margin-top: var(--space-1); color: var(--muted); }
@@ -358,7 +356,7 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .demo-stats dd { font-size: var(--text-48); }
   .demo-team { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
   .demo-teacher { display: block; }
-  .demo-portrait small { display: block; }
+  .demo-initials { aspect-ratio: 4 / 3; font-size: var(--text-48); }
   .demo-results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
   .why-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
   .why-list li { padding: var(--space-3); }
