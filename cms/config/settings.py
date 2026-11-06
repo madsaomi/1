@@ -1,0 +1,187 @@
+"""Settings for the hidden content admin (PLAN-044). Production values come from Railway variables."""
+import os
+from datetime import timedelta
+from pathlib import Path
+
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+SITE_ROOT = BASE_DIR.parent  # the static site whose content.js the admin publishes
+
+# Fail closed: debug and its conveniences exist only when DJANGO_DEBUG=1 is set explicitly (local preview).
+DEBUG = os.environ.get('DJANGO_DEBUG') == '1'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or ('local-dev-only-key' if DEBUG else None)
+if not SECRET_KEY:
+    raise RuntimeError('DJANGO_SECRET_KEY must be set outside local development')
+ALLOWED_HOSTS = [host for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost' if DEBUG else '').split(',') if host]
+CSRF_TRUSTED_ORIGINS = [origin for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if origin]
+# The admin lives on a secret path in production; the default is only for local preview.
+ADMIN_PATH = os.environ.get('ADMIN_PATH') or ('admin/' if DEBUG else '')
+if not DEBUG and (not ADMIN_PATH.endswith('/') or ADMIN_PATH in {'/', 'admin/'} or len(ADMIN_PATH) < 12):
+    raise RuntimeError('ADMIN_PATH must be a secret path (12+ characters, ending with "/") outside local development')
+
+INSTALLED_APPS = [
+    'unfold.apps.BasicAppConfig',  # templates and styles; the admin site itself comes from config.apps
+    'config.apps.AdminConfig',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
+    'axes',
+    'content',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'config.middleware.NoIndexMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_otp.middleware.OTPMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware',  # must be last
+]
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',  # must be first
+    'django.contrib.auth.backends.ModelBackend',
+]
+# Brute-force protection: behind Railway's proxy REMOTE_ADDR is shared, so lock by username, not IP.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=15)
+AXES_LOCKOUT_PARAMETERS = ['username']
+AXES_RESET_ON_SUCCESS = True
+# W006 warns that User-Agent/cookie rotation evades IP-less lockouts; a username lockout is not evaded that way,
+# and an IP lockout would lock every visitor sharing the proxy address.
+# W021: a *.up.railway.app host cannot join the browser HSTS preload list.
+SILENCED_SYSTEM_CHECKS = ['axes.W006', 'security.W021']
+OTP_TOTP_ISSUER = 'Stanford admin'
+
+ROOT_URLCONF = 'config.urls'
+WSGI_APPLICATION = 'config.wsgi.application'
+
+TEMPLATES = [{
+    'BACKEND': 'django.template.backends.django.DjangoTemplates',
+    'DIRS': [BASE_DIR / 'templates'],
+    'APP_DIRS': True,
+    'OPTIONS': {'context_processors': [
+        'django.template.context_processors.request',
+        'django.contrib.auth.context_processors.auth',
+        'django.contrib.messages.context_processors.messages',
+    ]},
+}]
+
+# Local preview uses SQLite; Railway provides Postgres through DATABASE_* variables (stage 5).
+if os.environ.get('POSTGRES_DB'):
+    DATABASES = {'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ['POSTGRES_DB'],
+        'USER': os.environ.get('POSTGRES_USER', ''),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+        'HOST': os.environ.get('POSTGRES_HOST', ''),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+    }}
+else:
+    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}}
+
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 12}},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+]
+
+LANGUAGE_CODE = 'ru'
+TIME_ZONE = 'Asia/Tashkent'
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [('site', SITE_ROOT / 'assets')]
+MEDIA_URL = 'media/'
+MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', BASE_DIR / 'media'))
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_AGE = 8 * 60 * 60
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+CSRF_COOKIE_SECURE = not DEBUG
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'same-origin'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+if not DEBUG:
+    # Railway terminates TLS and forwards the original scheme.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SECURE_REDIRECT_EXEMPT = [r'^healthz$']
+    SECURE_HSTS_SECONDS = 365 * 24 * 60 * 60
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # the admin host has no subdomains of its own
+
+# Photos only: small, common formats (see content.validators); requests stay modest.
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
+
+def changelist(model):
+    return reverse_lazy(f'admin:content_{model}_changelist')
+
+
+def singleton(model):
+    return reverse_lazy(f'admin:content_{model}_change', args=[1])
+
+
+UNFOLD = {
+    'SITE_TITLE': 'Stanford — админка',
+    'SITE_HEADER': 'Stanford',
+    'SITE_SUBHEADER': 'Language Center',
+    'SITE_SYMBOL': 'school',
+    'SITE_URL': None,  # no «Return to site» link: the admin has no site of its own
+    'SITE_ICON': lambda request: static('site/stanford-icon.svg'),
+    'SITE_FAVICONS': [{'rel': 'icon', 'type': 'image/svg+xml', 'href': lambda request: static('site/favicon.svg')}],
+    'SHOW_HISTORY': True,
+    'SHOW_VIEW_ON_SITE': False,
+    'BORDER_RADIUS': '12px',
+    # Brand #FFB703 (oklch 82.5% .171 79.9). Unfold puts white text on primary-600 (buttons),
+    # so 600+ are deep amber steps that keep white text readable.
+    'COLORS': {
+        'primary': {
+            '50': 'oklch(98.5% .02 80)', '100': 'oklch(96.5% .05 80)', '200': 'oklch(93% .09 80)',
+            '300': 'oklch(89% .13 80)', '400': 'oklch(86% .16 80)', '500': 'oklch(82.5% .171 79.9)',
+            '600': 'oklch(50% .12 68)', '700': 'oklch(43% .1 66)', '800': 'oklch(37% .085 64)',
+            '900': 'oklch(31% .07 62)', '950': 'oklch(23% .05 60)',
+        },
+    },
+    'SIDEBAR': {
+        'show_search': False,
+        'show_all_applications': False,
+        'navigation': [
+            {'title': 'Сайт', 'items': [
+                {'title': 'Настройки и демо-режим', 'icon': 'tune', 'link': singleton('sitesettings')},
+                {'title': 'Цифры', 'icon': 'bar_chart', 'link': changelist('stat')},
+            ]},
+            {'title': 'Обучение', 'items': [
+                {'title': 'Курсы и цены', 'icon': 'menu_book', 'link': changelist('course')},
+            ]},
+            {'title': 'Люди', 'items': [
+                {'title': 'Преподаватели', 'icon': 'group', 'link': changelist('teacher')},
+                {'title': 'Результаты студентов', 'icon': 'emoji_events', 'link': changelist('studentresult')},
+            ]},
+            {'title': 'Связь', 'items': [
+                {'title': 'Контакты', 'icon': 'call', 'link': singleton('contacts')},
+                {'title': 'Филиалы и карты', 'icon': 'location_on', 'link': changelist('location')},
+            ]},
+            {'title': 'Доступ', 'separator': True, 'items': [
+                {'title': 'Учетная запись', 'icon': 'person', 'link': reverse_lazy('admin:auth_user_changelist'),
+                 'permission': lambda request: request.user.is_superuser},
+            ]},
+        ],
+    },
+}

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderPrices, renderHero, renderCTA, escapeHTML } from '../build.mjs';
+import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderPrices, renderHero, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
 
 const data = readContent();
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -336,12 +336,14 @@ test('one lazy Google map has a static initial selection, accessible controls an
   assert(!/map-providers|data-map-provider|yandex\.ru\/map-widget/.test(output));
   assert(!/<script\b|<img\b|<embed\b/i.test(output));
   // Branches without a photo show one tagged placeholder each; a provided photo replaces it.
-  const photoSlots = output.match(/<div class="location-photo location-photo-demo"[\s\S]*?<\/div>/g) || [];
+  assert(!output.includes('location-photo-demo'), 'Placeholders appear only in demo mode');
+  const demoOutput = renderLocations(contacts, { demo: true });
+  const photoSlots = demoOutput.match(/<div class="location-photo location-photo-demo"[\s\S]*?<\/div>/g) || [];
   assert.equal(photoSlots.length, contacts.locations.length);
   for (const slot of photoSlots) assert(slot.includes('<span class="demo-tag">Пример</span>'));
   const withPhoto = structuredClone(contacts);
   withPhoto.locations[1].photo = 'assets/stanford-logo.webp';
-  const photoOutput = renderLocations(withPhoto);
+  const photoOutput = renderLocations(withPhoto, { demo: true });
   assert.equal((photoOutput.match(/class="location-photo location-photo-demo"/g) || []).length, contacts.locations.length - 1);
   assert(photoOutput.includes('<img class="location-photo" src="assets/stanford-logo.webp"'));
   const badPhoto = structuredClone(data);
@@ -411,9 +413,9 @@ test('native modal, no lead-copy flow, and no automatic content motion', () => {
   // PLAN-042: the teachers marquee was replaced by static cards, so nothing loops.
   assert(!/\binfinite\b/.test(css), 'No infinite animations are allowed');
   // Owner-approved placeholders must always be announced to visitors.
-  if (/class="demo-(?:stats|team|results)"|class="demo-results-grid"|location-photo-demo/.test(html)) assert(html.includes('class="demo-banner"'), 'Placeholders require the demo banner');
-  // Each placeholder block is tagged where it appears, not only in the page banner.
-  for (const block of ['demo-stats', 'teachers-title', 'results-title']) {
+  // Demo mode announces samples twice: the page banner and a «Пример» tag on each sample block.
+  assert.equal(html.includes('class="demo-banner"'), html.includes('class="demo-tag"'), 'Demo banner and «Пример» tags appear together');
+  for (const block of ['stats-strip', 'teachers-title', 'results-title']) {
     if (!html.includes(block)) continue;
     const start = html.indexOf(block);
     assert(html.slice(start, start + 400).includes('class="demo-tag">Пример</span>'), `${block} needs its «Пример» tag`);
@@ -844,4 +846,61 @@ test('direction prices show standard prices without "от" and omit unavailable 
   assert(output.includes('data-goal="languages"'));
   assert(!output.includes('data-goal="exam"'));
   assert.equal(renderHero([]), '');
+});
+
+test('stats, teachers and results are generated from content and demo mode controls every sample marker', () => {
+  const demo = { ...data.site, demoMode: true };
+  const live = { ...data.site, demoMode: false };
+  assert.match(renderDemoBanner(demo), /class="demo-banner"/);
+  assert.equal(renderDemoBanner(live), '');
+  assert.match(renderStats(data.stats, demo), /class="demo-tag">Пример<\/span><dl>/);
+  assert(!renderStats(data.stats, live).includes('demo-tag'));
+  assert.equal(renderStats([], demo), '');
+  assert.equal((renderStats(data.stats, live).match(/<dd>/g) || []).length, data.stats.length);
+  const teachers = renderTeachers(data.teachers, live);
+  assert.equal((teachers.match(/class="teacher-card"/g) || []).length, data.teachers.length);
+  assert(teachers.includes(`>${initials(data.teachers[0].name)}</div>`));
+  assert.equal(initials('Айгуль Бекмуратова'), 'АБ');
+  const withPhoto = renderTeachers([{ ...data.teachers[0], photo: 'assets/stanford-logo.webp' }], live);
+  assert(withPhoto.includes('<img class="teacher-photo" src="assets/stanford-logo.webp"') && !withPhoto.includes('teacher-initials'));
+  const emptyTeachers = renderTeachers([], live);
+  assert(emptyTeachers.includes('id="teachers-title"') && !emptyTeachers.includes('team-grid'), 'The #teachers anchor keeps its heading without cards');
+  assert(renderTeachers(data.teachers, demo).includes('Преподаватели <span class="demo-tag">Пример</span>'));
+  const results = renderResults(data.results, live);
+  assert.equal((results.match(/class="result-card"/g) || []).length, data.results.length);
+  assert(results.includes('id="results"') && !results.includes('demo-tag'));
+  assert.equal(renderResults([], demo), '');
+  const escaped = renderResults([{ score: '<b>', exam: 'IELTS', quote: '<script>', student: 'A & B' }], live);
+  assert(!/<script>|<b>/.test(escaped) && escaped.includes('A &amp; B'));
+  const liveHtml = generate(html, { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
+  assert(!/demo-banner|demo-tag|location-photo-demo|name="robots"/.test(liveHtml), 'Turning demo mode off removes every sample marker and allows indexing');
+  assert.equal(renderRobots(demo), '<meta name="robots" content="noindex, nofollow">');
+  assert.equal(renderRobots(live), '');
+  assert.equal(html.includes('name="robots" content="noindex'), data.site.demoMode === true, 'The published page is noindex exactly while demo mode is on');
+  assert(liveHtml.includes('href="#teachers"') && liveHtml.includes('id="teachers"'));
+});
+
+test('content validation guards stats, teachers, results, photos and student consent', () => {
+  const valid = () => structuredClone(data);
+  assert.doesNotThrow(() => validateContent(valid()));
+  const cases = [
+    content => { content.stats[0].value = ''; },
+    content => { content.stats[0].label = 'x'.repeat(41); },
+    content => { content.teachers[0].name = ''; },
+    content => { content.teachers[0].photo = 'https://example.org/p.jpg'; },
+    content => { content.teachers[0].photo = 'assets/uploads/missing.webp'; },
+    content => { content.results[0].quote = ''; },
+    content => { content.site.demoMode = 'yes'; },
+    content => { content.teachers = {}; }
+  ];
+  for (const breakContent of cases) {
+    const content = valid();
+    breakContent(content);
+    assert.throws(() => validateContent(content), undefined, breakContent.toString());
+  }
+  const live = valid();
+  live.site.demoMode = false;
+  assert.throws(() => validateContent(live), /consent/, 'Real results need consent');
+  live.results.forEach(result => { result.consent = true; });
+  assert.doesNotThrow(() => validateContent(live));
 });

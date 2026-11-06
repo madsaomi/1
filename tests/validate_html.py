@@ -51,7 +51,7 @@ def main():
     assert all((ROOT / path).is_file() for path in page.files), 'Missing static resource'
     assert not {'team', 'quiz', 'reviews', 'comparison', 'schedule', 'floating-island'} & set(page.ids)
     html = (ROOT / 'index.html').read_text(encoding='utf-8')
-    assert 'demo-team' not in html or 'class="demo-banner"' in html, 'Placeholders need the demo banner'
+    assert ('class="demo-banner"' in html) == ('class="demo-tag"' in html), 'Demo banner and «Пример» tags appear together'
     css = (ROOT / 'style.css').read_text(encoding='utf-8')
     assert css.count('{') == css.count('}'), 'Unbalanced CSS braces'
     assert css.count(':root {') == 1, 'Expected one token definition'

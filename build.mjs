@@ -23,6 +23,13 @@ export function readContent() {
   return context.window.schoolContent;
 }
 
+const photoPattern = /^assets\/[a-z0-9/_-]+\.(?:jpe?g|webp|png)$/;
+function validatePhoto(photo, message) {
+  if (photo !== undefined && (typeof photo !== 'string' || !photoPattern.test(photo) || !fs.existsSync(new URL(photo, import.meta.url)))) throw new Error(message);
+}
+const text = (value, max) => typeof value === 'string' && value.trim() !== '' && value.length <= max;
+const optionalText = (value, max) => value === undefined || text(value, max);
+
 export function validateContent(data) {
   const ids = new Set();
   for (const course of data.courses) {
@@ -30,7 +37,6 @@ export function validateContent(data) {
     ids.add(course.id);
     if (!Number.isFinite(course.price) || course.price <= 0) throw new Error(`Invalid price: ${course.id}`);
     if (course.specialPrice != null && (!Number.isFinite(course.specialPrice) || course.specialPrice <= 0 || course.specialPrice > course.price)) throw new Error(`Invalid discounted price: ${course.id}`);
-    if (!fs.existsSync(new URL(course.image, import.meta.url))) throw new Error(`Missing image: ${course.id}`);
     if (!/^#[a-z0-9-]+$/.test(course.target)) throw new Error(`Invalid course target: ${course.id}`);
   }
   if (data.contacts.verified) {
@@ -55,7 +61,7 @@ export function validateContent(data) {
         try { embed = new URL(location.googleEmbed); } catch { throw new Error('Use an approved Google embed URL'); }
         if (typeof location.googleEmbed !== 'string' || embed.origin !== 'https://www.google.com' || embed.username || embed.password || embed.pathname !== '/maps/embed' || embed.hash || embed.searchParams.size !== 1 || !embed.searchParams.get('pb')) throw new Error('Use an approved Google embed URL');
       }
-      if (location.photo !== undefined && (typeof location.photo !== 'string' || !/^assets\/[a-z0-9/_-]+\.(?:jpe?g|webp|png)$/.test(location.photo) || !fs.existsSync(new URL(location.photo, import.meta.url)))) throw new Error('Use an existing local branch photo');
+      validatePhoto(location.photo, 'Use an existing local branch photo');
       if (!Array.isArray(location.maps) || !location.maps.length) throw new Error('Location must have a map link');
       for (const map of location.maps) {
         const patterns = {
@@ -65,6 +71,20 @@ export function validateContent(data) {
         if (!Object.hasOwn(patterns, map.provider) || typeof map.url !== 'string' || !patterns[map.provider].test(map.url)) throw new Error('Use an approved HTTPS map URL for its provider');
       }
     }
+  }
+  const demo = data.site?.demoMode;
+  if (demo !== undefined && typeof demo !== 'boolean') throw new Error('demoMode must be true or false');
+  const { stats = [], teachers = [], results = [] } = data;
+  if (![stats, teachers, results].every(Array.isArray)) throw new Error('Stats, teachers and results must be arrays');
+  for (const stat of stats) if (!text(stat.value, 12) || !text(stat.label, 40)) throw new Error('Stat needs a short value and label');
+  for (const teacher of teachers) {
+    if (!text(teacher.name, 60) || !text(teacher.role, 80) || !optionalText(teacher.qualification, 40) || !optionalText(teacher.experience, 40)) throw new Error('Teacher needs a name, role and short optional details');
+    validatePhoto(teacher.photo, 'Use an existing local teacher photo');
+  }
+  for (const result of results) {
+    if (!text(result.score, 8) || !text(result.exam, 20) || !optionalText(result.level, 20) || !text(result.quote, 240) || !text(result.student, 40) || !optionalText(result.course, 60)) throw new Error('Result needs a score, exam, quote and student');
+    // Real student results are published only with the student's consent; demo samples are announced as examples instead.
+    if (!demo && result.consent !== true) throw new Error('Publish a real student result only with consent');
   }
   if (data.site?.url) {
     const url = new URL(data.site.url);
@@ -89,7 +109,51 @@ export function renderContacts(contacts, { compact = false } = {}) {
   return `<div class="contact-channels">${groups.join('')}</div>${extras.length ? `<div class="contact-extras">${extras.join('')}</div>` : ''}`;
 }
 
-export function renderLocations(contacts) {
+const demoTag = site => site?.demoMode ? ' <span class="demo-tag">Пример</span>' : '';
+
+// Samples must not be indexed: while demo mode is on, search engines are asked to skip the page.
+export function renderRobots(site) {
+  return site?.demoMode ? '<meta name="robots" content="noindex, nofollow">' : '';
+}
+
+export function renderDemoBanner(site) {
+  return site?.demoMode ? '<p class="demo-banner">Демо-версия: блоки «Пример» — образцы</p>' : '';
+}
+
+export function renderStats(stats = [], site) {
+  if (!stats.length) return '';
+  const items = stats.map(stat => `<div><dt>${escapeHTML(stat.label)}</dt><dd>${escapeHTML(stat.value)}</dd></div>`).join('');
+  return `<section class="wrap stats-strip" aria-label="Stanford в цифрах${site?.demoMode ? ' (пример)' : ''}">${site?.demoMode ? '<span class="demo-tag">Пример</span>' : ''}<dl>${items}</dl></section>`;
+}
+
+export function initials(name) {
+  return name.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
+}
+
+export function renderTeachers(teachers = [], site) {
+  const heading = `<div class="section-top"><h2 id="teachers-title">Преподаватели${demoTag(site)}</h2><p>Группу и преподавателя подбирают по уровню после входного теста.</p></div>`;
+  if (!teachers.length) return heading;
+  const cards = teachers.map(teacher => {
+    const name = escapeHTML(teacher.name);
+    const portrait = teacher.photo
+      ? `<img class="teacher-photo" src="${escapeHTML(teacher.photo)}" alt="Фото: ${name}" width="600" height="750" loading="lazy" decoding="async">`
+      : `<div class="teacher-initials" aria-hidden="true">${escapeHTML(initials(teacher.name))}</div>`;
+    const chips = [teacher.qualification && `<li class="teacher-chip-key">${escapeHTML(teacher.qualification)}</li>`, teacher.experience && `<li>${escapeHTML(teacher.experience)}</li>`].filter(Boolean).join('');
+    return `<article class="teacher-card">${portrait}<div class="teacher-body"><h3>${name}</h3><p>${escapeHTML(teacher.role)}</p>${chips ? `<ul class="teacher-chips">${chips}</ul>` : ''}</div></article>`;
+  }).join('');
+  return `${heading}\n<div class="team-grid">${cards}</div>`;
+}
+
+export function renderResults(results = [], site) {
+  if (!results.length) return '';
+  const cards = results.map(result => `<article class="result-card"><div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></article>`).join('');
+  return `<section data-reveal class="section wrap results-section" id="results" aria-labelledby="results-title">
+<div class="section-top"><h2 id="results-title">Результаты студентов${demoTag(site)}</h2><p>Реальные баллы — с согласия студентов.</p></div>
+<div class="results-grid">${cards}</div>
+</section>`;
+}
+
+export function renderLocations(contacts, { demo = false } = {}) {
   if (!contacts.verified || !contacts.locations?.length) return '';
   const providers = { google: 'Google Maps', yandex: 'Яндекс Карты' };
   // Only Google embeds are shown: the Yandex widget displays ads, so Yandex stays a link.
@@ -102,7 +166,7 @@ export function renderLocations(contacts) {
     // Until the owner sends entrance photos, each branch shows a tagged placeholder.
     const photo = location.photo
       ? `<img class="location-photo" src="${escapeHTML(location.photo)}" alt="Вход: ${name}" width="640" height="360" loading="lazy" decoding="async">`
-      : `<div class="location-photo location-photo-demo" role="img" aria-label="Пример: место для фото входа, ${name}">${svgIcon('camera')}<span>Фото входа</span><span class="demo-tag">Пример</span></div>`;
+      : !demo ? '' : `<div class="location-photo location-photo-demo" role="img" aria-label="Пример: место для фото входа, ${name}">${svgIcon('camera')}<span>Фото входа</span><span class="demo-tag">Пример</span></div>`;
     return `<article class="location-card"><h4>${name}</h4><p>${address}</p>${photo}${select}<div class="map-links">${links}</div></article>`;
   }).join('');
   const map = first ? `<div class="branch-map-panel"><div class="map-toolbar"><p id="map-status" class="map-status" tabindex="-1" aria-live="polite">${escapeHTML(`${first.name} — ${first.address}`)}</p></div><iframe id="branch-map" class="branch-map" src="${escapeHTML(first.googleEmbed)}" title="${escapeHTML(`Карта: ${first.name}`)}" width="1100" height="360" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : '';
@@ -181,7 +245,12 @@ export function generate(html, data) {
   html = replaceBlock(html, 'CTA', renderCTA(data.contacts));
   html = replaceBlock(html, 'PRICES', renderPrices(data.courses));
   html = replaceBlock(html, 'FILTERS', renderFilters(data.courses));
-  html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts));
+  html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts, { demo: data.site?.demoMode }));
+  html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'BANNER', renderDemoBanner(data.site));
+  html = replaceBlock(html, 'STATS', renderStats(data.stats, data.site));
+  html = replaceBlock(html, 'TEACHERS', renderTeachers(data.teachers, data.site));
+  html = replaceBlock(html, 'RESULTS', renderResults(data.results, data.site));
   html = replaceBlock(html, 'OPTIONS', data.courses.map(course => `<option value="${escapeHTML(course.id)}">${escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '))}</option>`).join(''));
   const siteURL = data.site?.url;
   const metadata = siteURL ? `<link rel="canonical" href="${escapeHTML(siteURL)}">\n<meta property="og:url" content="${escapeHTML(siteURL)}">\n<meta property="og:image" content="${escapeHTML(new URL('assets/stanford-logo.png', siteURL.endsWith('/') ? siteURL : `${siteURL}/`).href)}">` : '';

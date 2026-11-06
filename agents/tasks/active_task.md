@@ -1,3 +1,26 @@
+# 📋 Активная задача: PLAN-045 — P1 аудита 2026-11-06
+
+2026-11-06, Claude Code. План: `agents/plans/plan_045_audit_p1_admin_security.md`.
+- [x] Защита админки: DEBUG off по умолчанию, 2FA, axes, HSTS/SSL, лимиты фото, секретный ADMIN_PATH, requirements, тесты 13/13, CI job cms.
+- [x] noindex на сайте, пока демо-режим.
+- [x] Коммит и пуш этапа 1 PLAN-044 и cms.
+
+---
+
+# 📋 Активная задача: PLAN-044 — Скрытая админка Django + Unfold (DRAFT)
+
+2026-11-06, Claude Code. План: `agents/plans/plan_044_django_unfold_cms.md`, решение: `agents/decisions/ADR_001_static_site_with_django_unfold_admin.md`.
+- [x] Проверены версии: django-unfold 0.110.1 (MIT, Django 5.2–6.1), Django 6.1.3, Railway «Wait for CI».
+- [x] Составлены ADR-001 и PLAN-044.
+- [ ] Этап 0: одобрение владельца, Postgres + сервис cms в Railway, GitHub token — делает владелец.
+- [x] Этап 1: данные демо-блоков в content.js, генерация в build.mjs, тесты 51/51, вид сайта не изменился.
+- [ ] Commit/push этапа 1 — по запросу владельца.
+- [x] Ответы владельца §9: технический домен Railway; только владелец; 2FA (TOTP) — да; данные только через админку.
+- [ ] Этап 2 (идет): локальный прототип cms/ запущен (Django 6.1.3, Unfold 0.110.1, Pillow 13, Python 3.15, SQLite; импорт content.js: 7 курсов, 4 преподавателя, 3 результата, 3 филиала). Осталось: 2FA, тесты cms, requirements.txt, дашборд, Postgres.
+- [ ] Этапы 3–6.
+
+---
+
 # 📋 Активная задача: PLAN-043 — Аккуратный блок «Как добраться»
 
 2026-11-04, Claude Code. План: `agents/plans/plan_043_branches_block_polish.md`.

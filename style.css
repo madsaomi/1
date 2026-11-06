@@ -174,34 +174,35 @@ html:not([data-enhanced]) .header { position: relative; }
 .practice-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: var(--space-3); border-radius: var(--radius-control); background: var(--brand); color: var(--button-ink); }
 .practice-icon--label { font-size: var(--text-14); font-weight: 600; letter-spacing: .02em; }
 .practice-icon .icon { width: 24px; height: 24px; }
-/* PLAN-042: owner-approved placeholders on the main page, announced by the static demo banner. */
+/* PLAN-042/044: stats, teachers and results come from content.js; demo mode adds the banner and «Пример» tags. */
 /* Quiet notice; each placeholder block carries its own «Пример» tag. */
 .demo-banner { margin: 0; padding: 4px var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface-hover); color: var(--muted); font-size: var(--text-14); text-align: center; }
 .demo-tag { display: inline-block; padding: 2px 8px; border: 1px dashed var(--border-strong); border-radius: 999px; color: var(--muted); font-size: var(--text-14); font-weight: 500; letter-spacing: 0; line-height: 1.5; vertical-align: middle; }
-.demo-stats > .demo-tag { display: block; width: max-content; margin: 0 0 var(--space-1) auto; }
-.demo-stats { margin-top: var(--space-2); }
-.demo-stats dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-radius: var(--radius-panel); background: var(--dark-panel); color: var(--on-dark); overflow: hidden; }
-.demo-stats div { display: flex; flex-direction: column-reverse; gap: var(--space-1); padding: var(--space-3); }
-.demo-stats dd { margin: 0; font-size: var(--text-32); font-weight: 700; letter-spacing: -.03em; color: var(--brand); }
-.demo-stats dt { font-size: var(--text-14); color: var(--on-dark-muted); }
-.demo-team { display: grid; grid-auto-rows: 1fr; gap: var(--space-2); }
-.demo-teacher { display: grid; grid-template-columns: 112px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.stats-strip > .demo-tag { display: block; width: max-content; margin: 0 0 var(--space-1) auto; }
+.stats-strip { margin-top: var(--space-2); }
+.stats-strip dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-radius: var(--radius-panel); background: var(--dark-panel); color: var(--on-dark); overflow: hidden; }
+.stats-strip div { display: flex; flex-direction: column-reverse; gap: var(--space-1); padding: var(--space-3); }
+.stats-strip dd { margin: 0; font-size: var(--text-32); font-weight: 700; letter-spacing: -.03em; color: var(--brand); }
+.stats-strip dt { font-size: var(--text-14); color: var(--on-dark-muted); }
+.team-grid { display: grid; grid-auto-rows: 1fr; gap: var(--space-2); }
+.teacher-card { display: grid; grid-template-columns: 112px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
 /* Initials stand in for teacher photos until real portraits arrive. */
-.demo-initials { display: grid; place-items: center; aspect-ratio: 4 / 5; background: var(--brand); color: var(--on-brand); font-size: var(--text-32); font-weight: 700; letter-spacing: -.02em; }
-.demo-teacher-body { padding: var(--space-2) var(--space-3) var(--space-3); }
-.demo-teacher h3 { font-size: var(--text-20); }
-.demo-teacher p { margin-top: var(--space-1); color: var(--muted); }
-.demo-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
-.demo-chips li { padding: 4px 12px; border: 1px solid var(--border-strong); border-radius: 999px; font-size: var(--text-14); }
-.demo-chips .demo-chip-key { border-color: var(--brand); background: var(--brand); color: var(--on-brand); font-weight: 600; }
-.demo-results-grid { display: grid; gap: var(--space-2); }
-.demo-result { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
-.demo-score { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-1); }
-.demo-score strong { font-size: var(--text-48); line-height: 1; letter-spacing: -.04em; }
-.demo-score span { padding: 2px 8px; border-radius: 8px; background: var(--brand); color: var(--on-brand); font-weight: 600; font-size: var(--text-14); }
-.demo-score small { color: var(--muted); font-size: var(--text-14); }
-.demo-result blockquote { margin: 0; color: var(--muted); }
-.demo-result-name { margin-top: auto; font-weight: 600; font-size: var(--text-14); }
+.teacher-photo { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+.teacher-initials { display: grid; place-items: center; aspect-ratio: 4 / 5; background: var(--brand); color: var(--on-brand); font-size: var(--text-32); font-weight: 700; letter-spacing: -.02em; }
+.teacher-body { padding: var(--space-2) var(--space-3) var(--space-3); }
+.teacher-card h3 { font-size: var(--text-20); }
+.teacher-card p { margin-top: var(--space-1); color: var(--muted); }
+.teacher-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
+.teacher-chips li { padding: 4px 12px; border: 1px solid var(--border-strong); border-radius: 999px; font-size: var(--text-14); }
+.teacher-chips .teacher-chip-key { border-color: var(--brand); background: var(--brand); color: var(--on-brand); font-weight: 600; }
+.results-grid { display: grid; gap: var(--space-2); }
+.result-card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.result-score { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-1); }
+.result-score strong { font-size: var(--text-48); line-height: 1; letter-spacing: -.04em; }
+.result-score span { padding: 2px 8px; border-radius: 8px; background: var(--brand); color: var(--on-brand); font-weight: 600; font-size: var(--text-14); }
+.result-score small { color: var(--muted); font-size: var(--text-14); }
+.result-card blockquote { margin: 0; color: var(--muted); }
+.result-name { margin-top: auto; font-weight: 600; font-size: var(--text-14); }
 .practice-list h3 { margin-bottom: var(--space-2); font-size: var(--text-20); }
 .practice-list p { color: var(--muted); font-size: var(--text-16); }
 .exam-grid { display: grid; gap: var(--space-2); }
@@ -358,13 +359,13 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .about-layout { padding: var(--space-4); }
   .about-lead { max-width: 24ch; font-size: var(--text-32); }
   .practice-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
-  .demo-stats dl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .demo-stats div + div { border-left: 1px solid #ffffff14; }
-  .demo-stats dd { font-size: var(--text-48); }
-  .demo-team { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
-  .demo-teacher { display: block; }
-  .demo-initials { aspect-ratio: 4 / 3; font-size: var(--text-48); }
-  .demo-results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+  .stats-strip dl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stats-strip div + div { border-left: 1px solid #ffffff14; }
+  .stats-strip dd { font-size: var(--text-48); }
+  .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+  .teacher-card { display: block; }
+  .teacher-initials { aspect-ratio: 4 / 3; font-size: var(--text-48); }
+  .results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
   .why-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
   .why-list li { padding: var(--space-3); }
   .hero-description { font-size: var(--text-20); }
@@ -389,7 +390,7 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .why-list li { flex-direction: column; }
   .why-list .practice-icon { margin-bottom: var(--space-1); }
   .hero-programs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .demo-team { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .team-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .hero-program:nth-of-type(n) { border-top: 0; border-right: 1px solid var(--border); }
   .hero-program:last-of-type { border-right: 0; }
   .course-bottom { flex-direction: row; align-items: center; justify-content: space-between; }

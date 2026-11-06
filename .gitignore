@@ -29,3 +29,11 @@ assets/clubs/*.png
 assets/clubs/IMAGE_PROMPTS.md
 *.zip
 *.rar
+
+# PLAN-044 cms: local environment, database, uploads and credentials stay out of git
+cms/.venv/
+cms/db.sqlite3
+cms/media/
+cms/staticfiles/
+cms/.local-credentials
+cms/.local-2fa/

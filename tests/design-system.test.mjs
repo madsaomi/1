@@ -72,9 +72,14 @@ test('protected inputs match the visual baseline except the exact PLAN-032 Docke
   }
 });
 
-test('all page copy survives the visual redesign, including prices, disclosure answers and direct contacts', () => {
-  assert.equal(page(baseline.index).text, normalize(baseline.text), 'Baseline extraction must agree with the independently captured HTMLParser text');
-  assert.equal(page(html).text, normalize(baseline.text));
+// PLAN-044: generated blocks hold admin-managed data; the copy contract covers the static frame around them.
+const staticFrame = source => source
+  .replace(/<!-- ([A-Z]+)_START -->[\s\S]*?<!-- \1_END -->/g, '')
+  .replace(/<!-- CONTACT_START:([a-z]+) -->[\s\S]*?<!-- CONTACT_END:\1 -->/g, '');
+
+test('all static page copy survives redesigns; admin-managed blocks are excluded', () => {
+  assert.equal(page(staticFrame(baseline.index)).text, normalize(baseline.text), 'Baseline extraction must agree with the independently captured HTMLParser text');
+  assert.equal(page(staticFrame(html)).text, normalize(baseline.text));
 });
 
 test('existing navigation targets, destinations, alternative text and semantic labels survive presentation changes', () => {

@@ -38,3 +38,55 @@ jobs:
       - name: Run Integrity Checker
         run: |
           python agents/tools/check_integrity.py
+
+  cms:
+    name: Content admin (Django) on Postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: cms
+          POSTGRES_USER: cms
+          POSTGRES_PASSWORD: cms-ci-only
+        ports: [ '5432:5432' ]
+        options: >-
+          --health-cmd "pg_isready -U cms" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      POSTGRES_DB: cms
+      POSTGRES_USER: cms
+      POSTGRES_PASSWORD: cms-ci-only
+      POSTGRES_HOST: localhost
+    defaults:
+      run:
+        working-directory: cms
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Migrations are complete
+        env:
+          DJANGO_DEBUG: '1'
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Tests
+        env:
+          DJANGO_DEBUG: '1'
+        run: python manage.py test content
+
+      - name: Production security check
+        env:
+          DJANGO_DEBUG: '0'
+          ADMIN_PATH: ci-secret-path-0000/
+          DJANGO_ALLOWED_HOSTS: cms.example.org
+          DJANGO_CSRF_TRUSTED_ORIGINS: https://cms.example.org
+        run: DJANGO_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(60))')" python manage.py check --deploy --fail-level WARNING
