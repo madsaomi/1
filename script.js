@@ -199,8 +199,6 @@ window.addEventListener('hashchange', revealCourseFromHash);
 document.addEventListener('click', event => {
   const examLink = event.target.closest('[data-exam-details]');
   if (examLink) { revealExam(examLink.dataset.examDetails); return; }
-  const catalogLink = event.target.closest('[data-reveal-course]');
-  if (catalogLink) { revealCourse(catalogLink.dataset.revealCourse); return; }
   const trigger = event.target.closest('.open-enroll-btn, [data-open-course]');
   if (!trigger) return;
   event.preventDefault();
@@ -219,6 +217,80 @@ revealCourseFromHash();
 
 // Expose enhancement-only controls only after successful initialization.
 document.documentElement.dataset.enhanced = "true";
+
+// Highlights the menu link of the section being read; purely informational, so no motion preference applies.
+function setupSectionNav() {
+  if (typeof IntersectionObserver === 'undefined') return;
+  const links = [...document.querySelectorAll('#navigation a[href^="#"]')];
+  const sections = links.map(link => document.querySelector(link.getAttribute('href'))).filter(Boolean);
+  if (!sections.length) return;
+  const visible = new Map();
+  try {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => visible.set(entry.target, entry.isIntersecting));
+      const current = sections.find(section => visible.get(section));
+      links.forEach(link => {
+        if (current && link.getAttribute('href') === `#${current.id}`) link.setAttribute('aria-current', 'location');
+        else link.removeAttribute('aria-current');
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    sections.forEach(section => observer.observe(section));
+  } catch (error) {
+    console.warn('Section highlighting unavailable.', error);
+  }
+}
+setupSectionNav();
+
+// Presentation only: final numbers and cards are already in the HTML, so nothing is hidden or lost
+// without JavaScript, observers, animation frames, or when the visitor prefers reduced motion.
+function countUp(node) {
+  const text = node.textContent.trim();
+  const match = text.match(/^(\d[\d\s\u00a0]*)(.*)$/);
+  if (!match) return;
+  const digits = match[1].replace(/\D/g, '');
+  const target = Number(digits);
+  // A founding year counts up briefly instead of from zero.
+  const year = digits.length === 4 && target >= 1900 && target <= 2100;
+  const from = year ? target - 15 : 0;
+  const format = value => (year ? String(value) : new Intl.NumberFormat('ru-RU').format(value)) + match[2];
+  node.textContent = format(from);  // no flash of the final value before the first frame
+  const start = performance.now();
+  const step = now => {
+    const progress = Math.min((now - start) / 1200, 1);
+    const eased = 1 - (1 - progress) ** 3;
+    node.textContent = progress < 1 ? format(Math.round(from + (target - from) * eased)) : text;
+    if (progress < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function setupMotion() {
+  if (typeof IntersectionObserver === 'undefined' || typeof requestAnimationFrame === 'undefined' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const grids = [...document.querySelectorAll('.course-grid, .why-list, .team-grid, .results-grid, .practice-list')];
+  const counters = [...document.querySelectorAll('.stats-strip dd')];
+  if (!grids.length && !counters.length) return;
+  let observer;
+  try {
+    observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        observer.unobserve(entry.target);
+        if (counters.includes(entry.target)) countUp(entry.target);
+        else entry.target.classList.add('is-staggered');
+      });
+    }, { threshold: .15 });
+    grids.forEach(grid => {
+      [...grid.children].forEach((item, index) => item.style.setProperty('--stagger', String(Math.min(index, 8))));
+      grid.classList.add('stagger');
+      observer.observe(grid);
+    });
+    counters.forEach(counter => observer.observe(counter));
+  } catch (error) {
+    observer?.disconnect();
+    grids.forEach(grid => grid.classList.remove('stagger'));
+    console.warn('Motion effects unavailable; content remains visible.', error);
+  }
+}
+setupMotion();
 
 // Presentation only: the content remains visible without observer support.
 function setupReveal() {

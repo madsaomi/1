@@ -75,17 +75,17 @@ jobs:
 
       - name: Migrations are complete
         env:
-          DJANGO_DEBUG: '1'
+          DJANGO_LOCAL: '1'
         run: python manage.py makemigrations --check --dry-run
 
       - name: Tests
         env:
-          DJANGO_DEBUG: '1'
+          DJANGO_LOCAL: '1'
         run: python manage.py test content
 
       - name: Production security check
         env:
-          DJANGO_DEBUG: '0'
+          DJANGO_LOCAL: '0'
           ADMIN_PATH: ci-secret-path-0000/
           DJANGO_ALLOWED_HOSTS: cms.example.org
           DJANGO_CSRF_TRUSTED_ORIGINS: https://cms.example.org

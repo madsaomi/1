@@ -264,3 +264,64 @@ test('reveal observes only opted-in content and stops observing elements after t
   assert.deepEqual(calls.unobserved, [nodes[1]]);
   assert(!nodes.some(node => node.hidden || node.style.opacity === '0'));
 });
+
+function motionRuntime({ supported = true, reducedMotion = false, constructorFailure = false } = {}) {
+  const calls = { observed: [], unobserved: [], warnings: [], instances: [] };
+  const element = () => {
+    const classes = new Set();
+    return { classes, classList: { add: value => classes.add(value), remove: value => classes.delete(value) } };
+  };
+  const items = Array.from({ length: 10 }, () => ({ style: { values: {}, setProperty(name, value) { this.values[name] = value; } } }));
+  const grid = Object.assign(element(), { children: items });
+  const counters = ['2016', '5 000+', '25'].map(textContent => ({ textContent }));
+  const frames = [];
+  let clock = 0;
+  const context = {
+    document: { querySelectorAll: selector => selector.includes('stats-strip') ? counters : [grid] },
+    matchMedia: () => ({ matches: reducedMotion }),
+    console: { warn: (...args) => calls.warnings.push(args) },
+    performance: { now: () => clock },
+    requestAnimationFrame: callback => frames.push(callback),
+    Intl
+  };
+  if (supported) context.IntersectionObserver = class {
+    constructor(callback) { if (constructorFailure) throw new Error('Observer unavailable'); this.callback = callback; calls.instances.push(this); }
+    observe(node) { calls.observed.push(node); }
+    unobserve(node) { calls.unobserved.push(node); }
+    disconnect() { this.disconnected = true; }
+  };
+  const start = script.indexOf('function countUp(');
+  const end = script.indexOf('function setupReveal(');
+  assert(start >= 0 && end > start, 'Motion setup must stay separate from reveal setup');
+  vm.runInNewContext(script.slice(start, end), context, { timeout: 1000 });
+  const runFrames = () => { while (frames.length) { clock += 100; frames.shift()(clock); } };
+  return { calls, grid, items, counters, runFrames };
+}
+
+test('motion effects never hide content without observers or when reduced motion is preferred', () => {
+  for (const options of [{ supported: false }, { reducedMotion: true }, { constructorFailure: true }]) {
+    const { calls, grid, items, counters } = motionRuntime(options);
+    assert(!grid.classes.has('stagger'), 'Grids stay visible without the motion class');
+    assert(items.every(item => !Object.keys(item.style.values).length));
+    assert.deepEqual(counters.map(counter => counter.textContent), ['2016', '5 000+', '25']);
+    if (options.constructorFailure) assert(calls.warnings.length > 0, 'Observer failure must be diagnosed');
+  }
+  for (const [, selector, block] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!/opacity\s*:\s*0(?:\s|;|$)/.test(block) || !/(?:course-grid|why-list|team-grid|results-grid|practice-list|stagger)/.test(selector)) continue;
+    assert.match(selector, /\.stagger:not\(\.is-staggered\)/, `Only the JS-added pending state may hide cards: ${selector.trim()}`);
+  }
+});
+
+test('cards are staggered once in view and counters land exactly on the published text', () => {
+  const { calls, grid, items, counters, runFrames } = motionRuntime();
+  assert(grid.classes.has('stagger'));
+  assert.deepEqual(items.map(item => item.style.values['--stagger']), ['0', '1', '2', '3', '4', '5', '6', '7', '8', '8']);
+  const [observer] = calls.instances;
+  observer.callback([{ target: grid, isIntersecting: true }, ...counters.map(target => ({ target, isIntersecting: true }))]);
+  assert(grid.classes.has('is-staggered'));
+  assert.deepEqual(calls.unobserved, [grid, ...counters]);
+  assert.equal(counters[0].textContent.length, 4, 'A year starts near its value, not from zero');
+  assert(Number(counters[0].textContent) < 2016 && Number(counters[0].textContent) >= 2001);
+  runFrames();
+  assert.deepEqual(counters.map(counter => counter.textContent), ['2016', '5 000+', '25']);
+});

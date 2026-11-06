@@ -6,13 +6,13 @@
 ```bash
 python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt   # Linux/macOS: .venv/bin/pip
-DJANGO_DEBUG=1 .venv/Scripts/python manage.py migrate
-DJANGO_DEBUG=1 .venv/Scripts/python manage.py import_content          # данные из ../content.js
-DJANGO_DEBUG=1 .venv/Scripts/python manage.py createsuperuser
-DJANGO_DEBUG=1 .venv/Scripts/python manage.py enable_2fa <логин>     # QR в .local-2fa/ → Google Authenticator
-DJANGO_DEBUG=1 .venv/Scripts/python manage.py runserver
+DJANGO_LOCAL=1 .venv/Scripts/python manage.py migrate
+DJANGO_LOCAL=1 .venv/Scripts/python manage.py import_content          # данные из ../content.js
+DJANGO_LOCAL=1 .venv/Scripts/python manage.py createsuperuser
+DJANGO_LOCAL=1 .venv/Scripts/python manage.py enable_2fa <логин>     # QR в .local-2fa/ → Google Authenticator
+DJANGO_LOCAL=1 .venv/Scripts/python manage.py runserver
 ```
-Вход: http://127.0.0.1:8000/admin/ — логин, пароль и 6-значный код из приложения. Без `DJANGO_DEBUG=1` админка не запустится без серверных переменных — это намеренно.
+Вход: http://127.0.0.1:8000/admin/ — логин, пароль и 6-значный код из приложения. Без `DJANGO_LOCAL=1` админка не запустится без серверных переменных — это намеренно. Технические страницы ошибок Django выключены всегда; для отладки — осознанно добавить `DJANGO_TRACEBACKS=1`.
 
 ## Сервер (Railway, этап 5)
 Обязательные переменные: `DJANGO_SECRET_KEY` (длинный случайный), `ADMIN_PATH` (секретный путь, 12+ символов, с `/` в конце), `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS` (`https://…`), `POSTGRES_DB/USER/PASSWORD/HOST/PORT`, `MEDIA_ROOT` (том Railway).
@@ -23,6 +23,6 @@ DJANGO_DEBUG=1 .venv/Scripts/python manage.py runserver
 
 ## Проверки
 ```bash
-DJANGO_DEBUG=1 .venv/Scripts/python manage.py test content
+DJANGO_LOCAL=1 .venv/Scripts/python manage.py test content
 ```
 В CI — те же тесты на Postgres и `check --deploy --fail-level WARNING` с серверными настройками.

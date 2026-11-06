@@ -17,7 +17,7 @@
   --border: #00000014; --border-strong: #00000030; --focus: #070707;
   --tint: #ffb7030f; --marker: #ffb70359; --transparent: #00000000;
   --dark-panel: #070707; --on-dark: #fafafa; --on-dark-muted: #bdbdbd;
-  --overlay: #00000099; --shadow-color: #0000000a; --shadow-modal-color: #00000026;
+  --header-glass: #fafafab8; --menu-glass: #ffffffd1; --overlay-glass: #00000066; --overlay: #00000099; --shadow-color: #0000000a; --shadow-modal-color: #00000026;
   --font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --text-14: 14px; --text-16: 16px; --text-20: 20px; --text-24: 24px;
   --text-32: 32px; --text-48: 48px; --text-64: 64px;
@@ -26,14 +26,14 @@
   --header-height: calc(48px + var(--space-4) + 1px); --anchor-offset: calc(var(--header-height) + var(--space-2));
   --radius-control: 12px; --radius-panel: 16px; --container: 1200px;
   --shadow: 0 8px 24px var(--shadow-color); --shadow-modal: 0 24px 80px var(--shadow-modal-color);
-  --ease: cubic-bezier(.2,.65,.3,1); --duration: 180ms;
+  --ease: cubic-bezier(.2,.65,.3,1); --duration: 180ms; --spring: cubic-bezier(.34,1.56,.64,1);
 }
 html[data-theme="dark"] {
   color-scheme: dark;
   --paper: #070707; --ink: #f5f5f5; --muted: #a8a8a8;
   --surface: #151515; --surface-raised: #1b1b1b; --surface-hover: #222222; --solid: #282828;
   --border: #ffffff14; --border-strong: #ffffff33; --focus: #ffb703;
-  --tint: #ffb7030f; --shadow-color: #00000026; --shadow-modal-color: #00000066;
+  --header-glass: #070707b3; --menu-glass: #1b1b1bd1; --tint: #ffb7030f; --shadow-color: #00000026; --shadow-modal-color: #00000066;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -65,22 +65,29 @@ em { font-style: normal; }
 .section-label { margin-bottom: var(--space-1); }
 .skip { position: fixed; z-index: 100; top: -100px; left: var(--space-2); padding: var(--space-2); border-radius: var(--radius-control); background: var(--brand); color: var(--button-ink); }
 .skip:focus { top: var(--space-2); }
-.button, .course-enroll-btn, .button-outline { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); min-height: 48px; padding: 8px 16px; border: 1px solid var(--brand); border-radius: var(--radius-control); background: var(--brand); color: var(--button-ink); font-size: var(--text-14); font-weight: 600; line-height: 1.5; transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease), transform var(--duration) var(--ease); }
+.button, .course-enroll-btn, .button-outline { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); min-height: 48px; padding: 8px 16px; border: 1px solid var(--brand); border-radius: var(--radius-control); background: var(--brand); color: var(--button-ink); font-size: var(--text-14); font-weight: 600; line-height: 1.5; transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease), transform 220ms var(--spring); }
 .button:hover { background: var(--brand-hover); }
-.button:active, .course-enroll-btn:active { transform: translateY(1px); }
+.text-link, .filters button { transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease), transform 220ms var(--spring); }
+:is(.button, .course-enroll-btn, .text-link, .filters button):active { transform: scale(.97); }
 .course-enroll-btn, .button-outline { background: var(--surface); color: var(--ink); border-color: var(--border-strong); }
 .course-enroll-btn:hover, .button-outline:hover { background: var(--surface-hover); border-color: var(--ink); }
 .text-link, .link, .source-link { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 48px; font-size: var(--text-14); font-weight: 500; text-underline-offset: 4px; }
 .text-link:hover, .link:hover, .source-link:hover { text-decoration: underline; }
-.header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); min-height: var(--header-height); padding-block: var(--space-2); background: var(--paper); border-bottom: 1px solid var(--border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); min-height: var(--header-height); padding-block: var(--space-2); background: var(--transparent); }
 /* Extend the opaque surface across the viewport without widening the content grid. */
-.header::before { content: ''; position: absolute; z-index: -1; inset: 0; background: var(--paper); box-shadow: 0 0 0 100vmax var(--paper); clip-path: inset(0 -100vmax); pointer-events: none; }
+/* The header spans the window (content keeps the container's width through padding), so its frosted glass
+   needs no overflow. Opaque where blur is unavailable or the visitor prefers reduced transparency. */
+.header.wrap { width: 100%; padding-inline: max(var(--space-2), calc((100% - var(--container)) / 2)); }
+.header::before { content: ''; position: absolute; z-index: -1; inset: 0; background: var(--paper); border-bottom: 1px solid var(--border); pointer-events: none; }
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .header::before { background: var(--header-glass); -webkit-backdrop-filter: saturate(180%) blur(16px); backdrop-filter: saturate(180%) blur(16px); }
+}
 .brand { display: inline-flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
 .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; background: var(--brand); border-radius: var(--radius-control); }
 .brand-mark img { width: 32px; height: 32px; object-fit: contain; filter: brightness(0); }
 .brand-name { display: block; font-size: var(--text-20); font-weight: 600; line-height: 1.2; letter-spacing: -.03em; }
 .brand-name small { display: block; margin-top: 0; font-size: var(--text-14); line-height: 1.5; font-weight: 400; letter-spacing: 0; color: var(--muted); }
-#navigation { display: none; position: absolute; inset: calc(100% + 8px) 0 auto; padding: var(--space-1); max-height: calc(100dvh - 128px); overflow-y: auto; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow); }
+#navigation { display: none; position: absolute; inset: calc(100% + 8px) var(--space-2) auto; padding: var(--space-1); max-height: calc(100dvh - 128px); overflow-y: auto; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow); }
 #navigation.open { display: flex; flex-direction: column; align-items: stretch; }
 #navigation a { display: inline-flex; align-items: center; min-height: 48px; padding: 8px 16px; font-size: var(--text-14); font-weight: 500; border-radius: var(--radius-control); transition: background var(--duration) var(--ease); }
 #navigation a:hover { background: var(--surface-hover); }
@@ -124,10 +131,10 @@ html:not([data-enhanced]) .header { position: relative; }
 .hero-program:hover { background: var(--surface-hover); }
 .hero-program:focus-visible { outline-offset: -4px; }
 .hero-program > span:first-child { min-width: 0; }
+.hero-program > .icon { flex-shrink: 0; color: var(--muted); transition: transform var(--duration) var(--ease); }
+.hero-program:hover > .icon { transform: translateX(4px); }
 .hero-program strong { display: block; font-size: var(--text-16); font-weight: 600; }
 .hero-program small { display: block; margin-top: var(--space-1); font-size: var(--text-14); color: var(--muted); }
-.hero-program-price { flex-shrink: 0; font-size: var(--text-16); font-weight: 600; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
-.hero-program-price small { margin-top: 0; font-weight: 400; }
 /* PLAN-038: преимущества из уже опубликованных фактов; Supporter выделен как главное отличие. */
 .why-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .why-list li { display: flex; align-items: flex-start; gap: var(--space-2); min-width: 0; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
@@ -146,19 +153,28 @@ html:not([data-enhanced]) .header { position: relative; }
 .reset-filter { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 48px; padding: 8px; border: 0; background: var(--transparent); font-size: var(--text-14); color: var(--muted); }
 .reset-filter:hover { color: var(--ink); }
 .course-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
-.course-card { min-width: 0; display: flex; flex-direction: column; padding: var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-panel); transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease); }
+.course-card { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: 8px 8px var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow); transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), transform 260ms var(--spring), box-shadow 260ms var(--ease); }
+/* PLAN-051: the course card is the tariff — brand-yellow head with the monthly and family price. */
+.course-head { padding: var(--space-3); border-radius: var(--radius-control); background: var(--brand); color: var(--on-brand); }
+.course-price { margin-top: var(--space-2); color: var(--on-brand-muted); font-size: var(--text-16); }
+.course-price strong { color: var(--on-brand); font-size: var(--text-32); font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.course-special { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-top: var(--space-2); padding: 4px 12px; border-radius: 999px; background: var(--on-brand); color: var(--brand); font-size: var(--text-14); font-weight: 500; }
+.course-special strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+.course-special-none { padding: 0; background: var(--transparent); color: var(--on-brand-muted); }
+.course-card .course-enroll-btn { justify-content: center; min-height: 52px; margin: auto var(--space-2) 0; border: 0; border-radius: 999px; background: var(--dark-panel); color: var(--on-dark); font-size: var(--text-16); }
+.course-card .course-enroll-btn:hover { background: #000000; }
+html[data-theme="dark"] .course-card .course-enroll-btn { background: var(--brand); color: var(--button-ink); }
+html[data-theme="dark"] .course-card .course-enroll-btn:hover { background: var(--brand-hover); }
 .course-card:target { animation: course-arrival 2s var(--ease); }
 @keyframes course-arrival { 0%, 30% { background: var(--tint); border-color: var(--brand); } 100% { background: var(--surface); border-color: var(--border); } }
-.course-card h3 { margin-bottom: var(--space-2); font-size: var(--text-24); }
-.course-subtitle { display: block; margin-top: var(--space-1); color: var(--muted); font-size: var(--text-16); line-height: 1.5; font-weight: 400; letter-spacing: 0; }
-.course-description { margin-bottom: var(--space-3); color: var(--muted); font-size: var(--text-16); }
-.course-details { display: grid; gap: var(--space-1); margin: 0 0 var(--space-3); padding: 0; list-style: none; color: var(--muted); font-size: var(--text-16); }
+.course-card h3 { font-size: var(--text-20); line-height: 1.3; }
+.course-subtitle { display: block; margin-top: 4px; color: var(--on-brand-muted); font-size: var(--text-16); line-height: 1.5; font-weight: 400; letter-spacing: 0; }
+.course-description { padding: 0 var(--space-2); color: var(--muted); font-size: var(--text-16); }
+.course-details { display: grid; align-content: start; gap: 12px; margin: 0; padding: 0 var(--space-2); list-style: none; font-size: var(--text-16); }
+/* Heads, descriptions, programmes and buttons line up across a row. */
+@supports (grid-template-rows: subgrid) { .course-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: var(--space-3); } }
 .course-details li { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: var(--space-1); }
 .course-details li > .icon { margin-top: 2px; color: var(--ink); }
-.course-bottom { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); padding-top: var(--space-2); margin-top: auto; border-top: 1px solid var(--border); }
-.course-price strong { display: block; font-size: var(--text-20); font-weight: 600; font-variant-numeric: tabular-nums; }
-.course-price > span { font-size: var(--text-14); color: var(--muted); }
-.course-enroll-btn { justify-content: space-between; }
 .about-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); padding: var(--space-3); border-radius: var(--radius-panel); background: var(--dark-panel); color: var(--on-dark); }
 .about-intro { max-width: 42ch; color: var(--on-dark-muted); font-size: var(--text-20); line-height: 1.5; }
 .about-lead { display: block; margin-bottom: var(--space-3); color: var(--on-dark); font-size: var(--text-24); line-height: 1.25; font-weight: 600; letter-spacing: -.025em; text-wrap: balance; }
@@ -229,25 +245,7 @@ details[open] > summary > .icon { transform: rotate(45deg); }
 .data-table caption { padding-block: var(--space-2); text-align: left; }
 .exam-panel .data-table { min-width: 350px; }
 .discount-note { max-width: 80ch; margin-bottom: var(--space-3); color: var(--muted); font-size: var(--text-16); }
-.price-table-wrap { max-width: 960px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
-.price-table { table-layout: fixed; }
-.price-table th:first-child { width: 44%; }
-.price-table th:not(:first-child) { width: 28%; }
-.price-table :is(td, th:not(:first-child)) { text-align: right; }
-.price-table thead th { padding-block: var(--space-2); font-weight: 500; color: var(--muted); }
-.price-table tbody tr:last-child > * { border-bottom: 0; }
-.price-table tbody tr { transition: background var(--duration) var(--ease); }
-.price-table tbody tr:is(:hover, :focus-within) { background: var(--surface-hover); }
 /* Inline so the arrow follows the last word of a wrapped name instead of the column edge. */
-.price-course-link { display: inline; padding-block: var(--space-1); font-weight: 500; line-height: 1.5; text-underline-offset: 4px; }
-.price-course-link .nowrap { white-space: nowrap; }
-.price-course-link .icon { display: inline-block; width: 16px; height: 16px; margin-left: 4px; vertical-align: -3px; }
-.price-table tbody th { padding-block: var(--space-2); }
-.price-course-link:hover { text-decoration: underline; }
-.price-amount { font-size: var(--text-16); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.price-special { background: var(--transparent); }
-.price-special strong { font-size: inherit; font-weight: 600; }
-.price-empty { color: var(--muted); }
 .faq { display: grid; gap: var(--space-3); }
 .faq > div:first-child > p { max-width: 44ch; margin-top: var(--space-2); color: var(--muted); font-size: var(--text-16); }
 .faq-list { display: grid; gap: var(--space-1); }
@@ -337,25 +335,51 @@ footer { margin-top: var(--space-4); padding-block: var(--space-4); border-top: 
 .dialog-price-note, .form-note { margin-top: var(--space-2); font-size: var(--text-16); color: var(--muted); }
 .dialog-catalog-link, .dialog-exam-link { margin: var(--space-1) var(--space-2) 0 0; }
 .modal-backdrop[open] .modal-card { animation: panel-enter 200ms var(--ease); }
+/* PLAN-050: the phone menu and the page behind the course dialog are frosted too; the dialog card itself stays solid. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  #navigation { background: var(--menu-glass); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
+  .modal-backdrop::backdrop { background: var(--overlay-glass); -webkit-backdrop-filter: blur(10px) saturate(120%); backdrop-filter: blur(10px) saturate(120%); }
+}
 details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
 [data-reveal].is-revealed { animation: content-enter 200ms var(--ease) both; }
 [data-reveal]:is(:target, :focus-within) { animation: none; }
+/* PLAN-047: grids appear item by item. Only setupMotion adds .stagger, so without JS everything is visible;
+   items also show at once for keyboard focus or a link target inside. "backwards" keeps hover transitions intact. */
+.stagger:not(.is-staggered):not(:focus-within):not(:has(:target)) > * { opacity: 0; transform: translateY(16px); }
+.stagger.is-staggered > * { animation: stagger-in 480ms var(--ease) backwards; animation-delay: calc(var(--stagger, 0) * 70ms); }
+/* PLAN-048: the first screen enters in sequence; data-motion is set in <head> only when motion is allowed. */
+[data-motion="on"] :is(.hero-copy > *, .hero-visual) { animation: hero-in 700ms var(--ease) backwards; }
+[data-motion="on"] .hero-copy > :nth-child(2) { animation-delay: 80ms; }
+[data-motion="on"] .hero-copy > :nth-child(3) { animation-delay: 160ms; }
+[data-motion="on"] .hero-copy > :nth-child(4) { animation-delay: 240ms; }
+[data-motion="on"] .hero-copy > :nth-child(5) { animation-delay: 320ms; }
+[data-motion="on"] .hero-visual { animation-delay: 200ms; }
+@keyframes hero-in { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+#navigation a[aria-current="location"] { color: var(--ink); background: var(--surface-hover); box-shadow: inset 0 -2px 0 var(--brand); }
+@keyframes stagger-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.stats-strip dd { font-variant-numeric: tabular-nums; }
+/* Smooth disclosure where the browser can animate to height: auto; elsewhere it opens instantly as before. */
+@supports (interpolate-size: allow-keywords) {
+  html { interpolate-size: allow-keywords; }
+  details::details-content { block-size: 0; overflow: clip; transition: block-size 300ms var(--ease), content-visibility 300ms allow-discrete; }
+  details[open]::details-content { block-size: auto; }
+}
+@media print { .stagger > * { opacity: 1 !important; transform: none !important; } }
 @keyframes panel-enter { from { opacity: .7; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes content-enter { from { opacity: .65; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (min-width: 768px) {
   .wrap { width: min(calc(100% - var(--space-8)), var(--container)); }
+  .header.wrap { width: 100%; padding-inline: max(var(--space-4), calc((100% - var(--container)) / 2)); }
+  #navigation { inset-inline: var(--space-4); }
   .header { gap: var(--space-2); }
   h1 { font-size: var(--text-48); }
   .hero { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-block: var(--space-5); }
   .hero-programs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hero-program { flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3); }
+  .hero-program { padding: var(--space-3); }
   .hero-program + .hero-program { border-top: 0; }
   .hero-program:nth-of-type(odd) { border-right: 1px solid var(--border); }
   .hero-program:nth-of-type(n + 3) { border-top: 1px solid var(--border); }
-  .hero-program-price { font-size: var(--text-20); text-align: left; }
   .course-grid, .exam-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
-  .course-card h3 { min-height: var(--space-8); }
-  .course-description { min-height: 96px; }
   .about-layout { padding: var(--space-4); }
   .about-lead { max-width: 24ch; font-size: var(--text-32); }
   .practice-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
@@ -369,9 +393,6 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .why-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
   .why-list li { padding: var(--space-3); }
   .hero-description { font-size: var(--text-20); }
-  .price-table { font-size: var(--text-16); }
-  .price-table th:first-child { width: 48%; }
-  .price-table th:not(:first-child) { width: 26%; }
   .data-table :is(th, td) { padding-inline: var(--space-2); }
   .contact-channels, .dialog-prices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .branch-map { height: 360px; min-height: 360px; }
@@ -390,11 +411,10 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .why-list li { flex-direction: column; }
   .why-list .practice-icon { margin-bottom: var(--space-1); }
   .hero-programs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .course-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .team-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .hero-program:nth-of-type(n) { border-top: 0; border-right: 1px solid var(--border); }
   .hero-program:last-of-type { border-right: 0; }
-  .course-bottom { flex-direction: row; align-items: center; justify-content: space-between; }
-  .course-description { min-height: 72px; }
   .about-layout { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; gap: var(--space-6); padding: var(--space-6); }
   .faq { grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr); gap: var(--space-8); }
   .location-map-layout { grid-template-columns: minmax(280px, .8fr) minmax(0, 1.8fr); }
@@ -404,7 +424,7 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
 /* Keep the existing JavaScript navigation breakpoint (1050px). */
 @media (min-width: 1051px) {
   .header { flex-wrap: nowrap; }
-  #navigation, html:not([data-enhanced]) #navigation { position: static; display: flex; align-items: center; flex-direction: row; width: auto; max-height: none; padding: 0; margin-left: auto; background: var(--transparent); border: 0; box-shadow: none; }
+  #navigation, html:not([data-enhanced]) #navigation { position: static; display: flex; align-items: center; flex-direction: row; width: auto; max-height: none; padding: 0; margin-left: auto; background: var(--transparent); border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none }
   #navigation a { padding-inline: var(--space-1); }
   .theme-toggle { margin-left: 0; }
   [data-enhanced="true"] .menu { display: none; }
@@ -416,11 +436,21 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .hero { padding-block: var(--space-10); }
   .header { gap: var(--space-3); }
   #navigation a { padding-inline: var(--space-2); }
-  .course-card { padding: var(--space-4); }
 }
 @media (hover: hover) { .course-card:hover, .course-card:focus-within { border-color: var(--border-strong); } }
-@media (prefers-reduced-transparency: reduce) { .header { background: var(--paper); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+/* PLAN-048: a light spring lift on pointer devices; cards settle back with a small overshoot. */
+:is(.why-list li, .teacher-card, .result-card) { transition: transform 260ms var(--spring), box-shadow 260ms var(--ease); }
+@media (hover: hover) {
+  :is(.button, .course-enroll-btn, .text-link, .filters button):hover { transform: translateY(-2px); }
+  :is(.course-card, .why-list li, .teacher-card, .result-card):hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .header::before { background: var(--paper); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  #navigation { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .modal-backdrop::backdrop { background: var(--overlay); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  :is(.button, .course-enroll-btn, .text-link, .filters button, .course-card, .why-list li, .teacher-card, .result-card) { transform: none !important; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

@@ -148,8 +148,49 @@ class AdminAccessTests(TestCase):
         for _ in range(settings.AXES_FAILURE_LIMIT):
             self.login(password='wrong-password')
         response = self.login()
-        self.assertNotEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 429)
+        self.assertContains(response, 'Слишком много попыток входа', status_code=429)
+        self.assertNotContains(response, 'owner', status_code=429)
         self.assertNoAccess()
+
+
+LEAKS = ('admin', 'Django', 'Traceback', 'urlpatterns', 'URLconf', 'DEBUG', 'settings')
+
+
+class ErrorPageTests(TestCase):
+    """Error pages must not reveal paths, the framework, settings or stack traces."""
+
+    def assertNeutral(self, response, status, heading):
+        self.assertEqual(response.status_code, status)
+        body = response.content.decode()
+        self.assertIn(heading, body)
+        self.assertIn('noindex', body)
+        for leak in LEAKS:
+            self.assertNotIn(leak, body, f'{status} page reveals {leak!r}')
+
+    def test_unknown_paths_get_a_neutral_404(self):
+        for url in ('/', '/wp-admin/', '/admin', '/.env', '/static/missing.css', '/media/missing.jpg'):
+            self.assertNeutral(self.client.get(url), 404, 'Страница не найдена')
+
+    def test_path_traversal_gets_a_neutral_400(self):
+        for url in ('/static/../config/settings.py', '/media/../db.sqlite3'):
+            self.assertNeutral(self.client.get(url), 400, 'Некорректный запрос')
+
+    def test_bad_host_gets_a_neutral_400(self):
+        self.assertNeutral(self.client.get(reverse('admin:login'), HTTP_HOST='evil.example'), 400, 'Некорректный запрос')
+
+    def test_missing_csrf_token_gets_a_neutral_403(self):
+        client = self.client_class(enforce_csrf_checks=True)
+        self.assertNeutral(client.post(reverse('admin:login'), {'username': 'x', 'password': 'y'}), 403, 'Сессия устарела')
+
+    def test_server_error_gets_a_neutral_500(self):
+        from django.test import RequestFactory
+        from django.views.defaults import server_error
+        self.assertNeutral(server_error(RequestFactory().get('/')), 500, 'Что-то пошло не так')
+
+    def test_local_preview_never_turns_on_technical_error_pages(self):
+        result = manage('shell', '-c', 'from django.conf import settings; print(settings.DEBUG, settings.LOCAL)', DJANGO_LOCAL='1')
+        self.assertEqual(result.stdout.split()[-2:], ['False', 'True'], result.stderr)
 
 
 class EnableTwoFactorTests(TestCase):

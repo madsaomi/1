@@ -173,13 +173,21 @@ export function renderLocations(contacts, { demo = false } = {}) {
   return `<div class="contact-locations"><h3>Как добраться</h3><div class="location-map-layout"><div class="location-grid">${cards}</div>${map}</div></div>`;
 }
 
+// PLAN-051: one card per course carries everything — price, family price, description, programme, enrol.
 export function renderCourses(courses) {
-  return courses.map(course => `<article class="course-card" id="course-${escapeHTML(course.id)}" tabindex="-1" data-category="${escapeHTML(course.category)}" data-course-id="${escapeHTML(course.id)}">
-<h3>${escapeHTML(course.name)}${course.subtitle ? `<span class="course-subtitle">${escapeHTML(course.subtitle)}</span>` : ''}</h3>
+  return courses.map(course => {
+    const id = escapeHTML(course.id);
+    const name = escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '));
+    const special = course.specialPrice
+      ? `<p class="course-special">Семья · 2 курса <strong>${money(course.specialPrice)} сум</strong></p>`
+      : '<p class="course-special course-special-none">Семейной цены нет</p>';
+    return `<article class="course-card" id="course-${id}" tabindex="-1" data-category="${escapeHTML(course.category)}" data-course-id="${id}">
+<div class="course-head"><h3>${escapeHTML(course.name)}${course.subtitle ? `<span class="course-subtitle">${escapeHTML(course.subtitle)}</span>` : ''}</h3><p class="course-price"><strong>${money(course.price)}</strong> сум / месяц</p>${special}</div>
 <p class="course-description">${escapeHTML(course.description)}</p>
 <ul class="course-details" aria-label="В программе">${course.skills.map(skill => `<li>${svgIcon('check')}<span>${escapeHTML(skill)}</span></li>`).join('')}</ul>
-<div class="course-bottom"><div class="course-price"><strong>${money(course.price)} сум</strong><span>в месяц</span></div><a class="course-enroll-btn" href="#prices" data-open-course="${escapeHTML(course.id)}" aria-label="Программа и цены: ${escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '))}">Программа и цены${svgIcon('arrow-right')}</a></div>
-</article>`).join('\n');
+<a class="course-enroll-btn" href="#prices" data-open-course="${id}" aria-label="Записаться: ${name}">Записаться${svgIcon('arrow-right')}</a>
+</article>`;
+  }).join('\n');
 }
 
 export function renderHero(courses) {
@@ -192,11 +200,8 @@ export function renderHero(courses) {
   return groups.map(([category, title, description]) => {
     const programs = courses.filter(course => course.category === category);
     if (!programs.length) return '';
-    const prices = programs.map(course => course.price);
-    const [minimum, maximum] = [Math.min(...prices), Math.max(...prices)];
-    // Without "от": one price, or the full range when programs differ.
-    const price = minimum === maximum ? money(minimum) : `${money(minimum)} – ${money(maximum)}`;
-    return `<a class="hero-program" href="#courses" data-goal="${category}"><span><strong>${title}</strong><small>${description}</small></span><span class="hero-program-price">${price}<small>сум / месяц</small></span></a>`;
+    // PLAN-051: directions are shortcuts into the catalogue; prices live only in the course cards.
+    return `<a class="hero-program" href="#courses" data-goal="${category}"><span><strong>${title}</strong><small>${description}</small></span>${svgIcon('arrow-right')}</a>`;
   }).filter(Boolean).join('\n');
 }
 
@@ -211,16 +216,6 @@ export function renderCTA(contacts) {
     ? `Откроется Telegram. Или позвоните: <a href="tel:${escapeHTML(phone)}">${escapeHTML(displayPhone(phone))}</a>`
     : 'Запись — по телефону или в Telegram.';
   return `<div class="actions">${trial}<a class="text-link" href="#courses">Выбрать курс${svgIcon('arrow-right')}</a></div>\n<p class="hero-footnote">${note}</p>`;
-}
-
-export function renderPrices(courses) {
-  return courses.map(course => {
-    // Keep the arrow with the last word so a wrapped name never leaves it alone on a line.
-    const words = [course.name, course.subtitle].filter(Boolean).join(' ').split(' ');
-    const last = words.pop();
-    const label = `${words.length ? `${escapeHTML(words.join(' '))} ` : ''}<span class="nowrap">${escapeHTML(last)}${svgIcon('arrow-right')}</span>`;
-    return `<tr><th scope="row"><a class="price-course-link" href="#course-${escapeHTML(course.id)}" data-reveal-course="${escapeHTML(course.id)}">${label}</a></th><td class="price-amount"><span class="price-standard">${money(course.price)}</span></td><td class="price-amount">${course.specialPrice ? `<span class="price-special"><strong>${money(course.specialPrice)}</strong></span>` : '<span class="price-empty" aria-label="Специальная цена не предусмотрена">—</span>'}</td></tr>`;
-  }).join('\n');
 }
 
 export function renderFilters(courses) {
@@ -243,7 +238,6 @@ export function generate(html, data) {
   html = replaceBlock(html, 'COURSES', renderCourses(data.courses));
   html = replaceBlock(html, 'HERO', renderHero(data.courses));
   html = replaceBlock(html, 'CTA', renderCTA(data.contacts));
-  html = replaceBlock(html, 'PRICES', renderPrices(data.courses));
   html = replaceBlock(html, 'FILTERS', renderFilters(data.courses));
   html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts, { demo: data.site?.demoMode }));
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));

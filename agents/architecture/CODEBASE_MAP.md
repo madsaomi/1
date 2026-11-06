@@ -57,3 +57,7 @@ PLAN-039 (2026-11-04): встроенная карта — только Google M
 PLAN-044 этап 1 (2026-11-06): content.js — канонический JSON (site.demoMode, stats, courses, teachers, results, contacts), будущий экспорт админки cms. build.mjs генерирует также BANNER/STATS/TEACHERS/RESULTS (renderDemoBanner/renderStats/renderTeachers/renderResults/initials) и заглушки фото филиалов только в демо-режиме. Тест «весь текст» проверяет статический каркас вне генерируемых блоков; content.js не защищен baseline. 51 тест.
 
 PLAN-044/045 cms/ (Django 6.1.3 + Unfold 0.110.1, Postgres на сервере, SQLite локально): config/settings.py (fail-closed прод-настройки), config/sites.py (StanfordAdminSite + OTPLoginForm), config/middleware.py (noindex), content/models.py (Course/CourseSkill, Stat, Teacher, StudentResult, Contacts/Phone/AdmissionsTelegram, Location/MapLink, SiteSettings), content/admin.py (Unfold), команды import_content и enable_2fa, content/tests.py (13). Сайт: блок ROBOTS (noindex в демо-режиме). CI: job cms.
+
+PLAN-046: cms без технических страниц (DEBUG только при DJANGO_TRACEBACKS=1; локальный режим — DJANGO_LOCAL=1); templates/errors/base.html + 400/403/403_csrf/404/500/lockout.html; APPEND_SLASH=False; 19 тестов cms.
+
+PLAN-051 (2026-11-06): раздел тарифов удален — цены только в карточках курсов (`renderCourses`: цена, семейная цена, программа, «Записаться»); `renderHero` без цен; блоков PRICES/TARIFFS больше нет; `#prices` — якорь-псевдоним внутри `#courses`.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderPrices, renderHero, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
+import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderHero, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
 
 const data = readContent();
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -28,8 +28,7 @@ test('generated HTML is current, complete without JS, and generation is idempote
   assert.equal(output, html);
   assert.equal(generate(output, data), output);
   assert.equal((html.match(/data-course-id=/g) || []).length, data.courses.length);
-  const prices = html.split('<!-- PRICES_START -->')[1].split('<!-- PRICES_END -->')[0];
-  assert.equal((prices.match(/<tr><th scope="row">/g) || []).length, data.courses.length);
+  assert(!/class="tariff|data-price-mode|pricing-section|<!-- PRICES_START/.test(html), 'PLAN-051: prices live only in the course cards');
 });
 
 test('course IDs preserve the distinction between English teaching languages', () => {
@@ -426,6 +425,10 @@ test('theme initializes even when browser storage is blocked', () => {
   const context = { document: { documentElement: { dataset: {} } }, localStorage: { getItem() { throw new Error('blocked'); } }, matchMedia: () => ({ matches: true }) };
   vm.runInNewContext(fs.readFileSync(new URL('../theme-init.js', import.meta.url), 'utf8'), context);
   assert.equal(context.document.documentElement.dataset.theme, 'dark');
+  assert.equal(context.document.documentElement.dataset.motion, undefined, 'Reduced motion keeps the first screen still');
+  const moving = { document: { documentElement: { dataset: {} } }, localStorage: { getItem: () => null }, matchMedia: () => ({ matches: false }) };
+  vm.runInNewContext(fs.readFileSync(new URL('../theme-init.js', import.meta.url), 'utf8'), moving);
+  assert.equal(moving.document.documentElement.dataset.motion, 'on');
 });
 
 function runtime({ mapPresent = true, reducedMotion = false, viewportWidth = 1440, locations = data.contacts.locations } = {}) {
@@ -610,7 +613,7 @@ test('catalog exposes each program condition without a disclosure and labels its
     assert.deepEqual(items.map(item => item.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/g, '').replace(/<[^>]+>/g, '')), Array.from(course.skills, escapeHTML));
     for (const item of items) assert.match(item, /<svg\b[^>]*aria-hidden="true"[^>]*focusable="false"/);
     assert.equal((conditions[1].match(/<li>/g) || []).length, course.skills.length);
-    assert(output.includes('Программа и цены'));
+    assert(output.includes('>Записаться<'));
     assert.match(output, new RegExp(`<a\\b[^>]*href="#prices"[^>]*data-open-course="${course.id}"`));
   }
 });
@@ -754,11 +757,12 @@ test('reset reveals every course and restores focus to the all-programs filter',
   assert.equal(filters[0].focused, true);
 });
 
-test('each program has a static anchor and a matching link in the price list', () => {
+test('each program has a static anchor and its own enrol action', () => {
   for (const course of data.courses) {
     assert(html.includes(`id="course-${course.id}" tabindex="-1"`));
-    assert(html.includes(`href="#course-${course.id}" data-reveal-course="${course.id}"`));
+    assert(html.includes(`href="#prices" data-open-course="${course.id}"`));
   }
+  assert(html.includes('<span id="prices" class="anchor-alias" aria-hidden="true"></span>'), 'Old #prices links land in the merged section');
 });
 
 test('price navigation reveals a filtered course, but an unknown ID leaves the filter intact', () => {
@@ -793,35 +797,16 @@ test('hash navigation reveals and scrolls to a course after a conflicting filter
   assert.equal(card.scrolled, true);
 });
 
-test('standard and eligible family prices appear together in each static table row', () => {
-  const prices = renderPrices(data.courses);
+test('each course card shows the monthly price and the family price or its absence', () => {
+  const format = value => new Intl.NumberFormat('ru-RU').format(value);
   for (const course of data.courses) {
-    const row = prices.split('<tr>').find(part => part.includes(`data-reveal-course="${course.id}"`));
-    assert(row, `Missing static price row: ${course.id}`);
-    assert.equal((row.match(/<th\b/g) || []).length, 1);
-    const cells = [...row.matchAll(/<td\b([^>]*)>([\s\S]*?)<\/td>/g)];
-    assert.equal(cells.length, 2);
-    for (const cell of cells) assert.equal(htmlAttributes(`<td${cell[1]}>`).class, 'price-amount');
-    assert(cells[0][2].includes(`<span class="price-standard">${new Intl.NumberFormat('ru-RU').format(course.price)}</span>`));
-    if (course.specialPrice) {
-      assert(cells[1][2].includes(`<span class="price-special"><strong>${new Intl.NumberFormat('ru-RU').format(course.specialPrice)}</strong></span>`));
-      assert(!cells[1][2].includes('price-empty'));
-    } else {
-      assert.match(cells[1][2], /class="price-empty"/);
-      assert.match(cells[1][2], /aria-label="Специальная цена не предусмотрена"/);
-      assert(cells[1][2].includes('—'));
-      assert(!cells[1][2].includes('price-special'));
-    }
-    assert(!/<small\b|обычная цена|семья \/ два курса/i.test(row));
+    const card = renderCourses([course]);
+    assert(card.includes(`<p class="course-price"><strong>${format(course.price)}</strong> сум / месяц</p>`));
+    if (course.specialPrice) assert(card.includes(`Семья · 2 курса <strong>${format(course.specialPrice)} сум</strong>`));
+    else assert(card.includes('Семейной цены нет') && !card.includes('Семья · 2 курса'));
   }
-  const priceTable = [...html.matchAll(/<table\b([^>]*)>([\s\S]*?)<\/table>/g)]
-    .find(match => (htmlAttributes(`<table${match[1]}>`).class || '').split(/\s+/).includes('price-table'));
-  const tableHead = priceTable?.[2].match(/<thead>([\s\S]*?)<\/thead>/)?.[1];
-  assert(tableHead);
-  const headings = [...tableHead.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].map(match => match[1].replace(/<[^>]*>/g, ' '));
-  assert.equal(headings.length, 3);
-  assert.match(headings[1], /обычн/i);
-  assert.match(headings[2], /семья|специальн/i);
+  const escaped = renderCourses([{ ...data.courses[0], subtitle: '<b>x</b>', skills: ['<i>y</i>'] }]);
+  assert(!/<b>|<i>/.test(escaped));
 });
 
 test('discount conditions are visible without a popup, disclosure or JavaScript', () => {
@@ -831,19 +816,11 @@ test('discount conditions are visible without a popup, disclosure or JavaScript'
   assert(!html.includes('discount-tooltip'));
 });
 
-test('direction prices show standard prices without "от" and omit unavailable categories', () => {
+test('direction shortcuts lead into the catalogue without repeating prices and omit unavailable categories', () => {
   const english = data.courses.filter(course => course.name === 'General English');
   const output = renderHero(english);
-  const lowestStandard = Math.min(...english.map(course => course.price));
-  const lowestSpecial = Math.min(...english.map(course => course.specialPrice));
-  assert(output.includes(new Intl.NumberFormat('ru-RU').format(lowestStandard)));
-  assert(!output.includes(new Intl.NumberFormat('ru-RU').format(lowestSpecial)));
-  const highestStandard = Math.max(...english.map(course => course.price));
-  assert(output.includes(`${new Intl.NumberFormat('ru-RU').format(lowestStandard)} – ${new Intl.NumberFormat('ru-RU').format(highestStandard)}`), 'Differing prices show the full range');
-  assert(!/>от\s/.test(output), 'PLAN-040: no "от" before direction prices');
-  const single = renderHero(english.slice(0, 1));
-  assert(!single.includes(' – '), 'A single program shows one price');
-  assert(output.includes('data-goal="languages"'));
+  assert(!/сум|\d{3}\s?\d{3}/.test(output), 'PLAN-051: prices live only in the course cards');
+  assert(output.includes('data-goal="languages"') && output.includes('href="#courses"'));
   assert(!output.includes('data-goal="exam"'));
   assert.equal(renderHero([]), '');
 });
@@ -903,4 +880,39 @@ test('content validation guards stats, teachers, results, photos and student con
   assert.throws(() => validateContent(live), /consent/, 'Real results need consent');
   live.results.forEach(result => { result.consent = true; });
   assert.doesNotThrow(() => validateContent(live));
+});
+
+const clientScript = fs.readFileSync(new URL('../script.js', import.meta.url), 'utf8');
+function slice(from, to) {
+  const start = clientScript.indexOf(from);
+  const end = clientScript.indexOf(to, start);
+  assert(start >= 0 && end > start, `Missing script section ${from}`);
+  return clientScript.slice(start, end);
+}
+
+test('the menu marks the section being read and nothing else', () => {
+  const links = ['#courses', '#prices'].map(href => ({ attrs: {}, getAttribute(name) { return name === 'href' ? href : this.attrs[name]; },
+    setAttribute(name, value) { this.attrs[name] = value; }, removeAttribute(name) { delete this.attrs[name]; } }));
+  const sections = { '#courses': { id: 'courses' }, '#prices': { id: 'prices' } };
+  let observer;
+  const context = {
+    document: { querySelectorAll: () => links, querySelector: selector => sections[selector] },
+    IntersectionObserver: class { constructor(callback) { this.callback = callback; observer = this; } observe() {} },
+    console: { warn() {} }
+  };
+  vm.runInNewContext(slice('function setupSectionNav', '// Presentation only: final numbers'), context);
+  observer.callback([{ target: sections['#prices'], isIntersecting: true }]);
+  assert.deepEqual(links.map(link => link.attrs['aria-current']), [undefined, 'location']);
+  observer.callback([{ target: sections['#prices'], isIntersecting: false }, { target: sections['#courses'], isIntersecting: true }]);
+  assert.deepEqual(links.map(link => link.attrs['aria-current']), ['location', undefined]);
+  assert.doesNotThrow(() => vm.runInNewContext(slice('function setupSectionNav', '// Presentation only: final numbers'), { document: {}, console: {} }));
+});
+
+test('first-screen entrance runs only when motion is allowed, and there is no scroll progress bar', () => {
+  const css = fs.readFileSync(new URL('../style.css', import.meta.url), 'utf8');
+  for (const match of css.matchAll(/([^{}]+)\{[^{}]*animation:\s*hero-in/g)) assert.match(match[1], /\[data-motion="on"\]/, 'Hero entrance needs the head-time motion flag');
+  assert(!/scroll-progress|animation-timeline/.test(css), 'The owner removed the scroll progress bar');
+  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  assert.match(reduced, /transform: none !important/);
+  assert.match(reduced, /animation: none !important/);
 });

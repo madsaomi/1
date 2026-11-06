@@ -9,16 +9,18 @@ from django.urls import reverse_lazy
 BASE_DIR = Path(__file__).resolve().parent.parent
 SITE_ROOT = BASE_DIR.parent  # the static site whose content.js the admin publishes
 
-# Fail closed: debug and its conveniences exist only when DJANGO_DEBUG=1 is set explicitly (local preview).
-DEBUG = os.environ.get('DJANGO_DEBUG') == '1'
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or ('local-dev-only-key' if DEBUG else None)
+# Fail closed. DJANGO_LOCAL=1 enables local-preview conveniences (default key and path, SQLite, plain HTTP);
+# Django's technical error pages (DEBUG) need their own explicit DJANGO_TRACEBACKS=1 — they reveal URLs and code.
+LOCAL = os.environ.get('DJANGO_LOCAL') == '1'
+DEBUG = os.environ.get('DJANGO_TRACEBACKS') == '1'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or ('local-dev-only-key' if LOCAL else None)
 if not SECRET_KEY:
     raise RuntimeError('DJANGO_SECRET_KEY must be set outside local development')
-ALLOWED_HOSTS = [host for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost' if DEBUG else '').split(',') if host]
+ALLOWED_HOSTS = [host for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost' if LOCAL else '').split(',') if host]
 CSRF_TRUSTED_ORIGINS = [origin for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if origin]
 # The admin lives on a secret path in production; the default is only for local preview.
-ADMIN_PATH = os.environ.get('ADMIN_PATH') or ('admin/' if DEBUG else '')
-if not DEBUG and (not ADMIN_PATH.endswith('/') or ADMIN_PATH in {'/', 'admin/'} or len(ADMIN_PATH) < 12):
+ADMIN_PATH = os.environ.get('ADMIN_PATH') or ('admin/' if LOCAL else '')
+if not LOCAL and (not ADMIN_PATH.endswith('/') or ADMIN_PATH in {'/', 'admin/'} or len(ADMIN_PATH) < 12):
     raise RuntimeError('ADMIN_PATH must be a secret path (12+ characters, ending with "/") outside local development')
 
 INSTALLED_APPS = [
@@ -58,6 +60,7 @@ AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = timedelta(minutes=15)
 AXES_LOCKOUT_PARAMETERS = ['username']
 AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_TEMPLATE = 'lockout.html'
 # W006 warns that User-Agent/cookie rotation evades IP-less lockouts; a username lockout is not evaded that way,
 # and an IP lockout would lock every visitor sharing the proxy address.
 # W021: a *.up.railway.app host cannot join the browser HSTS preload list.
@@ -65,6 +68,8 @@ SILENCED_SYSTEM_CHECKS = ['axes.W006', 'security.W021']
 OTP_TOTP_ISSUER = 'Stanford admin'
 
 ROOT_URLCONF = 'config.urls'
+# No slash-appending redirects: «/secret-path» → «/secret-path/» would confirm that a path exists.
+APPEND_SLASH = False
 WSGI_APPLICATION = 'config.wsgi.application'
 
 TEMPLATES = [{
@@ -104,20 +109,20 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [('site', SITE_ROOT / 'assets')]
+STATICFILES_DIRS = [SITE_ROOT / 'assets']  # public site assets (logo, favicon); no prefix — prefixes break on Windows
 MEDIA_URL = 'media/'
 MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', BASE_DIR / 'media'))
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not LOCAL
 SESSION_COOKIE_AGE = 8 * 60 * 60
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not LOCAL
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'same-origin'
 SECURE_CONTENT_TYPE_NOSNIFF = True
-if not DEBUG:
+if not LOCAL:
     # Railway terminates TLS and forwards the original scheme.
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
@@ -144,8 +149,8 @@ UNFOLD = {
     'SITE_SUBHEADER': 'Language Center',
     'SITE_SYMBOL': 'school',
     'SITE_URL': None,  # no «Return to site» link: the admin has no site of its own
-    'SITE_ICON': lambda request: static('site/stanford-icon.svg'),
-    'SITE_FAVICONS': [{'rel': 'icon', 'type': 'image/svg+xml', 'href': lambda request: static('site/favicon.svg')}],
+    'SITE_ICON': lambda request: static('stanford-icon.svg'),
+    'SITE_FAVICONS': [{'rel': 'icon', 'type': 'image/svg+xml', 'href': lambda request: static('favicon.svg')}],
     'SHOW_HISTORY': True,
     'SHOW_VIEW_ON_SITE': False,
     'BORDER_RADIUS': '12px',
