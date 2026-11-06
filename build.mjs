@@ -190,21 +190,6 @@ export function renderCourses(courses) {
   }).join('\n');
 }
 
-export function renderHero(courses) {
-  const groups = [
-    ['languages', 'Языки', 'Английский и немецкий'],
-    ['exam', 'IELTS и SAT', 'Подготовка к экзаменам'],
-    ['kids', 'Английский для детей', 'Kids English'],
-    ['subjects', 'Математика', 'Разбор тем и задач']
-  ];
-  return groups.map(([category, title, description]) => {
-    const programs = courses.filter(course => course.category === category);
-    if (!programs.length) return '';
-    // PLAN-051: directions are shortcuts into the catalogue; prices live only in the course cards.
-    return `<a class="hero-program" href="#courses" data-goal="${category}"><span><strong>${title}</strong><small>${description}</small></span>${svgIcon('arrow-right')}</a>`;
-  }).filter(Boolean).join('\n');
-}
-
 export function renderCTA(contacts) {
   const telegram = contacts.verified ? contacts.telegrams?.[0] : '';
   const phone = contacts.verified ? contacts.phones?.[0] : '';
@@ -236,7 +221,6 @@ export function generate(html, data) {
   html = html.replace(/\r\n/g, '\n');
   validateContent(data);
   html = replaceBlock(html, 'COURSES', renderCourses(data.courses));
-  html = replaceBlock(html, 'HERO', renderHero(data.courses));
   html = replaceBlock(html, 'CTA', renderCTA(data.contacts));
   html = replaceBlock(html, 'FILTERS', renderFilters(data.courses));
   html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts, { demo: data.site?.demoMode }));

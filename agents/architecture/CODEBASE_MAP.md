@@ -61,3 +61,5 @@ PLAN-044/045 cms/ (Django 6.1.3 + Unfold 0.110.1, Postgres на сервере, 
 PLAN-046: cms без технических страниц (DEBUG только при DJANGO_TRACEBACKS=1; локальный режим — DJANGO_LOCAL=1); templates/errors/base.html + 400/403/403_csrf/404/500/lockout.html; APPEND_SLASH=False; 19 тестов cms.
 
 PLAN-051 (2026-11-06): раздел тарифов удален — цены только в карточках курсов (`renderCourses`: цена, семейная цена, программа, «Записаться»); `renderHero` без цен; блоков PRICES/TARIFFS больше нет; `#prices` — якорь-псевдоним внутри `#courses`.
+
+PLAN-053 (2026-11-06): полоса направлений под первым экраном удалена — `renderHero` и блока HERO больше нет.

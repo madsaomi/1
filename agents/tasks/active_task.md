@@ -1,3 +1,12 @@
+# 📋 Активная задача: PLAN-053 — Убрать полосу направлений
+
+2026-11-06, Claude Code. План: `agents/plans/plan_053_remove_direction_strip.md`.
+- [x] `renderHero`, блок HERO, обработчик `[data-goal]`, стили `.directions`/`.hero-program*` удалены; style v=70, script v=46.
+- [x] Тесты, validate, baseline; браузер 1280/375.
+- [x] Commit в main (cherry-pick) и в ветку experiment/gsap. Push — по запросу.
+
+---
+
 # 📋 Активная задача: PLAN-051 — Один раздел «Курсы и цены»
 
 2026-11-06, Claude Code. План: `agents/plans/plan_051_merge_courses_and_prices.md`.

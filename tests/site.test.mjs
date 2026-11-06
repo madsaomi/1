@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderHero, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
+import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
 
 const data = readContent();
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -816,13 +816,9 @@ test('discount conditions are visible without a popup, disclosure or JavaScript'
   assert(!html.includes('discount-tooltip'));
 });
 
-test('direction shortcuts lead into the catalogue without repeating prices and omit unavailable categories', () => {
-  const english = data.courses.filter(course => course.name === 'General English');
-  const output = renderHero(english);
-  assert(!/сум|\d{3}\s?\d{3}/.test(output), 'PLAN-051: prices live only in the course cards');
-  assert(output.includes('data-goal="languages"') && output.includes('href="#courses"'));
-  assert(!output.includes('data-goal="exam"'));
-  assert.equal(renderHero([]), '');
+test('PLAN-053: no direction strip under the first screen; filters live in the catalogue', () => {
+  assert(!/hero-program|data-goal|HERO_START|class="directions/.test(html));
+  assert(html.includes('class="filters" role="group"'));
 });
 
 test('stats, teachers and results are generated from content and demo mode controls every sample marker', () => {
