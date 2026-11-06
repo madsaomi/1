@@ -63,3 +63,5 @@ PLAN-046: cms без технических страниц (DEBUG только �
 PLAN-051 (2026-11-06): раздел тарифов удален — цены только в карточках курсов (`renderCourses`: цена, семейная цена, программа, «Записаться»); `renderHero` без цен; блоков PRICES/TARIFFS больше нет; `#prices` — якорь-псевдоним внутри `#courses`.
 
 PLAN-052 (ветка experiment/gsap): `assets/vendor/gsap/` — GSAP 3.15.0 (gsap, ScrollTrigger, SplitText; README с sha512 и лицензией); `assets/gsap-effects.js` — эффекты поверх готовой страницы (только при `prefers-reduced-motion: no-preference`; наклон и магнит — только мышь), подключены после `script.js`.
+
+PLAN-053 (2026-11-06): полоса направлений под первым экраном удалена — `renderHero` и блока HERO больше нет.

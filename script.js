@@ -24,10 +24,6 @@ resetFilter.addEventListener('click', () => {
   filters.find(button => button.dataset.filter === 'all')?.focus();
 });
 filters.forEach(button => button.addEventListener('click', () => filterCourses(button.dataset.filter, button.dataset.filterLabel || button.textContent.trim())));
-document.querySelectorAll('[data-goal]').forEach(link => link.addEventListener('click', () => {
-  const filter = filters.find(button => button.dataset.filter === link.dataset.goal);
-  if (filter) filterCourses(filter.dataset.filter, filter.dataset.filterLabel || filter.textContent.trim());
-}));
 
 const menu = document.querySelector('.menu');
 const navigation = document.querySelector('#navigation');

@@ -124,17 +124,6 @@ html:not([data-enhanced]) .header { position: relative; }
 .hero .button:hover { background: #000000; border-color: #000000; }
 .hero .text-link { padding: 10px 16px; border: 2px solid var(--on-brand); border-radius: var(--radius-control); color: var(--on-brand); font-weight: 600; }
 .hero :is(a, button):focus-visible { outline-color: var(--on-brand); }
-.directions { padding-bottom: var(--space-2); }
-.hero-programs { display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--border); border-radius: var(--radius-panel); overflow: hidden; background: var(--surface); }
-.hero-program { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; padding: var(--space-2); transition: background var(--duration) var(--ease); }
-.hero-program + .hero-program { border-top: 1px solid var(--border); }
-.hero-program:hover { background: var(--surface-hover); }
-.hero-program:focus-visible { outline-offset: -4px; }
-.hero-program > span:first-child { min-width: 0; }
-.hero-program > .icon { flex-shrink: 0; color: var(--muted); transition: transform var(--duration) var(--ease); }
-.hero-program:hover > .icon { transform: translateX(4px); }
-.hero-program strong { display: block; font-size: var(--text-16); font-weight: 600; }
-.hero-program small { display: block; margin-top: var(--space-1); font-size: var(--text-14); color: var(--muted); }
 /* PLAN-038: преимущества из уже опубликованных фактов; Supporter выделен как главное отличие. */
 .why-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .why-list li { display: flex; align-items: flex-start; gap: var(--space-2); min-width: 0; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
@@ -374,11 +363,6 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .header { gap: var(--space-2); }
   h1 { font-size: var(--text-48); }
   .hero { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-block: var(--space-5); }
-  .hero-programs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hero-program { padding: var(--space-3); }
-  .hero-program + .hero-program { border-top: 0; }
-  .hero-program:nth-of-type(odd) { border-right: 1px solid var(--border); }
-  .hero-program:nth-of-type(n + 3) { border-top: 1px solid var(--border); }
   .course-grid, .exam-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
   .about-layout { padding: var(--space-4); }
   .about-lead { max-width: 24ch; font-size: var(--text-32); }
@@ -410,11 +394,8 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .why-list { grid-auto-rows: 1fr; }
   .why-list li { flex-direction: column; }
   .why-list .practice-icon { margin-bottom: var(--space-1); }
-  .hero-programs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .course-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .team-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .hero-program:nth-of-type(n) { border-top: 0; border-right: 1px solid var(--border); }
-  .hero-program:last-of-type { border-right: 0; }
   .about-layout { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; gap: var(--space-6); padding: var(--space-6); }
   .faq { grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr); gap: var(--space-8); }
   .location-map-layout { grid-template-columns: minmax(280px, .8fr) minmax(0, 1.8fr); }
