@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import vm from 'node:vm';
 
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-const baseline = JSON.parse(read('agents/testing/plan_030_baseline.json'));
+const baseline = JSON.parse(read('tests/page_baseline.json'));
 const html = read('index.html');
 const css = read('style.css');
 const script = read('script.js');

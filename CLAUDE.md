@@ -1,13 +1,36 @@
-# Claude Code & Claude Assistant Guidelines
+# Stanford Language Center — правила проекта
 
-This repository strictly follows the **Second Brain** engineering methodology located in the `agents/` directory.
+Лендинг языкового центра в Нукусе. Отвечать владельцу по-русски, коротко и простыми словами.
 
-## Core Protocols & Mandatory Rules
-- **Entrypoint:** Read `AGENTS.md` and `agents/AGENT_GUIDE.md` first before any actions.
-- **PLAN-FIRST RULE (MANDATORY):** NEVER write or edit code without an existing or newly drafted implementation plan in `agents/plans/` (using `agents/templates/template_plan.md`) or an atomic checklist in `agents/tasks/active_task.md`. Blind coding is strictly prohibited.
-- **Rules & Prohibitions:** Study `agents/rules/AGENT_RULES.md` and `agents/rules/ANTI_PATTERNS.md` (no hardcoded credentials, no silent error swallowing, no destroying history).
-- **Project State:** Inspect `agents/STATUS.md` and `agents/tasks/active_task.md` before making edits. Mark progress `[x]` as you complete steps.
-- **Code Standards:** Adhere to `agents/rules/CODING_STANDARDS.md`.
-- **Known Bugs:** Inspect `agents/bugs_and_fixes/` before troubleshooting and document new resolutions there.
-- **Session Continuity:** Always append a new session summary to `agents/history/` at the end of work. Never overwrite existing history files.
-- **Integrity Validation:** Run `python agents/tools/check_integrity.py` before finalizing any task.
+## Устройство
+- Публичный сайт — статика без фреймворков: `index.html`, `style.css`, `script.js`, `theme-init.js`, `content.js`, `assets/`. Раздает Caddy в Docker на Railway.
+- `content.js` — данные (курсы, цены, контакты, преподаватели). `node build.mjs` вставляет из них готовый HTML между `<!-- NAME_START -->…<!-- NAME_END -->` в `index.html`. Генерируемые блоки руками не править — менять `content.js` или `build.mjs` и пересобирать.
+- `cms/` — закрытая админка (Django + Unfold, Postgres, 2FA, axes). Локально: `DJANGO_LOCAL=1`. Будет публиковать `content.js` коммитом в git.
+- После правки CSS/JS увеличить `?v=` у файла в `index.html`.
+
+## Проверки (перед коммитом)
+- Сайт: `npm run check` (или по отдельности: `node build.mjs --check`, `node --test`, `python tests/validate_html.py`). Портативный npm может быть сломан — тогда запускать команды напрямую через `node`.
+- Эталон текста страницы `tests/page_baseline.json` защищает статический текст и ссылки. После намеренных изменений текста/ссылок: `python tests/update_baseline.py` (показывает разницу), затем `python tests/update_baseline.py --write`. Обновлять только когда разница совпадает с задуманным.
+- Админка: `cd cms && DJANGO_LOCAL=1 python manage.py test content`.
+- Визуально: 375 и 1280 px, светлая и темная тема, без горизонтальной прокрутки, консоль без ошибок.
+
+## Нельзя без явного разрешения владельца
+- Коммитить и пушить (только по просьбе).
+- Менять `Dockerfile`, `Caddyfile`, `railway.json`, настройки Railway, DNS, учетные данные.
+- Переписывать тексты, цены, контакты и программы курсов; выдумывать реальные данные (демо-блоки помечены «Пример»).
+- Секреты не выводить в чат и не коммитить; `.local-credentials` и `.local-2fa/` — только локально. Токены владелец вписывает сам в Railway.
+
+## Дизайн
+- Палитра: фирменный желтый `#FFB703` + нейтральные черный/белый/серый; цвета — только CSS-переменные; на желтом текст темный; контраст AA.
+- Шрифт Inter (локальный WOFF2), mobile-first, контейнер до 1200 px, отступы кратны 8 px, иконки — inline SVG.
+- CSP: `script-src 'self'`, `style-src 'self'` — никаких CDN и инлайн-стилей; библиотеки класть локально в `assets/`. Новые файлы вне `assets/` нужно добавить и в `Dockerfile`, и в `.dockerignore` (там default-deny).
+- Анимации — только как украшение: контент виден без JS, уважать `prefers-reduced-motion` и `prefers-reduced-transparency`.
+- Ветка `experiment/gsap` — эффекты на GSAP для показа владельцу; в main не вливать без его решения.
+
+## Известные подводные камни
+- Windows: в Bash heredoc съедает `\1` и `\\` — Python-скрипты писать файлом; правки по подстроке брать с уникальным контекстом.
+- `validate_html.py` требует ровно один `:root {` в CSS.
+- Фоновая панель браузера не рисует кадры: CSS-переходы, IntersectionObserver и GSAP двигаются только после скриншота — замерять после него.
+- При изменении цен проверять карточку курса и окно курса (dialog), включая курс без семейной цены.
+- Меню проверять с клавиатуры: открытие, Tab по ссылкам, уход в контент, Escape, возврат фокуса.
+- При изменении `scroll-padding` проверять все переходы по якорям и `scrollIntoView`.

@@ -1,4 +1,4 @@
-name: Second Brain Integrity Check
+name: Site and admin checks
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main, master, develop ]
 
 jobs:
-  validate-second-brain:
-    name: Validate Second Brain Structure & Rules
+  site:
+    name: Static site and container
     runs-on: ubuntu-latest
 
     steps:
@@ -30,14 +30,6 @@ jobs:
 
       - name: Validate production container
         run: docker build -t stanford-check .
-
-      - name: Compile Python Tools
-        run: |
-          python -m py_compile agents/tools/*.py
-
-      - name: Run Integrity Checker
-        run: |
-          python agents/tools/check_integrity.py
 
   cms:
     name: Content admin (Django) on Postgres
