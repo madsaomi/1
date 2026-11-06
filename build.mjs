@@ -12,6 +12,11 @@ export function svgIcon(name) {
     external: 'M15 3h6v6 M10 14 21 3 M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5',
     'arrow-right': 'M5 12h14 M12 5l7 7-7 7',
     check: 'm5 12 4 4L19 6',
+    phone: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z',
+    telegram: 'M22 2 11 13 M22 2l-7 20-4-9-9-4Z',
+    instagram: 'M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Z M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37Z M17.5 6.5h.01',
+    google: 'M17.66 6.34A8 8 0 1 0 20 12h-7',
+    yandex: 'M15 20V4h-4a4 4 0 0 0 0 8h4 M11 12l-4 8',
     camera: 'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3Z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z'
   };
   return `<svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${paths[name]}"/></svg>`;
@@ -101,11 +106,11 @@ export function renderContacts(contacts, { compact = false } = {}) {
   if (!contacts.verified) return '<p class="contact-unavailable"><strong>Контакты уточняются.</strong><br>Запись временно недоступна. Подтвержденные телефон и Telegram появятся здесь.</p>';
   const heading = compact ? 'p' : 'h3';
   const groups = [];
-  if (contacts.phones?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Позвонить</${heading}><ul class="contact-list">${contacts.phones.map(phone => `<li><a class="contact-channel" href="tel:${escapeHTML(phone)}" aria-label="Позвонить: ${escapeHTML(displayPhone(phone))}">${escapeHTML(displayPhone(phone))}</a></li>`).join('')}</ul></div>`);
-  if (contacts.telegrams?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Запись в Telegram</${heading}><ul class="contact-list">${contacts.telegrams.map(url => `<li><a class="contact-channel" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Написать для записи: @${escapeHTML(url.split('/').pop())}">@${escapeHTML(url.split('/').pop())}${svgIcon('external')}</a></li>`).join('')}</ul></div>`);
+  if (contacts.phones?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Позвонить</${heading}><ul class="contact-list">${contacts.phones.map(phone => `<li><a class="contact-channel" href="tel:${escapeHTML(phone)}" aria-label="Позвонить: ${escapeHTML(displayPhone(phone))}">${svgIcon('phone')}${escapeHTML(displayPhone(phone))}</a></li>`).join('')}</ul></div>`);
+  if (contacts.telegrams?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Запись в Telegram</${heading}><ul class="contact-list">${contacts.telegrams.map(url => `<li><a class="contact-channel" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Написать для записи: @${escapeHTML(url.split('/').pop())}">${svgIcon('telegram')}@${escapeHTML(url.split('/').pop())}</a></li>`).join('')}</ul></div>`);
   const extras = [];
-  if (!compact && contacts.instagram) extras.push(`<a href="${escapeHTML(contacts.instagram)}" target="_blank" rel="noopener noreferrer">Instagram ${svgIcon('external')}</a>`);
-  if (!compact && contacts.hrTelegram) extras.push(`<span class="contact-extra">По вопросам работы: <a href="${escapeHTML(contacts.hrTelegram)}" target="_blank" rel="noopener noreferrer">@${escapeHTML(contacts.hrTelegram.split('/').pop())} ${svgIcon('external')}</a></span>`);
+  if (!compact && contacts.instagram) extras.push(`<a class="contact-icon-link" href="${escapeHTML(contacts.instagram)}" target="_blank" rel="noopener noreferrer" aria-label="Instagram" title="Instagram">${svgIcon('instagram')}</a>`);
+  if (!compact && contacts.hrTelegram) extras.push(`<span class="contact-extra">По вопросам работы: <a href="${escapeHTML(contacts.hrTelegram)}" target="_blank" rel="noopener noreferrer">${svgIcon('telegram')}@${escapeHTML(contacts.hrTelegram.split('/').pop())}</a></span>`);
   return `<div class="contact-channels">${groups.join('')}</div>${extras.length ? `<div class="contact-extras">${extras.join('')}</div>` : ''}`;
 }
 
@@ -162,7 +167,7 @@ export function renderLocations(contacts, { demo = false } = {}) {
     const name = escapeHTML(location.name);
     const address = escapeHTML(location.address);
     const select = location.googleEmbed ? `<button type="button" class="location-select" data-map-location="${escapeHTML(location.id)}" data-map-src="${escapeHTML(location.googleEmbed)}" data-map-title="Карта: ${name}" data-map-label="${name} — ${address}" aria-label="Показать на карте: ${name}" aria-pressed="${location === first}" aria-controls="branch-map"><span class="sr-only">Показать на карте: ${name}</span>${svgIcon('arrow-right')}</button>` : '';
-    const links = location.maps.map(map => `<a href="${escapeHTML(map.url)}" target="_blank" rel="noopener noreferrer" aria-label="${providers[map.provider]}: ${name}, ${address}">${providers[map.provider]} ${svgIcon('external')}</a>`).join('');
+    const links = location.maps.map(map => `<a href="${escapeHTML(map.url)}" target="_blank" rel="noopener noreferrer" aria-label="${providers[map.provider]}: ${name}, ${address}" title="${providers[map.provider]}">${svgIcon(map.provider)}</a>`).join('');
     // Until the owner sends entrance photos, each branch shows a tagged placeholder.
     const photo = location.photo
       ? `<img class="location-photo" src="${escapeHTML(location.photo)}" alt="Вход: ${name}" width="640" height="360" loading="lazy" decoding="async">`
