@@ -916,3 +916,18 @@ test('first-screen entrance runs only when motion is allowed, and there is no sc
   assert.match(reduced, /transform: none !important/);
   assert.match(reduced, /animation: none !important/);
 });
+
+test('GSAP experiment: local files load after script.js, and nothing changes without GSAP or with reduced motion', () => {
+  const order = ['script.js', 'assets/vendor/gsap/gsap.min.js', 'assets/vendor/gsap/ScrollTrigger.min.js', 'assets/vendor/gsap/SplitText.min.js', 'assets/gsap-effects.js'];
+  const positions = order.map(src => html.indexOf(`<script src="${src}?`));
+  assert(positions.every((position, index) => position > 0 && (!index || position > positions[index - 1])), 'GSAP loads after the page script, effects last');
+  for (const src of order) assert(fs.existsSync(new URL(`../${src}`, import.meta.url)), src);
+  const source = fs.readFileSync(new URL('../assets/gsap-effects.js', import.meta.url), 'utf8');
+  assert.doesNotThrow(() => vm.runInNewContext(source, { window: {} }), 'Missing GSAP is not an error');
+  let touched = false;
+  const touch = () => { touched = true; return []; };
+  const gsap = { registerPlugin() {}, matchMedia: () => ({ add: (queries, setup) => setup({ conditions: { motion: false, mouse: true } }) }), to: touch, from: touch, set: touch, quickTo: touch };
+  vm.runInNewContext(source, { window: { gsap, ScrollTrigger: {}, SplitText: { create: touch } }, document: { querySelectorAll: touch }, console });
+  assert(!touched, 'Reduced motion: no splits, tweens or listeners');
+});
+

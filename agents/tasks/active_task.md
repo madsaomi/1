@@ -1,3 +1,13 @@
+# 📋 Активная задача: PLAN-052 — Эксперимент: эффекты на GSAP (ветка experiment/gsap)
+
+2026-11-06, Claude Code. План: `agents/plans/plan_052_gsap_experiment.md`.
+- [x] PLAN-046…051 закоммичены на main (792fed9, без пуша); ветка `experiment/gsap`.
+- [x] GSAP 3.15.0 локально в `assets/vendor/gsap/` (sha512 сверен); `assets/gsap-effects.js`: заголовки по словам, параллакс первого экрана, наклон карточек, магнитные кнопки.
+- [x] Тесты 56/56, validate PASS; браузер с боевым CSP — без ошибок; 1280 и 375.
+- [ ] Владелец смотрит: оставить, доработать или выбросить ветку. Commit в ветку / merge в main — по запросу.
+
+---
+
 # 📋 Активная задача: PLAN-051 — Один раздел «Курсы и цены»
 
 2026-11-06, Claude Code. План: `agents/plans/plan_051_merge_courses_and_prices.md`.

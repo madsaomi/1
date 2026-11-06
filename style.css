@@ -454,3 +454,7 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   :is(.button, .course-enroll-btn, .text-link, .filters button, .course-card, .why-list li, .teacher-card, .result-card) { transform: none !important; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+/* PLAN-052 (experiment/gsap): GSAP drives transform on these, so CSS must not ease it a second time. */
+.gsap-tilt { transition-property: border-color, background, box-shadow, color; }
+/* Word masks keep descenders (у, р, д) visible. */
+.split-word-mask { padding-bottom: .12em; margin-bottom: -.12em; }
