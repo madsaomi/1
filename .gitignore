@@ -16,21 +16,12 @@ __pycache__/
 # Local environment and private configuration
 .env
 .env.*
-!.env.example
 
-# Source artwork, preview captures and archives
-brand-source/
-# preview/ holds the owner demo (tracked, never in Docker); only captures stay local.
-preview/*.png
-preview/*.jpg
-assets/courses/*.png
-assets/courses/IMAGE_PROMPTS.md
-assets/clubs/*.png
-assets/clubs/IMAGE_PROMPTS.md
+# Archives
 *.zip
 *.rar
 
-# PLAN-044 cms: local environment, database, uploads and credentials stay out of git
+# cms: local environment, database, uploads and credentials stay out of git
 cms/.venv/
 cms/db.sqlite3
 cms/media/
