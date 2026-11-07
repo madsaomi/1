@@ -261,6 +261,16 @@ export function renderHeroReward(cashback) {
   return `<a class="hero-reward-banner" href="#cashback"><div class="hero-reward-header"><span class="hero-reward-tag">${svgIcon('award')}Кэшбэк за результат</span><strong class="hero-reward-val">до ${escapeHTML(rewardLabel(top))}</strong></div>${pills ? `<div class="hero-reward-pills">${pills}</div>` : ''}<p class="hero-reward-sub">Выплачиваем деньги за официальные баллы</p></a>`;
 }
 
+// Floating shortcut to admissions, always within thumb reach on phones.
+export function renderContactFab(contacts) {
+  if (!contacts.verified) return '';
+  const telegram = contacts.telegrams?.[0];
+  const phone = contacts.phones?.[0];
+  if (telegram) return `<a class="contact-fab" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer" aria-label="Записаться: написать в Telegram">${svgIcon('telegram')}</a>`;
+  if (phone) return `<a class="contact-fab" href="tel:${escapeHTML(phone)}" aria-label="Записаться: позвонить ${escapeHTML(displayPhone(phone))}">${svgIcon('phone')}</a>`;
+  return '';
+}
+
 export function renderCTA(contacts) {
   const telegram = contacts.verified ? contacts.telegrams?.[0] : '';
   const phone = contacts.verified ? contacts.phones?.[0] : '';
@@ -302,6 +312,7 @@ export function generate(html, data) {
   html = replaceBlock(html, 'RESULTS', renderResults(data.results, data.site));
   html = replaceBlock(html, 'CASHBACK', renderCashback(data.cashback));
   html = replaceBlock(html, 'REWARD', renderHeroReward(data.cashback));
+  html = replaceBlock(html, 'FAB', renderContactFab(data.contacts));
   html = replaceBlock(html, 'OPTIONS', data.courses.map(course => `<option value="${escapeHTML(course.id)}">${escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '))}</option>`).join(''));
   const siteURL = data.site?.url;
   const metadata = siteURL ? `<link rel="canonical" href="${escapeHTML(siteURL)}">\n<meta property="og:url" content="${escapeHTML(siteURL)}">\n<meta property="og:image" content="${escapeHTML(new URL('assets/stanford-logo.png', siteURL.endsWith('/') ? siteURL : `${siteURL}/`).href)}">` : '';
