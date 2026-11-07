@@ -143,7 +143,8 @@ test('semantic text colors satisfy WCAG AA in both themes, including muted text 
   const pairs = [
     ['--ink', '--paper'], ['--muted', '--paper'], ['--ink', '--surface'], ['--muted', '--surface'],
     ['--ink', '--surface-hover'], ['--muted', '--surface-hover'], ['--ink', '--surface-raised'], ['--muted', '--surface-raised'], ['--button-ink', '--brand'],
-    ['--on-dark', '--dark-panel'], ['--on-dark-muted', '--dark-panel']
+    ['--on-dark', '--dark-panel'], ['--on-dark-muted', '--dark-panel'],
+    ['--accent-text', '--paper'], ['--accent-text', '--surface'], ['--accent-text', '--surface-raised']
   ];
   for (const [theme, values] of Object.entries(themes())) {
     for (const [foreground, background] of pairs) {

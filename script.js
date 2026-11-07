@@ -128,7 +128,7 @@ function updateCourseSummary() {
   if (course.specialPrice) {
     const conditions = document.createElement('p');
     conditions.className = 'dialog-price-note';
-    conditions.textContent = 'Специальная цена — для семьи или записи на два курса. Условия и итоговую стоимость подтвердите перед оплатой.';
+    conditions.textContent = 'Скидка действует, если из одной семьи занимаются 2 ученика или один ученик записан на 2 курса. Условия и итоговую стоимость подтвердите перед оплатой.';
     price.append(conditions);
   }
   const skills = document.createElement('ul');
@@ -210,6 +210,38 @@ dialog.addEventListener('close', () => {
 
 filterCourses("all", "Все программы");
 revealCourseFromHash();
+
+// Cashback tables: without JS both exams are listed; here they become tabs.
+function setupCashbackTabs() {
+  const tabs = [...document.querySelectorAll('.cashback-tab')];
+  const panels = tabs.map(tab => document.querySelector(`#${tab.getAttribute('aria-controls')}`));
+  if (!tabs.length || panels.some(panel => !panel)) return;
+  const select = (tab, focus) => {
+    tabs.forEach((item, index) => {
+      const active = item === tab;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-selected', String(active));
+      item.tabIndex = active ? 0 : -1;
+      panels[index].hidden = !active;
+    });
+    if (focus) tab.focus();
+  };
+  tabs.forEach((tab, index) => {
+    panels[index].setAttribute('role', 'tabpanel');
+    panels[index].setAttribute('aria-labelledby', tab.id);
+    panels[index].removeAttribute('aria-label');
+    panels[index].tabIndex = 0;
+    tab.addEventListener('click', () => select(tab, false));
+    tab.addEventListener('keydown', event => {
+      const next = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 }[event.key];
+      if (next === undefined) return;
+      event.preventDefault();
+      select(tabs[(next + tabs.length) % tabs.length], true);
+    });
+  });
+  select(tabs.find(tab => tab.getAttribute('aria-selected') === 'true') || tabs[0], false);
+}
+setupCashbackTabs();
 
 // Expose enhancement-only controls only after successful initialization.
 document.documentElement.dataset.enhanced = "true";

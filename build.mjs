@@ -12,9 +12,14 @@ export function svgIcon(name) {
     external: 'M15 3h6v6 M10 14 21 3 M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5',
     'arrow-right': 'M5 12h14 M12 5l7 7-7 7',
     check: 'm5 12 4 4L19 6',
-    camera: 'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3Z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z'
+    camera: 'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3Z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+    phone: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z',
+    telegram: 'm22 2-7 20-4-9-9-4Z M22 2 11 13',
+    'map-pin': 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
+    instagram: 'M17 2H7a5 5 0 0 0-5 5v10a5 5 0 0 0 5 5h10a5 5 0 0 0 5-5V7a5 5 0 0 0-5-5Zm-5 15a5 5 0 1 1 5-5 5 5 0 0 1-5 5Zm5.5-9.8a1.2 1.2 0 1 1 1.2-1.2 1.2 1.2 0 0 1-1.2 1.2Z',
+    award: 'M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z M8.2 13.9 7 22l5-3 5 3-1.2-8.1'
   };
-  return `<svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${paths[name]}"/></svg>`;
+  return `<svg class="icon icon-${name}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${paths[name]}"/></svg>`;
 }
 
 export function readContent() {
@@ -86,6 +91,16 @@ export function validateContent(data) {
     // Real student results are published only with the student's consent; demo samples are announced as examples instead.
     if (!demo && result.consent !== true) throw new Error('Publish a real student result only with consent');
   }
+  if (data.cashback !== undefined) {
+    const { cashback } = data;
+    for (const exam of cashbackExams) {
+      const tiers = cashback[exam.key] ?? [];
+      if (!Array.isArray(tiers)) throw new Error(`Cashback ${exam.label} must be an array`);
+      for (const tier of tiers) if (!text(tier.score, 8) || !Number.isSafeInteger(tier.reward) || tier.reward <= 0 || !optionalText(tier.label, 40) || (tier.hero !== undefined && typeof tier.hero !== 'boolean')) throw new Error('Cashback tier needs a score and a positive whole reward');
+    }
+    if (!Array.isArray(cashback.rules ?? [])) throw new Error('Cashback rules must be an array');
+    for (const rule of cashback.rules ?? []) if (!text(rule.title, 60) || !text(rule.text, 200)) throw new Error('Cashback rule needs a title and text');
+  }
   if (data.site?.url) {
     const url = new URL(data.site.url);
     if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Use a public HTTPS site URL without credentials, query or hash');
@@ -101,11 +116,11 @@ export function renderContacts(contacts, { compact = false } = {}) {
   if (!contacts.verified) return '<p class="contact-unavailable"><strong>Контакты уточняются.</strong><br>Запись временно недоступна. Подтвержденные телефон и Telegram появятся здесь.</p>';
   const heading = compact ? 'p' : 'h3';
   const groups = [];
-  if (contacts.phones?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Позвонить</${heading}><ul class="contact-list">${contacts.phones.map(phone => `<li><a class="contact-channel" href="tel:${escapeHTML(phone)}" aria-label="Позвонить: ${escapeHTML(displayPhone(phone))}">${escapeHTML(displayPhone(phone))}</a></li>`).join('')}</ul></div>`);
-  if (contacts.telegrams?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Запись в Telegram</${heading}><ul class="contact-list">${contacts.telegrams.map(url => `<li><a class="contact-channel" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Написать для записи: @${escapeHTML(url.split('/').pop())}">@${escapeHTML(url.split('/').pop())}${svgIcon('external')}</a></li>`).join('')}</ul></div>`);
+  if (contacts.phones?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Позвонить</${heading}><ul class="contact-list">${contacts.phones.map(phone => `<li><a class="contact-channel" href="tel:${escapeHTML(phone)}" aria-label="Позвонить: ${escapeHTML(displayPhone(phone))}">${svgIcon('phone')}<span>${escapeHTML(displayPhone(phone))}</span></a></li>`).join('')}</ul></div>`);
+  if (contacts.telegrams?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Запись в Telegram</${heading}><ul class="contact-list">${contacts.telegrams.map(url => `<li><a class="contact-channel" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Написать для записи: @${escapeHTML(url.split('/').pop())}">${svgIcon('telegram')}<span>@${escapeHTML(url.split('/').pop())}</span>${svgIcon('external')}</a></li>`).join('')}</ul></div>`);
   const extras = [];
-  if (!compact && contacts.instagram) extras.push(`<a href="${escapeHTML(contacts.instagram)}" target="_blank" rel="noopener noreferrer">Instagram ${svgIcon('external')}</a>`);
-  if (!compact && contacts.hrTelegram) extras.push(`<span class="contact-extra">По вопросам работы: <a href="${escapeHTML(contacts.hrTelegram)}" target="_blank" rel="noopener noreferrer">@${escapeHTML(contacts.hrTelegram.split('/').pop())} ${svgIcon('external')}</a></span>`);
+  if (!compact && contacts.instagram) extras.push(`<a href="${escapeHTML(contacts.instagram)}" target="_blank" rel="noopener noreferrer">${svgIcon('instagram')}<span>Instagram</span>${svgIcon('external')}</a>`);
+  if (!compact && contacts.hrTelegram) extras.push(`<span class="contact-extra">По вопросам работы: <a href="${escapeHTML(contacts.hrTelegram)}" target="_blank" rel="noopener noreferrer">${svgIcon('telegram')}<span>@${escapeHTML(contacts.hrTelegram.split('/').pop())}</span>${svgIcon('external')}</a></span>`);
   return `<div class="contact-channels">${groups.join('')}</div>${extras.length ? `<div class="contact-extras">${extras.join('')}</div>` : ''}`;
 }
 
@@ -190,6 +205,62 @@ export function renderCourses(courses) {
   }).join('\n');
 }
 
+const cashbackExams = [{ key: 'ielts', label: 'IELTS' }, { key: 'sat', label: 'SAT' }];
+const rewardLabel = tier => tier.label || `${money(tier.reward)} сум`;
+const shortReward = reward => reward % 1000000 === 0 ? `${money(reward / 1000000)} млн` : `${money(reward)} сум`;
+
+// Without JS both exam tables stay visible; script.js turns them into tabs.
+export function renderCashback(cashback) {
+  if (!cashback) return '';
+  const exams = cashbackExams.filter(exam => cashback[exam.key]?.length);
+  const tabs = exams.map((exam, index) => `    <button type="button" role="tab" class="cashback-tab${index ? '' : ' active'}" id="tab-${exam.key}" aria-selected="${index ? 'false' : 'true'}" aria-controls="panel-${exam.key}"${index ? ' tabindex="-1"' : ''}>${exam.label}</button>`).join('\n');
+  const panels = exams.map(exam => {
+    const tiers = cashback[exam.key];
+    const top = Math.max(...tiers.map(tier => tier.reward));
+    const cards = tiers.map(tier => {
+      const max = tier.reward === top ? '-max' : '';
+      return `<article class="cashback-card${max ? ' cashback-card-max' : ''}">
+<div class="cashback-score"><strong>${escapeHTML(tier.score)}</strong><span>${exam.label}</span></div>
+<p class="cashback-amount${max ? ' cashback-amount-max' : ''}">${escapeHTML(rewardLabel(tier))}</p>
+</article>`;
+    }).join('\n');
+    return `  <div class="cashback-grid" id="panel-${exam.key}" aria-label="Кэшбэк за ${exam.label}">
+${cards}
+  </div>`;
+  }).join('\n');
+  const rules = (cashback.rules || []).map(rule => `    <li><strong>${escapeHTML(rule.title)}</strong><span>${escapeHTML(rule.text)}</span></li>`).join('\n');
+  return `<div class="cashback-container">
+<div class="cashback-toolbar">
+  <div class="cashback-tabs" role="tablist" aria-label="Направления кэшбэка">
+${tabs}
+  </div>
+</div>
+<div class="cashback-panels">
+${panels}
+</div>
+${rules ? `<div class="cashback-rules-card">
+  <h3>Условия получения кэшбэка</h3>
+  <ol class="cashback-steps">
+${rules}
+  </ol>
+  <div class="cashback-action">
+    <a class="button" href="#courses">Выбрать курс подготовки</a>
+  </div>
+</div>
+` : ''}</div>`;
+}
+
+// Hero teaser: the same tiers as the cashback section, so amounts are edited in one place.
+export function renderHeroReward(cashback) {
+  if (!cashback) return '';
+  const all = cashbackExams.flatMap(exam => (cashback[exam.key] || []).map(tier => ({ ...tier, exam: exam.label })));
+  if (!all.length) return '';
+  const top = all.reduce((best, tier) => tier.reward > best.reward ? tier : best);
+  const pills = cashbackExams.flatMap(exam => all.filter(tier => tier.exam === exam.label && tier.hero).sort((a, b) => b.reward - a.reward))
+    .map(tier => `<span>${escapeHTML(`${tier.exam} ${tier.score} · ${shortReward(tier.reward)}`)}</span>`).join('');
+  return `<a class="hero-reward-banner" href="#cashback"><div class="hero-reward-header"><span class="hero-reward-tag">${svgIcon('award')}Кэшбэк за результат</span><strong class="hero-reward-val">до ${escapeHTML(rewardLabel(top))}</strong></div>${pills ? `<div class="hero-reward-pills">${pills}</div>` : ''}<p class="hero-reward-sub">Выплачиваем деньги за официальные баллы</p></a>`;
+}
+
 export function renderCTA(contacts) {
   const telegram = contacts.verified ? contacts.telegrams?.[0] : '';
   const phone = contacts.verified ? contacts.phones?.[0] : '';
@@ -229,6 +300,8 @@ export function generate(html, data) {
   html = replaceBlock(html, 'STATS', renderStats(data.stats, data.site));
   html = replaceBlock(html, 'TEACHERS', renderTeachers(data.teachers, data.site));
   html = replaceBlock(html, 'RESULTS', renderResults(data.results, data.site));
+  html = replaceBlock(html, 'CASHBACK', renderCashback(data.cashback));
+  html = replaceBlock(html, 'REWARD', renderHeroReward(data.cashback));
   html = replaceBlock(html, 'OPTIONS', data.courses.map(course => `<option value="${escapeHTML(course.id)}">${escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '))}</option>`).join(''));
   const siteURL = data.site?.url;
   const metadata = siteURL ? `<link rel="canonical" href="${escapeHTML(siteURL)}">\n<meta property="og:url" content="${escapeHTML(siteURL)}">\n<meta property="og:image" content="${escapeHTML(new URL('assets/stanford-logo.png', siteURL.endsWith('/') ? siteURL : `${siteURL}/`).href)}">` : '';
