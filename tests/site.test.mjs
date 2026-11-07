@@ -747,7 +747,10 @@ test('filter counts match actual categories and are hidden from duplicate screen
 
 test('reset reveals every course and restores focus to the all-programs filter', () => {
   const { context, nodes, cards, filters } = runtime();
-  assert.equal(nodes['#reset-filter'].hidden, true);
+  // The catalogue opens on the first tab, so «Все курсы» is offered right away.
+  const firstTab = data.courses.filter(course => course.category === 'languages').length;
+  assert.equal(cards.filter(card => !card.hidden).length, firstTab);
+  assert.equal(nodes['#reset-filter'].hidden, false);
   context.filterCourses('kids', 'Для детей');
   assert.equal(nodes['#reset-filter'].hidden, false);
   assert.equal(cards.filter(card => !card.hidden).length, 1);
@@ -771,7 +774,10 @@ test('price navigation reveals a filtered course, but an unknown ID leaves the f
   assert.equal(context.revealCourse('does-not-exist'), false);
   assert.equal(cards.filter(card => !card.hidden).length, 1);
   assert.equal(context.revealCourse('sat'), true);
-  assert.equal(cards.filter(card => !card.hidden).length, data.courses.length);
+  // The course's own tab opens, so the linked card is visible among its neighbours.
+  const sat = data.courses.find(course => course.id === 'sat');
+  assert.equal(cards.filter(card => !card.hidden).length, data.courses.filter(course => course.category === sat.category).length);
+  assert.equal(cards.find(card => card.dataset.courseId === 'sat').hidden, false);
   assert.equal(cards.find(card => card.dataset.courseId === 'sat').focused, true);
 });
 

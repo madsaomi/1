@@ -1,6 +1,7 @@
-<!doctype html>
+<!doctype html>{% load public_site %}{% public_site_url as home %}
 {% comment %}
-Neutral error page: no paths, versions, stack traces or framework names, and no links into the admin.
+Neutral error page: no paths, versions, stack traces or framework names, and no links into the admin; the only link
+leads to the public site (see content/templatetags/public_site.py).
 Self-contained (inline styles, no context) so it also renders for 500 errors.
 {% endcomment %}
 <html lang="ru">
@@ -16,6 +17,14 @@ Self-contained (inline styles, no context) so it also renders for 500 errors.
     body { display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 16px; background: var(--paper); color: var(--ink);
            font: 400 16px/1.5 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; }
     main { width: min(100%, 440px); padding: 32px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); text-align: center; }
+    .mark { display: grid; place-items: center; width: 96px; height: 96px; margin: 0 auto 24px; border-radius: 22%; background: var(--brand); color: #070707; transform: rotate(-8deg); }
+    .mark svg { width: 64%; height: 64%; fill: currentColor; }
+    .home { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 24px; padding: 8px 24px; border-radius: 12px; background: var(--brand); color: #070707; font-weight: 700; text-decoration: none; }
+    .home:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
+    @media (prefers-reduced-motion: no-preference) {
+      .mark { animation: pop 900ms cubic-bezier(.34,1.56,.64,1) both; }
+      @keyframes pop { from { opacity: 0; transform: translateY(24px) scale(.6) rotate(0deg); } to { opacity: 1; transform: rotate(-8deg); } }
+    }
     .code { display: inline-block; margin-bottom: 16px; padding: 4px 12px; border-radius: 999px; background: var(--brand); color: #070707; font-weight: 700; font-size: 14px; }
     h1 { margin: 0 0 8px; font-size: 24px; line-height: 1.3; letter-spacing: -.02em; }
     p { margin: 0; color: var(--muted); }
@@ -23,9 +32,11 @@ Self-contained (inline styles, no context) so it also renders for 500 errors.
 </head>
 <body>
   <main>
+    <div class="mark" aria-hidden="true"><svg viewBox="600 650 800 700" focusable="false"><path d="M1097.92,1199.98c0,66.33-41.07,110.54-105.29,110.54c-101.09,0-163.21-117.91-184.26-185.3l-36.85,11.57 c5.51,48.12,14.59,109.79,22.76,148.77c-0.86-0.45-1.71-0.91-2.57-1.38l-145,50.38l45.05-130.06 c-51.08-57.7-81.47-130.14-81.47-208.79c0-158.73,123.77-292.17,291.44-330.3c-71.53,35.39-112.3,101.41-112.3,178.68 c0,101.09,74.75,157.93,183.21,212.69C1051.59,1098.9,1097.92,1137.86,1097.92,1199.98z"/><path d="M1389.71,995.72c0,154.43-117.16,284.9-277.88,326.98c73.07-37.15,116.66-104.33,116.66-182.73 c0-104.23-75.81-163.21-186.38-216.89c-92.64-46.33-130.54-80.03-130.54-137.93c0-60.01,43.16-104.26,102.12-104.26 c86.35,0,125.31,77.92,147.42,144.25l35.79-8.4c-6.56-50.96-12.5-90.35-16.78-123.7C1304.67,749.99,1389.71,864.15,1389.71,995.72z"/></svg></div>
     <span class="code">{% block code %}{% endblock %}</span>
     <h1>{% block heading %}{% endblock %}</h1>
     <p>{% block message %}{% endblock %}</p>
+    {% if home %}<a class="home" href="{{ home }}">На главную</a>{% endif %}
   </main>
 </body>
 </html>

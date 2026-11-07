@@ -261,6 +261,14 @@ export function renderHeroReward(cashback) {
   return `<a class="hero-reward-banner" href="#cashback"><div class="hero-reward-header"><span class="hero-reward-tag">${svgIcon('award')}Кэшбэк за результат</span><strong class="hero-reward-val">до ${escapeHTML(rewardLabel(top))}</strong></div>${pills ? `<div class="hero-reward-pills">${pills}</div>` : ''}<p class="hero-reward-sub">Выплачиваем деньги за официальные баллы</p></a>`;
 }
 
+// Trial-lesson button at the bottom of the phone menu drawer (same target as the hero CTA).
+export function renderNavCta(contacts) {
+  const telegram = contacts.verified ? contacts.telegrams?.[0] : '';
+  return telegram
+    ? `<a class="button nav-cta" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer" aria-label="Бесплатный пробный урок: написать в Telegram">Бесплатный пробный урок${svgIcon('external')}</a>`
+    : '<a class="button nav-cta" href="#enroll">Бесплатный пробный урок</a>';
+}
+
 // Floating shortcut to admissions, always within thumb reach on phones.
 export function renderContactFab(contacts) {
   if (!contacts.verified) return '';
@@ -313,6 +321,7 @@ export function generate(html, data) {
   html = replaceBlock(html, 'CASHBACK', renderCashback(data.cashback));
   html = replaceBlock(html, 'REWARD', renderHeroReward(data.cashback));
   html = replaceBlock(html, 'FAB', renderContactFab(data.contacts));
+  html = replaceBlock(html, 'NAVCTA', renderNavCta(data.contacts));
   html = replaceBlock(html, 'OPTIONS', data.courses.map(course => `<option value="${escapeHTML(course.id)}">${escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '))}</option>`).join(''));
   const siteURL = data.site?.url;
   const metadata = siteURL ? `<link rel="canonical" href="${escapeHTML(siteURL)}">\n<meta property="og:url" content="${escapeHTML(siteURL)}">\n<meta property="og:image" content="${escapeHTML(new URL('assets/stanford-logo.png', siteURL.endsWith('/') ? siteURL : `${siteURL}/`).href)}">` : '';

@@ -23,7 +23,17 @@ resetFilter.addEventListener('click', () => {
   filterCourses('all', 'Все программы');
   filters.find(button => button.dataset.filter === 'all')?.focus();
 });
-filters.forEach(button => button.addEventListener('click', () => filterCourses(button.dataset.filter, button.dataset.filterLabel || button.textContent.trim())));
+filters.forEach(button => button.addEventListener('click', () => {
+  filterCourses(button.dataset.filter, button.dataset.filterLabel || button.textContent.trim());
+  // On phones the catalogue is a swipe row: a new tab starts from its first card.
+  document.querySelector('#course-grid')?.scrollTo?.({ left: 0 });
+}));
+const filterLabel = category => {
+  const button = filters.find(item => item.dataset.filter === category);
+  return button ? button.dataset.filterLabel || button.textContent.trim() : 'Все программы';
+};
+// With JS the catalogue opens on the first tab; without JS every course stays listed.
+const defaultCategory = filters.find(button => button.dataset.filter !== 'all')?.dataset.filter || 'all';
 
 const menu = document.querySelector('.menu');
 const navigation = document.querySelector('#navigation');
@@ -182,7 +192,8 @@ function revealCourse(courseId) {
   const card = cards.find(item => item.dataset.courseId === courseId);
   if (!card) return false;
   closeDialogForNavigation();
-  filterCourses('all', 'Все программы');
+  const category = filters.some(button => button.dataset.filter === card.dataset.category) ? card.dataset.category : 'all';
+  filterCourses(category, filterLabel(category));
   card.focus({ preventScroll: true });
   return true;
 }
@@ -208,7 +219,7 @@ dialog.addEventListener('close', () => {
   if (dialogTrigger?.isConnected) dialogTrigger.focus();
 });
 
-filterCourses("all", "Все программы");
+filterCourses(defaultCategory, filterLabel(defaultCategory));
 revealCourseFromHash();
 
 // Cashback tables: without JS both exams are listed; here they become tabs.
