@@ -14,6 +14,11 @@ These unmodified WOFF2 files are self-hosted font assets, not an installed npm d
 | --- | ---: | --- |
 | `inter-latin-wght-normal.woff2` | 48,256 bytes | `3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62` |
 | `inter-cyrillic-wght-normal.woff2` | 18,748 bytes | `71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075` |
+| `inter-latin-ext-wght-normal.woff2` | 85,068 bytes | `34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956` |
+
+`inter-latin-ext-wght-normal.woff2` (added 2026-11-07 for the Uzbek 2026 Latin alphabet: Ş ş, Ğ ğ) comes from the same
+package version, fetched from `https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.3.0/files/`. Its unicode range is
+the standard Google Fonts / Fontsource `latin-ext` range used in `style.css`.
 
 Use separate `@font-face` declarations with `font-style: normal`, `font-weight: 100 900`, `font-display: swap`, and the distribution's unicode ranges:
 
