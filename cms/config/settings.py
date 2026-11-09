@@ -3,8 +3,16 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from django.templatetags.static import static
 from django.urls import reverse_lazy
+
+try:  # WhiteNoise comes from requirements.txt; the offline sandbox may not have it installed.
+    import whitenoise  # noqa: F401
+except ImportError:
+    WHITENOISE_AVAILABLE = False
+else:
+    WHITENOISE_AVAILABLE = True
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SITE_ROOT = BASE_DIR.parent  # the static site whose content.js the admin publishes
@@ -12,16 +20,32 @@ SITE_ROOT = BASE_DIR.parent  # the static site whose content.js the admin publis
 # Fail closed. DJANGO_LOCAL=1 enables local-preview conveniences (default key and path, SQLite, plain HTTP);
 # Django's technical error pages (DEBUG) need their own explicit DJANGO_TRACEBACKS=1 — they reveal URLs and code.
 LOCAL = os.environ.get('DJANGO_LOCAL') == '1'
+if LOCAL and (os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID')):
+    raise ImproperlyConfigured('DJANGO_LOCAL=1 запрещен на Railway: локальный режим отключает HTTPS-защиту.')
 DEBUG = os.environ.get('DJANGO_TRACEBACKS') == '1'
+if DEBUG and not LOCAL:
+    raise ImproperlyConfigured('DJANGO_TRACEBACKS разрешен только вместе с DJANGO_LOCAL=1: технические страницы '
+                               'раскрывают пути и код.')
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or ('local-dev-only-key' if LOCAL else None)
 if not SECRET_KEY:
-    raise RuntimeError('DJANGO_SECRET_KEY must be set outside local development')
-ALLOWED_HOSTS = [host for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost' if LOCAL else '').split(',') if host]
-CSRF_TRUSTED_ORIGINS = [origin for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if origin]
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set outside local development')
 # The admin lives on a secret path in production; the default is only for local preview.
 ADMIN_PATH = os.environ.get('ADMIN_PATH') or ('admin/' if LOCAL else '')
 if not LOCAL and (not ADMIN_PATH.endswith('/') or ADMIN_PATH in {'/', 'admin/'} or len(ADMIN_PATH) < 12):
-    raise RuntimeError('ADMIN_PATH must be a secret path (12+ characters, ending with "/") outside local development')
+    raise ImproperlyConfigured('ADMIN_PATH must be a secret path (12+ characters, ending with "/") outside local development')
+# Outside local preview every production dependency must be explicit: a silent fallback to SQLite or an empty
+# ALLOWED_HOSTS would produce either a broken or an insecure deployment. POSTGRES_PORT has a sane default.
+PRODUCTION_ENV = ('DJANGO_ALLOWED_HOSTS', 'DJANGO_CSRF_TRUSTED_ORIGINS',
+                  'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_HOST')
+if not LOCAL:
+    missing = [name for name in PRODUCTION_ENV if not os.environ.get(name)]
+    if missing:
+        raise ImproperlyConfigured('Не заданы обязательные переменные прода: ' + ', '.join(missing))
+ALLOWED_HOSTS = [host for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost' if LOCAL else '').split(',') if host]
+if not LOCAL:
+    # The container healthcheck calls http://127.0.0.1:$PORT/healthz.
+    ALLOWED_HOSTS += [host for host in ('127.0.0.1', 'localhost') if host not in ALLOWED_HOSTS]
+CSRF_TRUSTED_ORIGINS = [origin for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if origin]
 
 INSTALLED_APPS = [
     'unfold.apps.BasicAppConfig',  # templates and styles; the admin site itself comes from config.apps
@@ -50,6 +74,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'axes.middleware.AxesMiddleware',  # must be last
 ]
+if WHITENOISE_AVAILABLE and not LOCAL:
+    # Production serves collected static files itself (gunicorn has no static server);
+    # local preview keeps Django's explicit static view from config/urls.py.
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 AUTHENTICATION_BACKENDS = [
     'axes.backends.AxesStandaloneBackend',  # must be first
@@ -83,7 +111,7 @@ TEMPLATES = [{
     ]},
 }]
 
-# Local preview uses SQLite; Railway provides Postgres through DATABASE_* variables (stage 5).
+# Local preview uses SQLite; Railway provides Postgres through POSTGRES_* variables (stage 5).
 if os.environ.get('POSTGRES_DB'):
     DATABASES = {'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -93,8 +121,10 @@ if os.environ.get('POSTGRES_DB'):
         'HOST': os.environ.get('POSTGRES_HOST', ''),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }}
-else:
+elif LOCAL:
     DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}}
+else:
+    raise ImproperlyConfigured('POSTGRES_DB is required outside local development')
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -109,10 +139,37 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [SITE_ROOT / 'assets']  # public site assets (logo, favicon); no prefix — prefixes break on Windows
+# Public site assets (logo, favicon). The directory is absent when the image is built from cms/ alone, which is
+# fine: collectstatic then simply has nothing extra to copy. No prefix — prefixes break on Windows.
+SITE_ASSETS = SITE_ROOT / 'assets'
+STATICFILES_DIRS = [SITE_ASSETS] if SITE_ASSETS.is_dir() else []
+# The brand icon/favicon come from assets/; a cms-only image (Railway builds from cms/) has no assets directory,
+# so fall back to Unfold's default symbol instead of linking to a missing file.
+BRAND_ASSETS = {name for name in ('stanford-icon.svg', 'favicon.svg') if (SITE_ASSETS / name).is_file()}
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+}
+if WHITENOISE_AVAILABLE:
+    # Compressed (but not manifest-hashed) files: WhiteNoise serves them with long-lived caching, and a missing
+    # referenced asset can never abort a deployment. This admin is the only consumer of these files.
+    STORAGES['staticfiles'] = {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'}
 MEDIA_URL = 'media/'
 MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', BASE_DIR / 'media'))
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# All logs to stdout: Railway collects them; security and lockout events are called out by name.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {'plain': {'format': '{asctime} {levelname} {name}: {message}', 'style': '{'}},
+    'handlers': {'console': {'class': 'logging.StreamHandler', 'formatter': 'plain'}},
+    'root': {'handlers': ['console'], 'level': 'INFO'},
+    'loggers': {
+        'django.security': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'axes': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+    },
+}
 
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not LOCAL
@@ -149,8 +206,10 @@ UNFOLD = {
     'SITE_SUBHEADER': 'Language Center',
     'SITE_SYMBOL': 'school',
     'SITE_URL': None,  # no «Return to site» link: the admin has no site of its own
-    'SITE_ICON': lambda request: static('stanford-icon.svg'),
-    'SITE_FAVICONS': [{'rel': 'icon', 'type': 'image/svg+xml', 'href': lambda request: static('favicon.svg')}],
+    'SITE_ICON': (lambda request: static('stanford-icon.svg')) if 'stanford-icon.svg' in BRAND_ASSETS else None,
+    'SITE_FAVICONS': ([{'rel': 'icon', 'type': 'image/svg+xml',
+                        'href': lambda request: static('favicon.svg')}]
+                      if 'favicon.svg' in BRAND_ASSETS else []),
     'SHOW_HISTORY': True,
     'SHOW_VIEW_ON_SITE': False,
     'BORDER_RADIUS': '12px',
@@ -174,6 +233,8 @@ UNFOLD = {
             ]},
             {'title': 'Обучение', 'items': [
                 {'title': 'Курсы и цены', 'icon': 'menu_book', 'link': changelist('course')},
+                {'title': 'Кэшбэк за баллы', 'icon': 'payments', 'link': changelist('cashbacktier')},
+                {'title': 'Условия кэшбэка', 'icon': 'checklist', 'link': changelist('cashbackrule')},
             ]},
             {'title': 'Люди', 'items': [
                 {'title': 'Преподаватели', 'icon': 'group', 'link': changelist('teacher')},

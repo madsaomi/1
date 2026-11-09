@@ -1,0 +1,8 @@
+node_modules/
+pnpm-store/
+test.mjs
+README.md
+Dockerfile
+.dockerignore
+.env
+.env.*

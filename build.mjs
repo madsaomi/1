@@ -34,16 +34,25 @@ function validatePhoto(photo, message) {
 }
 const text = (value, max) => typeof value === 'string' && value.trim() !== '' && value.length <= max;
 const optionalText = (value, max) => value === undefined || text(value, max);
+const courseCategories = new Set(['languages', 'kids', 'subjects', 'exam']);
 
 export function validateContent(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Content must be an object');
+  if (!Array.isArray(data.courses) || !data.courses.length) throw new Error('Courses must be a non-empty array');
   const ids = new Set();
   for (const course of data.courses) {
     if (!/^[a-z0-9-]+$/.test(course.id) || ids.has(course.id)) throw new Error('Course IDs must be unique slugs');
     ids.add(course.id);
+    if (!text(course.name, 80)) throw new Error(`Invalid course name: ${course.id}`);
+    if (!optionalText(course.subtitle, 80)) throw new Error(`Invalid course subtitle: ${course.id}`);
+    if (!text(course.description, 400)) throw new Error(`Invalid course description: ${course.id}`);
+    if (!courseCategories.has(course.category)) throw new Error(`Invalid course category: ${course.id}`);
+    if (!Array.isArray(course.skills) || !course.skills.length || course.skills.some(skill => !text(skill, 200))) throw new Error(`Invalid course skills: ${course.id}`);
     if (!Number.isFinite(course.price) || course.price <= 0) throw new Error(`Invalid price: ${course.id}`);
     if (course.specialPrice != null && (!Number.isFinite(course.specialPrice) || course.specialPrice <= 0 || course.specialPrice > course.price)) throw new Error(`Invalid discounted price: ${course.id}`);
     if (!/^#[a-z0-9-]+$/.test(course.target)) throw new Error(`Invalid course target: ${course.id}`);
   }
+  if (!data.contacts || typeof data.contacts !== 'object' || Array.isArray(data.contacts)) throw new Error('Contacts must be an object');
   if (data.contacts.verified) {
     const { phones = [], telegrams = [], hrTelegram = '', instagram = '', locations = [] } = data.contacts;
     if (!Array.isArray(phones) || !Array.isArray(telegrams)) throw new Error('Contact channels must be arrays');
@@ -77,8 +86,10 @@ export function validateContent(data) {
       }
     }
   }
+  if (data.site !== undefined && (!data.site || typeof data.site !== 'object' || Array.isArray(data.site))) throw new Error('Site settings must be an object');
   const demo = data.site?.demoMode;
   if (demo !== undefined && typeof demo !== 'boolean') throw new Error('demoMode must be true or false');
+  if (data.site?.demoLabels !== undefined && typeof data.site.demoLabels !== 'boolean') throw new Error('demoLabels must be true or false');
   const { stats = [], teachers = [], results = [] } = data;
   if (![stats, teachers, results].every(Array.isArray)) throw new Error('Stats, teachers and results must be arrays');
   for (const stat of stats) if (!text(stat.value, 12) || !text(stat.label, 40)) throw new Error('Stat needs a short value and label');
@@ -102,7 +113,8 @@ export function validateContent(data) {
     for (const rule of cashback.rules ?? []) if (!text(rule.title, 60) || !text(rule.text, 200)) throw new Error('Cashback rule needs a title and text');
   }
   if (data.site?.url) {
-    const url = new URL(data.site.url);
+    let url;
+    try { url = new URL(data.site.url); } catch { throw new Error('Site URL must be a valid public HTTPS address'); }
     if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Use a public HTTPS site URL without credentials, query or hash');
   }
 }
@@ -117,14 +129,19 @@ export function renderContacts(contacts, { compact = false } = {}) {
   const heading = compact ? 'p' : 'h3';
   const groups = [];
   if (contacts.phones?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Позвонить</${heading}><ul class="contact-list">${contacts.phones.map(phone => `<li><a class="contact-channel" href="tel:${escapeHTML(phone)}" aria-label="Позвонить: ${escapeHTML(displayPhone(phone))}">${svgIcon('phone')}<span>${escapeHTML(displayPhone(phone))}</span></a></li>`).join('')}</ul></div>`);
-  if (contacts.telegrams?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Запись в Telegram</${heading}><ul class="contact-list">${contacts.telegrams.map(url => `<li><a class="contact-channel" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Написать для записи: @${escapeHTML(url.split('/').pop())}">${svgIcon('telegram')}<span>@${escapeHTML(url.split('/').pop())}</span>${svgIcon('external')}</a></li>`).join('')}</ul></div>`);
+  if (!compact && contacts.telegrams?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Написать в Telegram</${heading}><ul class="contact-list">${contacts.telegrams.map(url => `<li><a class="contact-channel" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Написать в Telegram: @${escapeHTML(url.split('/').pop())}">${svgIcon('telegram')}<span>@${escapeHTML(url.split('/').pop())}</span>${svgIcon('external')}</a></li>`).join('')}</ul></div>`);
   const extras = [];
   if (!compact && contacts.instagram) extras.push(`<a href="${escapeHTML(contacts.instagram)}" target="_blank" rel="noopener noreferrer">${svgIcon('instagram')}<span>Instagram</span>${svgIcon('external')}</a>`);
-  if (!compact && contacts.hrTelegram) extras.push(`<span class="contact-extra">По вопросам работы: <a href="${escapeHTML(contacts.hrTelegram)}" target="_blank" rel="noopener noreferrer">${svgIcon('telegram')}<span>@${escapeHTML(contacts.hrTelegram.split('/').pop())}</span>${svgIcon('external')}</a></span>`);
-  return `<div class="contact-channels">${groups.join('')}</div>${extras.length ? `<div class="contact-extras">${extras.join('')}</div>` : ''}`;
+  // HR no longer gets messages directly from this block: candidates fill the career form instead.
+  if (!compact) extras.push(`<a class="contact-extras-link" href="career.html">${svgIcon('check')}<span>Заполнить анкету</span>${svgIcon('arrow-right')}</a>`);
+  // The course dialog is where the visitor signs up: send them to the branch addresses instead of a messenger.
+  const jump = compact ? `<p class="contact-jump"><a class="text-link" href="#enroll" data-dialog-jump>Приходите в центр: адреса филиалов${svgIcon('arrow-right')}</a></p>` : '';
+  return `<div class="contact-channels">${groups.join('')}</div>${extras.length ? `<div class="contact-extras">${extras.join('')}</div>` : ''}${jump}`;
 }
 
-const demoTag = site => site?.demoMode ? ' <span class="demo-tag">Пример</span>' : '';
+const demoTag = site => showDemo(site) ? ' <span class="demo-tag">Пример</span>' : '';
+// demoLabels=false keeps the sample data private to the team: no «Пример» banners while the owner prepares real content.
+const showDemo = site => Boolean(site?.demoMode && site?.demoLabels !== false);
 
 // Samples must not be indexed: while demo mode is on, search engines are asked to skip the page.
 export function renderRobots(site) {
@@ -132,13 +149,13 @@ export function renderRobots(site) {
 }
 
 export function renderDemoBanner(site) {
-  return site?.demoMode ? '<p class="demo-banner">Демо-версия: блоки «Пример» — образцы</p>' : '';
+  return showDemo(site) ? '<p class="demo-banner">Демо-версия: блоки «Пример» — образцы</p>' : '';
 }
 
 export function renderStats(stats = [], site) {
   if (!stats.length) return '';
   const items = stats.map(stat => `<div><dt>${escapeHTML(stat.label)}</dt><dd>${escapeHTML(stat.value)}</dd></div>`).join('');
-  return `<section class="wrap stats-strip" aria-label="Stanford в цифрах${site?.demoMode ? ' (пример)' : ''}">${site?.demoMode ? '<span class="demo-tag">Пример</span>' : ''}<dl>${items}</dl></section>`;
+  return `<section class="wrap stats-strip" aria-label="Stanford в цифрах${showDemo(site) ? ' (пример)' : ''}">${showDemo(site) ? '<span class="demo-tag">Пример</span>' : ''}<dl>${items}</dl></section>`;
 }
 
 export function initials(name) {
@@ -146,7 +163,7 @@ export function initials(name) {
 }
 
 export function renderTeachers(teachers = [], site) {
-  const heading = `<div class="section-top"><h2 id="teachers-title">Преподаватели${demoTag(site)}</h2><p>Группу и преподавателя подбирают по уровню после входного теста.</p></div>`;
+  const heading = `<div class="section-top"><h2 id="teachers-title">Преподаватели${demoTag(site)}</h2></div>`;
   if (!teachers.length) return heading;
   const cards = teachers.map(teacher => {
     const name = escapeHTML(teacher.name);
@@ -159,12 +176,17 @@ export function renderTeachers(teachers = [], site) {
   return `${heading}\n<div class="team-grid">${cards}</div>`;
 }
 
+// One card per published student result; reused by the home section and the full results page.
+export function renderResultCards(results = []) {
+  return results.map(result => `<article class="result-card"><div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></article>`).join('');
+}
+
 export function renderResults(results = [], site) {
   if (!results.length) return '';
-  const cards = results.map(result => `<article class="result-card"><div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></article>`).join('');
   return `<section data-reveal class="section wrap results-section" id="results" aria-labelledby="results-title">
-<div class="section-top"><h2 id="results-title">Результаты студентов${demoTag(site)}</h2><p>Реальные баллы — с согласия студентов.</p></div>
-<div class="results-grid">${cards}</div>
+<div class="section-top"><h2 id="results-title">Результаты студентов${demoTag(site)}</h2></div>
+<div class="results-grid">${renderResultCards(results)}</div>
+<a class="text-link results-more" href="results.html">Все результаты${svgIcon('arrow-right')}</a>
 </section>`;
 }
 
@@ -228,7 +250,6 @@ export function renderCashback(cashback) {
 ${cards}
   </div>`;
   }).join('\n');
-  const rules = (cashback.rules || []).map(rule => `    <li><strong>${escapeHTML(rule.title)}</strong><span>${escapeHTML(rule.text)}</span></li>`).join('\n');
   return `<div class="cashback-container">
 <div class="cashback-toolbar">
   <div class="cashback-tabs" role="tablist" aria-label="Направления кэшбэка">
@@ -237,17 +258,7 @@ ${tabs}
 </div>
 <div class="cashback-panels">
 ${panels}
-</div>
-${rules ? `<div class="cashback-rules-card">
-  <h3>Условия получения кэшбэка</h3>
-  <ol class="cashback-steps">
-${rules}
-  </ol>
-  <div class="cashback-action">
-    <a class="button" href="#courses">Выбрать курс подготовки</a>
-  </div>
-</div>
-` : ''}</div>`;
+</div></div>`;
 }
 
 // Hero teaser: the same tiers as the cashback section, so amounts are edited in one place.
@@ -261,34 +272,24 @@ export function renderHeroReward(cashback) {
   return `<a class="hero-reward-banner" href="#cashback"><div class="hero-reward-header"><span class="hero-reward-tag">${svgIcon('award')}Кэшбэк за результат</span><strong class="hero-reward-val">до ${escapeHTML(rewardLabel(top))}</strong></div>${pills ? `<div class="hero-reward-pills">${pills}</div>` : ''}<p class="hero-reward-sub">Выплачиваем деньги за официальные баллы</p></a>`;
 }
 
-// Trial-lesson button at the bottom of the phone menu drawer (same target as the hero CTA).
+// Trial-lesson CTA lives on the same page: sign-up happens at the centre, not in a messenger.
 export function renderNavCta(contacts) {
-  const telegram = contacts.verified ? contacts.telegrams?.[0] : '';
-  return telegram
-    ? `<a class="button nav-cta" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer" aria-label="Бесплатный пробный урок: написать в Telegram">Бесплатный пробный урок${svgIcon('external')}</a>`
-    : '<a class="button nav-cta" href="#enroll">Бесплатный пробный урок</a>';
+  return `<a class="button nav-cta" href="#enroll" aria-label="Записаться в центре: адреса филиалов">Записаться в центре${svgIcon('arrow-right')}</a>`;
 }
 
-// Floating shortcut to admissions, always within thumb reach on phones.
+// Floating shortcut to the branch addresses, always within thumb reach on phones.
 export function renderContactFab(contacts) {
   if (!contacts.verified) return '';
-  const telegram = contacts.telegrams?.[0];
-  const phone = contacts.phones?.[0];
-  if (telegram) return `<a class="contact-fab" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer" aria-label="Записаться: написать в Telegram">${svgIcon('telegram')}</a>`;
-  if (phone) return `<a class="contact-fab" href="tel:${escapeHTML(phone)}" aria-label="Записаться: позвонить ${escapeHTML(displayPhone(phone))}">${svgIcon('phone')}</a>`;
-  return '';
+  return `<a class="contact-fab" href="#enroll" aria-label="Записаться в центре: адреса филиалов">${svgIcon('map-pin')}</a>`;
 }
 
 export function renderCTA(contacts) {
-  const telegram = contacts.verified ? contacts.telegrams?.[0] : '';
   const phone = contacts.verified ? contacts.phones?.[0] : '';
-  // The trial lesson goes straight to admissions in Telegram; unverified contacts keep the in-page fallback.
-  const trial = telegram
-    ? `<a class="button" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer" aria-label="Бесплатный пробный урок: написать в Telegram">Бесплатный пробный урок${svgIcon('external')}</a>`
-    : '<a class="button" href="#enroll">Бесплатный пробный урок</a>';
-  const note = telegram && phone
-    ? `Откроется Telegram. Или позвоните: <a href="tel:${escapeHTML(phone)}">${escapeHTML(displayPhone(phone))}</a>`
-    : 'Запись — по телефону или в Telegram.';
+  // Sign-up is a visit to the centre; the phone stays as a fallback line under the buttons.
+  const trial = `<a class="button" href="#enroll" aria-label="Записаться в центре: адреса филиалов">Записаться в центре${svgIcon('map-pin')}</a>`;
+  const note = phone
+    ? `Приходите в центр — подскажем программу и поможем с записью. Или позвоните: <a href="tel:${escapeHTML(phone)}">${escapeHTML(displayPhone(phone))}</a>`
+    : 'Приходите в центр — подскажем программу и поможем с записью. Адреса филиалов — в контактах.';
   return `<div class="actions">${trial}<a class="text-link" href="#courses">Выбрать курс${svgIcon('arrow-right')}</a></div>\n<p class="hero-footnote">${note}</p>`;
 }
 
@@ -312,7 +313,7 @@ export function generate(html, data) {
   html = replaceBlock(html, 'COURSES', renderCourses(data.courses));
   html = replaceBlock(html, 'CTA', renderCTA(data.contacts));
   html = replaceBlock(html, 'FILTERS', renderFilters(data.courses));
-  html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts, { demo: data.site?.demoMode }));
+  html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts, { demo: showDemo(data.site) }));
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
   html = replaceBlock(html, 'BANNER', renderDemoBanner(data.site));
   html = replaceBlock(html, 'STATS', renderStats(data.stats, data.site));
@@ -330,15 +331,33 @@ export function generate(html, data) {
   return html;
 }
 
+// The full results page grows with the admin data: every published result becomes a card.
+export function generateResults(html, data) {
+  html = html.replace(/\r\n/g, '\n');
+  validateContent(data);
+  return replaceBlock(html, 'RESULTS_LIST', renderResultCards(data.results));
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
-  const file = new URL('./index.html', import.meta.url);
-  const source = fs.readFileSync(file, 'utf8');
-  const output = generate(source, readContent());
+  const data = readContent();
+  const pages = [
+    { file: new URL('./index.html', import.meta.url), build: generate, label: 'index.html' },
+    { file: new URL('./results.html', import.meta.url), build: generateResults, label: 'results.html' }
+  ];
+  let stale = false;
+  for (const page of pages) {
+    const source = fs.readFileSync(page.file, 'utf8');
+    const output = page.build(source, data);
+    if (process.argv.includes('--check')) {
+      if (output !== source) { console.error(`Generated ${page.label} is stale. Run node build.mjs`); stale = true; }
+    } else {
+      fs.writeFileSync(page.file, output);
+    }
+  }
   if (process.argv.includes('--check')) {
-    if (output !== source) { console.error('Generated HTML is stale. Run node build.mjs'); process.exitCode = 1; }
+    if (stale) process.exitCode = 1;
     else console.log('Generated HTML is current.');
   } else {
-    fs.writeFileSync(file, output);
-    console.log('Static courses, prices and direct contacts generated.');
+    console.log('Static courses, prices, direct contacts and the results page generated.');
   }
 }

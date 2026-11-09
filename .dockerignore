@@ -2,7 +2,11 @@
 !Dockerfile
 !Caddyfile
 !index.html
+!results.html
+!career.html
 !content.js
+!results.js
+!career.js
 !script.js
 !theme-init.js
 !style.css
@@ -10,9 +14,5 @@
 !assets/
 !assets/**
 
-assets/courses/*.png
-assets/courses/IMAGE_PROMPTS.md
-assets/clubs/*.png
-assets/clubs/*PROMPT*.md
 **/*.zip
 **/*.rar

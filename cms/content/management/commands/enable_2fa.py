@@ -28,6 +28,9 @@ class Command(BaseCommand):
         TOTPDevice.objects.filter(user=user).delete()
         device = TOTPDevice.objects.create(user=user, name='Authenticator', confirmed=True)
         if options['print']:
+            self.stderr.write(self.style.WARNING(
+                'Внимание: ссылка содержит секрет для входа. Вывод терминала может попасть в логи сервиса '
+                '(например, Railway), поэтому не публикуйте его и очистите логи после подключения.'))
             self.stdout.write('Отсканируйте эту ссылку в приложении (или введите ее вручную):')
             self.stdout.write(device.config_url)
             return

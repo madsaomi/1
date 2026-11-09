@@ -2,14 +2,28 @@
 
 Validators mirror validateContent() in build.mjs so mistakes surface in the form, before publishing.
 """
+from urllib.parse import urlsplit
+
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
 from .validators import PHOTO_VALIDATORS
 
 slug_validator = RegexValidator(r'^[a-z0-9-]+$', 'Только строчные латинские буквы, цифры и дефис.')
-phone_validator = RegexValidator(r'^\+[1-9]\d{7,14}$', 'Международный формат, например +998913036001.')
+phone_validator = RegexValidator(r'^\+998\d{9}$', 'Формат +998 и 9 цифр, например +998913036001.')
+positive_validator = MinValueValidator(1, 'Значение должно быть больше нуля.')
+
+
+def validate_https_site_url(value):
+    """Public site address: HTTPS, no credentials, query or hash; a path after the domain is fine (build.mjs)."""
+    if not value:
+        return
+    url = urlsplit(value)
+    if (url.scheme != 'https' or not url.netloc or url.username or url.password or url.query or url.fragment
+            or '@' in url.netloc):
+        raise ValidationError('Только https:// без логина, параметров (?…) и якоря (#…). Путь после домена можно.')
+
 telegram_validator = RegexValidator(r'^https://t\.me/[a-zA-Z0-9_]{5,32}$', 'Прямая ссылка вида https://t.me/имя.')
 instagram_validator = RegexValidator(r'^https://www\.instagram\.com/[a-zA-Z0-9_.]{1,30}/?$', 'Ссылка вида https://www.instagram.com/имя/.')
 target_validator = RegexValidator(r'^#[a-z0-9-]+$', 'Якорь на странице, например #prices.')
@@ -46,7 +60,10 @@ class Singleton(models.Model):
 class SiteSettings(Singleton):
     demo_mode = models.BooleanField('Демо-режим', default=True,
                                     help_text='Включен: на сайте плашка «Демо-версия» и метки «Пример». Выключите, когда все данные реальные.')
-    site_url = models.URLField('Адрес сайта', blank=True, help_text='Нужен для canonical и превью в соцсетях.')
+    demo_labels = models.BooleanField('Плашки «Пример»', default=True,
+                                      help_text='Показывать баннер демо-версии и метки «Пример» на блоках. Выключите, чтобы смотреть сайт без служебных подписей.')
+    site_url = models.URLField('Адрес сайта', blank=True, validators=[validate_https_site_url],
+                               help_text='Нужен для canonical и превью в соцсетях. Только https://.')
     city = models.CharField('Город', max_length=60, default='Нукус')
 
     class Meta:
@@ -75,8 +92,9 @@ class Course(Ordered):
     subtitle = models.CharField('Уточнение', max_length=80, blank=True, help_text='Например: на каракалпакском')
     category = models.CharField('Направление', max_length=20, choices=CATEGORIES)
     description = models.TextField('Описание', max_length=400)
-    price = models.PositiveIntegerField('Цена в месяц, сум')
+    price = models.PositiveIntegerField('Цена в месяц, сум', validators=[positive_validator])
     special_price = models.PositiveIntegerField('Семейная цена, сум', null=True, blank=True,
+                                                validators=[positive_validator],
                                                 help_text='Для семьи или записи на два курса. Пусто — не предусмотрена.')
     target = models.CharField('Ссылка «Подробнее»', max_length=40, default='#prices', validators=[target_validator])
     is_published = models.BooleanField('Показывать на сайте', default=True)
@@ -89,8 +107,16 @@ class Course(Ordered):
         return ' '.join(filter(None, [self.name, self.subtitle]))
 
     def clean(self):
-        if self.special_price is not None and self.price is not None and self.special_price > self.price:
-            raise ValidationError({'special_price': 'Семейная цена не может быть выше обычной.'})
+        errors = {}
+        # build.mjs rejects empty name/description and non-positive prices, so the form must too.
+        if not (self.name or '').strip():
+            errors['name'] = 'Укажите название курса.'
+        if not (self.description or '').strip():
+            errors['description'] = 'Укажите описание курса.'
+        if self.special_price is not None and self.price is not None and self.special_price >= self.price:
+            errors['special_price'] = 'Семейная цена должна быть ниже обычной.'
+        if errors:
+            raise ValidationError(errors)
 
 
 class CourseSkill(Ordered):
@@ -105,6 +131,44 @@ class CourseSkill(Ordered):
         return self.text
 
 
+class CashbackTier(Ordered):
+    """One «exam score → cash reward» row of the cashback section (stage 3 of PLAN-044)."""
+    EXAMS = [('ielts', 'IELTS'), ('sat', 'SAT')]
+    exam = models.CharField('Экзамен', max_length=10, choices=EXAMS)
+    score = models.CharField('Балл', max_length=8, help_text='Например: 7.5 или 1500')
+    reward = models.PositiveIntegerField('Выплата, сум', validators=[positive_validator])
+    label = models.CharField('Подпись суммы', max_length=40, blank=True,
+                             help_text='Например: 2 000 000 сум. Пусто — соберется само из выплаты.')
+    hero = models.BooleanField('Сумма в баннере', default=False,
+                               help_text='Показывать сумму в верхнем баннере «Кэшбэк за результат».')
+
+    class Meta(Ordered.Meta):
+        verbose_name = 'Ступень кэшбэка'
+        verbose_name_plural = 'Кэшбэк за баллы'
+        ordering = ['exam', 'order', 'pk']
+        constraints = [models.UniqueConstraint(fields=['exam', 'score'], name='content_cashbacktier_unique_exam_score')]
+
+    def __str__(self):
+        return f'{self.get_exam_display()} {self.score} — {self.reward:,}'.replace(',', ' ') + ' сум'
+
+    def clean(self):
+        if self.reward is not None and self.reward <= 0:
+            raise ValidationError({'reward': 'Выплата должна быть больше нуля.'})
+
+
+class CashbackRule(Ordered):
+    """A numbered step of «Условия получения кэшбэка»."""
+    title = models.CharField('Шаг', max_length=60)
+    text = models.CharField('Пояснение', max_length=200)
+
+    class Meta(Ordered.Meta):
+        verbose_name = 'Условие кэшбэка'
+        verbose_name_plural = 'Условия кэшбэка'
+
+    def __str__(self):
+        return self.title
+
+
 class Contacts(Singleton):
     verified = models.BooleanField('Контакты подтверждены', default=True,
                                    help_text='Выключено — на сайте вместо телефонов надпись «Контакты уточняются».')
@@ -116,6 +180,22 @@ class Contacts(Singleton):
 
     def __str__(self):
         return 'Контакты'
+
+    def clean(self):
+        # build.mjs publishes verified contacts only with an admissions channel, and keeps HR separate.
+        # Existing channels are read from the database: save the contacts once (verification can be off),
+        # add a phone/Telegram on the same page, then enable «Контакты подтверждены».
+        if not self.verified or not self.pk:
+            return
+        errors = {}
+        phones = list(self.phones.values_list('number', flat=True))
+        telegrams = [url.lower() for url in self.telegrams.values_list('url', flat=True)]
+        if not phones and not telegrams:
+            errors['verified'] = 'Добавьте хотя бы один телефон или Telegram для записи, иначе контакты нельзя подтвердить.'
+        if self.hr_telegram and self.hr_telegram.lower() in telegrams:
+            errors['hr_telegram'] = 'Telegram для вопросов работы должен отличаться от Telegram для записи.'
+        if errors:
+            raise ValidationError(errors)
 
 
 class Phone(Ordered):

@@ -223,7 +223,46 @@ window.stanfordUz = {
     'Яндекс Карты': 'Yandex Xaritalar',
     'Наверх': 'Yuqoriga',
     'Навигация в подвале': 'Pastki navigatsiya',
-    'Записаться: написать в Telegram': 'Yoziliş: Telegramga yoziş'
+    'Записаться: написать в Telegram': 'Yoziliş: Telegramga yoziş',
+
+    // Sign-up at the centre, no city emphasis
+    'Stanford — английский, IELTS и SAT': 'Stanford — ingliz tili, IELTS va SAT',
+    'Курсы Stanford: английский и немецкий, IELTS и SAT, занятия для детей и математика. Программы, цены и адреса филиалов.': 'Stanford kurslari: ingliz va nemis tillari, IELTS va SAT, bolalar uçun darslar va matematika. Dasturlar, narxlar va filiallar manzillari.',
+    'Stanford — курсы английского, IELTS и SAT': 'Stanford — ingliz tili, IELTS va SAT kurslari',
+    'Языки, IELTS, SAT и математика. Программы, цены и три филиала Stanford.': 'Tillar, IELTS, SAT va matematika. Stanfordning dasturlari, narxlari va uç filiali.',
+    'Языковой центр': 'Til markazi',
+    'Записаться в центре': 'Markazda yoziliş',
+    'Записаться в центре: адреса филиалов': 'Markazda yoziliş: filiallar manzillari',
+    'Приходите в центр — подскажем программу и поможем с записью. Или позвоните:': 'Markazga keling — dastur tanlaşqa yordam beramiz va yozilişqa kömekleşemiz. Yoki qönğiroq qiling:',
+    'Приходите в центр — подскажем программу и поможем с записью. Адреса филиалов — в контактах.': 'Markazga keling — dastur tanlaşqa yordam beramiz va yozilişqa kömekleşemiz. Filiallar manzillari — aloqa böliminde.',
+    'филиала': 'filial',
+    'Три филиала': 'Uçta filial',
+    'Приходите в центр или позвоните — адрес и время пробного урока подтвердит администратор.': 'Markazga keling yoki qönğiroq qiling — sinov darsi manzili va vaqtini administrator tasdiqlaydi.',
+    'Приходите в центр: выберите удобный филиал, подскажем программу и согласуем пробное занятие. Или позвоните — время и место подтвердим.': 'Markazga keling: qulay filialni tanlang, dastur tanlaşqa yordam beramiz va sinov darsini kelişamiz. Yoki qönğiroq qiling — vaqt va joyni tasdiqlaymiz.',
+    'Написать в Telegram': 'Telegramga yoziş',
+    'Приходите в центр: адреса филиалов': 'Markazga keling: filiallar manzillari',
+    'Как проходит IELTS?': 'IELTS qanday ötadi?',
+    'Что нужно для подготовки к SAT?': 'SATga tayyorgarlik uçun nima kerak?',
+    'улица Николая Сараева, 34': 'Nikolay Saraev köçasi, 34',
+    'улица Чарджоу Абдирова, 44А': 'Çarjou Abdirov köçasi, 44A',
+    'Центр молодёжи': 'Yoşlar markazi',
+    'Полный курс подготовки IELTS или SAT в любом филиале.': 'IELTS yoki SATga töliq tayyorgarlik kursi istalgan filialda.',
+
+    // Mobile quick navigation
+    'Курсы': 'Kurslar',
+    'Быстрая навигация': 'Tez navigatsiya',
+
+    // How to start, partners and the full results page
+    'Сначала входной тест — он покажет уровень и поможет подобрать группу.': 'Avval kiriş testi — u darajani körsatadi va guruh tanlaşqa yordam beradi.',
+    'Партнёры и экзамены': 'Hamkorlar va imtihonlar',
+    'Официальные ресурсы и экзаменационные центры.': 'Rasmiy manbalar va imtihon markazlari.',
+    'Экзамены и учебные материалы': 'Imtihonlar va öquv materiallari',
+    'Teaching Knowledge Test — методика преподавания': 'Teaching Knowledge Test — öqitiş metodikasi',
+    'Регистрация и подготовка к IELTS': 'IELTSga röyxatdan ötiş va tayyorgarlik',
+    'Запись на IELTS и информация об экзамене': 'IELTSga yoziliş va imtihon haqida maʼlumot',
+    'Все результаты': 'Barça natijalar',
+    'Вакансии': 'Vakansiyalar',
+    'Заполнить анкету': 'Anketani töldiriş'
   },
 
   // Texts with numbers, names or two translatable halves. Each entry: [regular expression, builder];

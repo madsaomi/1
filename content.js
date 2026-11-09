@@ -3,7 +3,8 @@ window.schoolContent = {
   "site": {
     "url": "https://1-production-8f16.up.railway.app",
     "city": "Нукус",
-    "demoMode": true
+    "demoMode": true,
+    "demoLabels": false
   },
   "stats": [
     {
@@ -16,7 +17,7 @@ window.schoolContent = {
     },
     {
       "value": "3",
-      "label": "филиала в Нукусе"
+      "label": "филиала"
     },
     {
       "value": "25",
@@ -37,11 +38,6 @@ window.schoolContent = {
       { "score": "1400", "reward": 5000000, "label": "5 000 000 сум" },
       { "score": "1500", "reward": 15000000, "label": "15 000 000 сум" },
       { "score": "1600", "reward": 100000000, "label": "100 000 000 сум", "hero": true }
-    ],
-    "rules": [
-      { "title": "Пройти курс в Stanford", "text": "Полный курс подготовки IELTS или SAT в любом филиале в Нукусе." },
-      { "title": "Регистрация через наш центр", "text": "Официальная регистрация на сдачу экзамена через администратора Stanford." },
-      { "title": "Выплата за результат", "text": "Предоставьте официальный сертификат и получите выплату." }
     ]
   },
   "courses": [
@@ -207,7 +203,7 @@ window.schoolContent = {
       {
         "id": "saraeva",
         "name": "Филиал на Сараева",
-        "address": "Нукус, улица Николая Сараева, 34",
+        "address": "улица Николая Сараева, 34",
         "coordinates": [
           59.60799,
           42.467377
@@ -227,7 +223,7 @@ window.schoolContent = {
       {
         "id": "abdirova",
         "name": "Филиал на Абдирова",
-        "address": "Нукус, улица Чарджоу Абдирова, 44А",
+        "address": "улица Чарджоу Абдирова, 44А",
         "coordinates": [
           59.62766,
           42.455094
@@ -243,7 +239,7 @@ window.schoolContent = {
       {
         "id": "youth-center",
         "name": "Филиал «Жазлар ораый»",
-        "address": "Нукус, Центр молодёжи",
+        "address": "Центр молодёжи",
         "coordinates": [
           59.604319,
           42.4576377

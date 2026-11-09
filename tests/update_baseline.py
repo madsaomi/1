@@ -3,10 +3,10 @@
 Python port of page()/normalize() from tests/design-system.test.mjs. Generated blocks
 (<!-- NAME_START --> … <!-- NAME_END -->) are excluded, as in the test.
 
-    python tests/update_baseline.py           # self-check and show the text difference
-    python tests/update_baseline.py --write   # save the current index.html as the baseline
+    python tests/update_baseline.py           # self-check and show the difference
+    python tests/update_baseline.py --write   # save index, text, script and protected hashes
 """
-import json, re, sys
+import difflib, hashlib, json, re, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -51,20 +51,45 @@ def strip_frame(src):
     src = re.sub(r'<!-- ([A-Z]+)_START -->[\s\S]*?<!-- \1_END -->', '', src)
     return re.sub(r'<!-- CONTACT_START:([a-z]+) -->[\s\S]*?<!-- CONTACT_END:\1 -->', '', src)
 
+# Files whose exact bytes are fingerprinted in the baseline: changing them needs the owner's approval.
+PROTECTED = ['Dockerfile', 'Caddyfile', 'railway.json', '.dockerignore', 'package.json']
+
+def lf_bytes(path):
+    """Bytes as git stores them: .gitattributes normalizes CRLF line endings to LF."""
+    return path.read_bytes().replace(b'\r\n', b'\n')
+
 FRAME = True
 path = ROOT/'tests/page_baseline.json'
 data = json.loads(path.read_text(encoding='utf-8'))
 assert page(strip_frame(data['index']) if FRAME else data['index']) == normalize(data['text']), 'SELF-CHECK FAILED: port does not reproduce old baseline'
 print('self-check OK (old index -> old text exact)')
 html = (ROOT/'index.html').read_text(encoding='utf-8').replace('\r\n','\n')
+script = (ROOT/'script.js').read_text(encoding='utf-8').replace('\r\n','\n')
 old_text = normalize(data['text'])
 new_text = page(strip_frame(html))
-if '--write' in sys.argv:
-    data['index'] = html
-    data['text'] = new_text
-    path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8', newline='\n')
-    print('baseline written')
-import difflib
+new_protected = {name: hashlib.sha256(lf_bytes(ROOT/name)).hexdigest() for name in PROTECTED}
+
+print('text diff:')
 a, b = old_text.split(' '), new_text.split(' ')
 for op in difflib.SequenceMatcher(None, a, b).get_opcodes():
     if op[0] != 'equal': print(op[0], '|', ' '.join(a[op[1]:op[2]]), '=>', ' '.join(b[op[3]:op[4]]))
+
+for label, old, new in [('index', data['index'], html), ('script', data['script'], script)]:
+    if old == new:
+        print(f'{label}: unchanged')
+        continue
+    print(f'{label}: changed')
+    for line in difflib.unified_diff(old.splitlines(), new.splitlines(), 'baseline', 'current', lineterm='', n=1):
+        print(line)
+
+for name in PROTECTED:
+    old = data['protected'].get(name)
+    print(f'protected {name}: {"unchanged" if old == new_protected[name] else f"{old} -> {new_protected[name]}"}')
+
+if '--write' in sys.argv:
+    data['index'] = html
+    data['text'] = new_text
+    data['script'] = script
+    data['protected'] = new_protected
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8', newline='\n')
+    print('baseline written')

@@ -6,6 +6,6 @@
   "scripts": {
     "build": "node build.mjs",
     "test": "node --test",
-    "check": "node --check script.js && node --check content.js && node --check theme-init.js && node build.mjs --check && node --test && python tests/validate_html.py"
+    "check": "node --check script.js && node --check content.js && node --check theme-init.js && node --check assets/i18n/uz.js && node --check results.js && node --check career.js && node build.mjs --check && node --test && python tests/validate_html.py"
   }
 }

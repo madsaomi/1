@@ -53,22 +53,15 @@ function counts(values) {
   return result;
 }
 
-test('protected inputs match the visual baseline except the exact PLAN-032 Docker context fix', () => {
+test('protected inputs match their approved baseline', () => {
   for (const [path, expected] of Object.entries(baseline.protected)) {
-    let bytes = fs.readFileSync(new URL(`../${path}`, import.meta.url));
-    if (path === '.dockerignore') {
-      // PLAN-032: existing Docker COPY requires these two runtime files. Removing
-      // exactly the documented additions must recover the original fingerprint.
-      const source = bytes.toString('utf8');
-      for (const name of ['theme-init.js', 'robots.txt']) assert.equal(source.split(/\r?\n/).filter(line => line === `!${name}`).length, 1);
-      bytes = Buffer.from(source.replace(/^!(?:theme-init\.js|robots\.txt)\r?\n/gm, ''), 'utf8');
-    }
-    // .gitattributes stores LF, while the original Windows snapshot captured
-    // content.js as CRLF. Permit only EOL equivalence across clean checkouts.
+    const bytes = fs.readFileSync(new URL(`../${path}`, import.meta.url));
+    // .gitattributes stores LF, while a Windows checkout may keep CRLF:
+    // permit only EOL equivalence across clean checkouts.
     const lf = bytes.toString('utf8').replace(/\r\n/g, '\n');
     const versions = [bytes, Buffer.from(lf), Buffer.from(lf.replace(/\n/g, '\r\n'))];
     const matches = versions.some(value => crypto.createHash('sha256').update(value).digest('hex') === expected);
-    assert(matches, `${path} differs from its approved baseline beyond EOL normalization and the declared packaging fix`);
+    assert(matches, `${path} differs from its approved baseline beyond EOL normalization`);
   }
 });
 

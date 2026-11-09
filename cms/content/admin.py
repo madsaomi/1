@@ -7,8 +7,8 @@ from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
-from .models import (AdmissionsTelegram, Contacts, Course, CourseSkill, Location, MapLink, Phone, SiteSettings, Stat,
-                     StudentResult, Teacher)
+from .models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Location, MapLink,
+                     Phone, SiteSettings, Stat, StudentResult, Teacher)
 
 admin.site.unregister(User)
 admin.site.unregister(Group)
@@ -48,7 +48,7 @@ def thumbnail(image, initials=''):
 
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(SingletonAdmin):
-    fieldsets = [('Режим сайта', {'fields': ['demo_mode']}), ('Сайт', {'fields': ['site_url', 'city']})]
+    fieldsets = [('Режим сайта', {'fields': ['demo_mode', 'demo_labels']}), ('Сайт', {'fields': ['site_url', 'city']})]
 
 
 @admin.register(Stat)
@@ -153,3 +153,22 @@ class StudentResultAdmin(ModelAdmin):
         ('Отзыв', {'fields': ['quote', ('student', 'course')]}),
         ('Публикация', {'fields': ['consent', 'is_published', 'order']}),
     ]
+
+
+@admin.register(CashbackTier)
+class CashbackTierAdmin(ModelAdmin):
+    list_display = ['__str__', 'exam', 'score', 'reward_display', 'hero', 'order']
+    list_editable = ['hero', 'order']
+    list_filter = ['exam', 'hero']
+    fields = ['exam', 'score', 'reward', 'label', 'hero', 'order']
+
+    @admin.display(description='Выплата', ordering='reward')
+    def reward_display(self, obj):
+        return f'{obj.reward:,}'.replace(',', ' ') + ' сум'
+
+
+@admin.register(CashbackRule)
+class CashbackRuleAdmin(ModelAdmin):
+    list_display = ['title', 'text', 'order']
+    list_editable = ['order']
+    fields = ['title', 'text', 'order']

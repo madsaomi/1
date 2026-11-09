@@ -204,6 +204,16 @@ function revealCourseFromHash() {
 window.addEventListener('hashchange', revealCourseFromHash);
 
 document.addEventListener('click', event => {
+  // The course dialog signs the visitor up at a branch: close it, then bring the contacts section into view.
+  const jump = event.target.closest('[data-dialog-jump]');
+  if (jump) {
+    event.preventDefault();
+    closeDialogForNavigation();
+    document.querySelector(jump.getAttribute('href'))?.scrollIntoView({
+      block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+    });
+    return;
+  }
   const examLink = event.target.closest('[data-exam-details]');
   if (examLink) { revealExam(examLink.dataset.examDetails); return; }
   const trigger = event.target.closest('.open-enroll-btn, [data-open-course]');
@@ -253,6 +263,54 @@ function setupCashbackTabs() {
   select(tabs.find(tab => tab.getAttribute('aria-selected') === 'true') || tabs[0], false);
 }
 setupCashbackTabs();
+
+// Phones: card rows rotate one by one like an app carousel; desktop keeps the full grid.
+function setupCarousels() {
+  if (typeof IntersectionObserver === 'undefined') return;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  if (reduced.matches) return;
+  const phone = matchMedia('(max-width: 767px)');
+  const grids = [...document.querySelectorAll('.team-grid, .practice-list, .results-grid')];
+  if (!grids.length) return;
+  const timers = new Map();
+  const stop = grid => {
+    const timer = timers.get(grid);
+    if (timer) { clearInterval(timer); timers.delete(grid); }
+  };
+  const advance = grid => {
+    if (!phone.matches) return;
+    const items = [...grid.children];
+    if (items.length < 2) return;
+    const gridLeft = grid.getBoundingClientRect().left;
+    const current = items.findIndex(item => item.getBoundingClientRect().left >= gridLeft - 8);
+    const next = items[(current + 1) % items.length];
+    const left = next.getBoundingClientRect().left - gridLeft + grid.scrollLeft;
+    grid.scrollTo({ left, behavior: 'smooth' });
+  };
+  const start = grid => {
+    stop(grid);
+    if (!phone.matches) return;
+    timers.set(grid, setInterval(() => advance(grid), 5200));
+  };
+  let observer;
+  try {
+    observer = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (entry.isIntersecting) start(entry.target); else stop(entry.target);
+    }), { threshold: .25 });
+  } catch {
+    return;
+  }
+  grids.forEach(grid => {
+    observer.observe(grid);
+    grid.addEventListener('pointerdown', () => stop(grid));
+    grid.addEventListener('pointerup', () => start(grid));
+    grid.addEventListener('focusin', () => stop(grid));
+    grid.addEventListener('focusout', () => start(grid));
+  });
+  phone.addEventListener('change', () => grids.forEach(grid => phone.matches ? start(grid) : stop(grid)));
+  reduced.addEventListener('change', () => grids.forEach(grid => reduced.matches ? stop(grid) : start(grid)));
+}
+setupCarousels();
 
 // Language switch: Russian stays the source in HTML; Uzbek (assets/i18n/uz.js) is swapped in place
 // and Russian is restored on RU. Texts missing from the dictionary simply stay in Russian.

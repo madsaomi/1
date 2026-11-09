@@ -6,10 +6,14 @@ on:
   pull_request:
     branches: [ main, master, develop ]
 
+permissions:
+  contents: read
+
 jobs:
   site:
     name: Static site and container
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -31,10 +35,34 @@ jobs:
       - name: Validate production container
         run: docker build -t stanford-check .
 
+      - name: Smoke-test the production container
+        run: |
+          set -euo pipefail
+          docker run -d --name stanford-smoke -p 8080:8080 stanford-check
+          trap 'docker rm -f stanford-smoke' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:8080/healthz; then break; fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Container did not become healthy in 60 seconds" >&2
+              docker logs stanford-smoke >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          curl -fsS http://localhost:8080/ -o /tmp/stanford-home.html
+          grep -q Stanford /tmp/stanford-home.html
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/assets/i18n/uz.js)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/results.html)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/results.js)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/career.html)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/no-such-page)" = "404"
+          curl -fsSI http://localhost:8080/ -o /tmp/stanford-headers.txt
+          grep -qi '^content-security-policy:' /tmp/stanford-headers.txt
+
   cms:
     name: Content admin (Django) on Postgres
     runs-on: ubuntu-latest
-    services:
+    timeout-minutes: 30    services:
       postgres:
         image: postgres:17
         env:
@@ -82,3 +110,29 @@ jobs:
           DJANGO_ALLOWED_HOSTS: cms.example.org
           DJANGO_CSRF_TRUSTED_ORIGINS: https://cms.example.org
         run: DJANGO_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(60))')" python manage.py check --deploy --fail-level WARNING
+
+      - name: Build the admin image
+        run: docker build -t stanford-cms .
+
+  hr:
+    name: HR API (career form)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: hr-api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Tests
+        run: node --test

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F2F2F2"/>
+    </linearGradient>
+    <linearGradient id="sheet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070707"/>
+      <stop offset="1" stop-color="#2A2A2A"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="400" fill="url(#bg)"/>
+  <circle cx="90" cy="70" r="120" fill="#FFB703" opacity=".22"/>
+  <circle cx="560" cy="330" r="130" fill="#FFB703" opacity=".16"/>
+  <g transform="translate(176 56)">
+    <rect x="0" y="0" width="288" height="288" rx="28" fill="url(#sheet)"/>
+    <rect x="34" y="42" width="150" height="16" rx="8" fill="#FFFFFF" opacity=".85"/>
+    <g stroke="#FFB703" stroke-width="7" stroke-linecap="round" fill="none">
+      <path d="M38 100l16 16 28-32"/>
+      <path d="M38 156l16 16 28-32"/>
+      <path d="M38 212l16 16 28-32"/>
+    </g>
+    <g fill="#FFFFFF" opacity=".3">
+      <rect x="108" y="96" width="140" height="12" rx="6"/>
+      <rect x="108" y="152" width="110" height="12" rx="6"/>
+      <rect x="108" y="208" width="126" height="12" rx="6"/>
+    </g>
+  </g>
+  <g transform="translate(470 92)">
+    <circle cx="0" cy="0" r="46" fill="#FFB703"/>
+    <path d="M-12-20 26 0l-38 20Z" fill="#070707"/>
+  </g>
+</svg>

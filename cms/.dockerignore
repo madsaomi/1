@@ -1,0 +1,10 @@
+# Build context for cms/Dockerfile is the cms/ directory; keep local state out of the image.
+.venv/
+db.sqlite3
+media/
+staticfiles/
+.local-2fa/
+.local-credentials
+__pycache__/
+*.py[cod]
+.git/

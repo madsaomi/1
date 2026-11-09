@@ -2,12 +2,45 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { readContent, validateContent, generate, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
+import { readContent, validateContent, generate, generateResults, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
 
 const data = readContent();
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
-test('every root COPY input is present in the default-deny Docker build context', () => {
+// Minimal .dockerignore matcher for the default-deny context: patterns are relative to the
+// build context, `**` spans directories and the last matching rule decides.
+function dockerPattern(pattern) {
+  let source = '^';
+  for (let index = 0; index < pattern.length; index++) {
+    const char = pattern[index];
+    if (char === '*' && pattern[index + 1] === '*') {
+      if (pattern[index + 2] === '/') { source += '(?:.*/)?'; index += 2; } else { source += '.*'; index += 1; }
+    } else if (char === '*') source += '[^/]*';
+    else if (char === '?') source += '[^/]';
+    else source += char.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(`${source}$`);
+}
+
+function dockerContextKeeps(path, rules) {
+  const parts = path.split('/');
+  for (let index = 1; index <= parts.length; index++) {
+    const target = parts.slice(0, index).join('/');
+    const matching = rules.filter(rule => dockerPattern(rule.replace(/^!/, '').replace(/\/$/, '')).test(target));
+    const last = matching.at(-1);
+    if (!last || !last.startsWith('!')) return false;
+  }
+  return true;
+}
+
+function walkFiles(directory, prefix) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const relative = `${prefix}${entry.name}`;
+    return entry.isDirectory() ? walkFiles(new URL(`${entry.name}/`, directory), `${relative}/`) : [relative];
+  });
+}
+
+test('every root COPY input and every asset file stays in the default-deny Docker build context', () => {
   const dockerfile = fs.readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8');
   const rules = fs.readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8').split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#'));
   assert.equal(rules[0], '**', 'This check enforces the repository default-deny context contract');
@@ -18,9 +51,16 @@ test('every root COPY input is present in the default-deny Docker build context'
     assert(fs.existsSync(path), `Missing Docker COPY input: ${input}`);
     if (fs.statSync(path).isDirectory()) continue;
     assert(!input.includes('/'), 'Root-file context test must be extended for nested COPY inputs');
-    const matching = rules.filter(rule => ['**', '*', input, `!${input}`].includes(rule));
-    assert.equal(matching.at(-1), `!${input}`, `Docker context excludes COPY input: ${input}`);
+    assert(dockerContextKeeps(input, rules), `Docker context excludes COPY input: ${input}`);
   }
+  const assets = walkFiles(new URL('../assets/', import.meta.url), 'assets/');
+  assert(assets.length, 'Assets must be shipped inside the image');
+  for (const file of assets) assert(dockerContextKeeps(file, rules), `Docker context excludes asset: ${file}`);
+  for (const required of ['assets/i18n/uz.js', 'assets/stanford-icon.svg', 'assets/favicon.svg', 'assets/errors/404.html']) {
+    assert(assets.includes(required), `Missing Docker context asset: ${required}`);
+  }
+  assert(assets.some(file => /^assets\/fonts\/[\w.-]+\.woff2$/.test(file)), 'Local Inter WOFF2 fonts must be in the context');
+  assert(assets.some(file => /^assets\/stanford-logo\.(?:png|webp)$/.test(file)), 'The brand logo must be in the context');
 });
 
 test('generated HTML is current, complete without JS, and generation is idempotent', () => {
@@ -54,20 +94,19 @@ test('unverified contacts never produce actionable links', () => {
   assert(cta.includes('href="#enroll"'));
 });
 
-test('trial lesson CTA opens the first admissions Telegram and offers the first phone', () => {
+test('sign-up CTA leads to the branch contacts and keeps the first phone next to it', () => {
   const contacts = contactFixture();
   const cta = renderCTA(contacts);
   const trial = htmlAttributes(cta.match(/<a\b[^>]*class="button"[^>]*>/)[0]);
-  assert.equal(trial.href, contacts.telegrams[0]);
-  assert.equal(trial.target, '_blank');
-  assert.equal(trial.rel, 'noopener noreferrer');
-  assert.match(trial['aria-label'], /Telegram/);
+  assert.equal(trial.href, '#enroll', 'Sign-up is a visit to the centre, not a messenger link');
+  assert.match(trial['aria-label'], /центре|филиал/);
   assert(cta.includes(`href="tel:${contacts.phones[0]}"`));
   assert(cta.includes('href="#courses"'));
+  assert(!cta.includes('t.me'), 'The hero CTA never opens Telegram');
   assert(!cta.includes(contacts.hrTelegram || 'no-hr'), 'HR never becomes the admissions CTA');
   const published = html.split('<!-- CTA_START -->')[1].split('<!-- CTA_END -->')[0];
-  assert(published.includes(`href="${data.contacts.telegrams[0]}"`));
-  assert.equal(renderCTA({ ...contacts, telegrams: [] }).includes('href="#enroll"'), true, 'Without Telegram the trial stays in-page');
+  assert(published.includes('href="#enroll"'));
+  assert(!published.includes('https://t.me/'));
 });
 
 test('verified channels are constrained and require at least one usable channel', () => {
@@ -101,7 +140,7 @@ function contactFixture(overrides = {}) {
   };
 }
 
-test('published contacts expose both admissions phones and Telegram accounts without unavailable placeholders', () => {
+test('published contacts expose both admissions phones and keep Telegram out of the sign-up dialog', () => {
   assert.equal(data.contacts.verified, true);
   assert.deepEqual(Array.from(data.contacts.phones), ['+998913036001', '+998994576001']);
   assert.deepEqual(Array.from(data.contacts.telegrams), ['https://t.me/stanford_nukus', 'https://t.me/Nukus_Stanford']);
@@ -110,12 +149,16 @@ test('published contacts expose both admissions phones and Telegram accounts wit
   assert.equal(data.site.city, 'Нукус');
   const enroll = html.split('<!-- CONTACT_START:enroll -->')[1].split('<!-- CONTACT_END:enroll -->')[0];
   const dialog = html.split('<!-- CONTACT_START:dialog -->')[1].split('<!-- CONTACT_END:dialog -->')[0];
-  for (const output of [enroll, dialog]) {
-    for (const phone of data.contacts.phones) assert(output.includes(`href="tel:${phone}"`));
-    for (const telegram of data.contacts.telegrams) assert(output.includes(`href="${telegram}"`));
+  for (const phone of data.contacts.phones) {
+    assert(enroll.includes(`href="tel:${phone}"`));
+    assert(dialog.includes(`href="tel:${phone}"`));
   }
-  assert(enroll.includes(`href="${data.contacts.hrTelegram}"`));
+  for (const telegram of data.contacts.telegrams) assert(enroll.includes(`href="${telegram}"`));
+  assert.equal(enroll.includes(`href="${data.contacts.hrTelegram}"`), false, 'HR Telegram is replaced by the career form');
+  assert(enroll.includes('href="career.html"'));
   assert(enroll.includes(`href="${data.contacts.instagram}"`));
+  assert(!dialog.includes('t.me/'), 'The course dialog asks the visitor to come to the centre instead of messaging');
+  assert(dialog.includes('href="#enroll"'));
   assert(!dialog.includes(data.contacts.hrTelegram));
   assert(!dialog.includes(data.contacts.instagram));
   assert(!dialog.includes('maps.app.goo.gl'));
@@ -124,24 +167,27 @@ test('published contacts expose both admissions phones and Telegram accounts wit
   assert(!/Запись временно недоступна|Контакты уточняются/.test(html));
 });
 
-test('compact contacts keep admissions channels while the full view separates HR and social links', () => {
+test('compact contacts keep phones and point to the branch addresses while the full view adds the career form and social links', () => {
   const contacts = contactFixture();
   const full = renderContacts(contacts);
   const compact = renderContacts(contacts, { compact: true });
   for (const output of [full, compact]) {
     for (const phone of contacts.phones) assert.equal(output.split(`href="tel:${phone}"`).length - 1, 1);
-    for (const telegram of contacts.telegrams) assert.equal(output.split(`href="${telegram}"`).length - 1, 1);
     assert(!/iframe|<form\b|mailto:/i.test(output));
-    for (const tag of output.match(/<a\b[^>]*href="https:[^"]*"[^>]*>/g) || []) {
-      assert(tag.includes('target="_blank"'));
-      assert.match(tag, /rel="[^"]*\bnoopener\b[^\"]*\bnoreferrer\b[^"]*"/);
-    }
   }
-  assert(full.includes(`href="${contacts.hrTelegram}"`));
+  for (const telegram of contacts.telegrams) assert.equal(full.split(`href="${telegram}"`).length - 1, 1);
+  assert(!compact.includes('t.me/'));
+  assert(compact.includes('href="#enroll"'));
+  assert(full.includes('href="career.html"'));
   assert(full.includes(`href="${contacts.instagram}"`));
-  assert.match(full, /HR|ваканси|работ/iu);
+  assert(!full.includes(contacts.hrTelegram));
+  assert(!compact.includes('career.html'));
   assert(!compact.includes(contacts.hrTelegram));
   assert(!compact.includes(contacts.instagram));
+  for (const tag of full.match(/<a\b[^>]*href="https:[^"]*"[^>]*>/g) || []) {
+    assert(tag.includes('target="_blank"'));
+    assert.match(tag, /rel="[^"]*\bnoopener\b[^\"]*\bnoreferrer\b[^"]*"/);
+  }
   for (const output of [full, compact]) {
     for (const map of contacts.locations[0].maps) assert(!output.includes(map.url));
   }
@@ -396,7 +442,8 @@ test('metadata is emitted only for a configured real HTTPS URL', () => {
 
 test('public HTML has no invented biographies, contacts or unfinished translations', () => {
   assert(!/Lorem Johnson|Ipsum Williams|Долор Сит|Лорем Ипсум|Адиписцинг|123-45-67|stanford_central|Ташкент \/ Нукус/.test(html));
-  assert(!html.includes('lang-switcher'));
+  assert(html.includes('id="lang-toggle"'), 'The page keeps its Uzbek language switch');
+  assert(html.includes('<script src="assets/i18n/uz.js'), 'The Uzbek dictionary must be loaded');
   assert(!html.includes('enroll-form'));
   assert(!/<script>([\s\S]*?)<\/script>/.test(html));
   assert(!/style="/.test(html));
@@ -413,11 +460,14 @@ test('native modal, no lead-copy flow, and no automatic content motion', () => {
   assert(!/\binfinite\b/.test(css), 'No infinite animations are allowed');
   // Owner-approved placeholders must always be announced to visitors.
   // Demo mode announces samples twice: the page banner and a «Пример» tag on each sample block.
-  assert.equal(html.includes('class="demo-banner"'), html.includes('class="demo-tag"'), 'Demo banner and «Пример» tags appear together');
-  for (const block of ['stats-strip', 'teachers-title', 'results-title']) {
-    if (!html.includes(block)) continue;
-    const start = html.indexOf(block);
-    assert(html.slice(start, start + 400).includes('class="demo-tag">Пример</span>'), `${block} needs its «Пример» tag`);
+  const demoOn = html.includes('class="demo-banner"');
+  assert.equal(demoOn, html.includes('class="demo-tag"'), 'Demo banner and «Пример» tags appear together');
+  if (demoOn) {
+    for (const block of ['stats-strip', 'teachers-title', 'results-title']) {
+      if (!html.includes(block)) continue;
+      const start = html.indexOf(block);
+      assert(html.slice(start, start + 400).includes('class="demo-tag">Пример</span>'), `${block} needs its «Пример» tag`);
+    }
   }
 });
 
@@ -828,8 +878,8 @@ test('PLAN-053: no direction strip under the first screen; filters live in the c
 });
 
 test('stats, teachers and results are generated from content and demo mode controls every sample marker', () => {
-  const demo = { ...data.site, demoMode: true };
-  const live = { ...data.site, demoMode: false };
+  const demo = { ...data.site, demoMode: true, demoLabels: true };
+  const live = { ...data.site, demoMode: false, demoLabels: false };
   assert.match(renderDemoBanner(demo), /class="demo-banner"/);
   assert.equal(renderDemoBanner(live), '');
   assert.match(renderStats(data.stats, demo), /class="demo-tag">Пример<\/span><dl>/);
@@ -884,6 +934,36 @@ test('content validation guards stats, teachers, results, photos and student con
   assert.doesNotThrow(() => validateContent(live));
 });
 
+test('course, contact and site validation reports broken admin data instead of a TypeError', () => {
+  const valid = () => structuredClone(data);
+  const cases = [
+    [/courses/i, content => { content.courses = {}; }],
+    [/courses/i, content => { content.courses = []; }],
+    [/name/, content => { delete content.courses[0].name; }],
+    [/name/, content => { content.courses[0].name = '   '; }],
+    [/subtitle/, content => { content.courses[0].subtitle = 'x'.repeat(81); }],
+    [/description/, content => { content.courses[0].description = ''; }],
+    [/category/, content => { content.courses[0].category = 'cooking'; }],
+    [/skills/, content => { content.courses[0].skills = 'Supporter'; }],
+    [/skills/, content => { content.courses[0].skills = []; }],
+    [/skills/, content => { content.courses[0].skills = ['']; }],
+    [/skills/, content => { content.courses[0].skills = ['x'.repeat(201)]; }],
+    [/contacts/i, content => { delete content.contacts; }],
+    [/contacts/i, content => { content.contacts = 'none'; }],
+    [/site/i, content => { content.site = 'none'; }],
+    [/HTTPS/, content => { content.site.url = 'not a url'; }],
+    [/HTTPS/, content => { content.site.url = 'http://example.org'; }]
+  ];
+  for (const [error, breakContent] of cases) {
+    const content = valid();
+    breakContent(content);
+    assert.throws(() => validateContent(content), error, breakContent.toString());
+  }
+  const missingName = valid();
+  delete missingName.courses[0].name;
+  assert.throws(() => validateContent(missingName), /course name/i, 'A missing name must give a readable message, not a TypeError');
+});
+
 const clientScript = fs.readFileSync(new URL('../script.js', import.meta.url), 'utf8');
 function slice(from, to) {
   const start = clientScript.indexOf(from);
@@ -917,4 +997,32 @@ test('first-screen entrance runs only when motion is allowed, and there is no sc
   const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
   assert.match(reduced, /transform: none !important/);
   assert.match(reduced, /animation: none !important/);
+});
+
+test('career form posts to the HR service without exposing a Telegram account', () => {
+  const page = fs.readFileSync(new URL('../career.html', import.meta.url), 'utf8');
+  const script = fs.readFileSync(new URL('../career.js', import.meta.url), 'utf8');
+  assert.match(page, /<meta name="career-endpoint" content="\/career">/);
+  assert(!/hrstanfordlc|t\.me\/hr/i.test(page + script), 'The form must not expose the HR Telegram account');
+  assert(!/<form[^>]*\baction=/.test(page), 'The form is submitted by fetch, never by a native post');
+  assert(page.includes('type="file"'));
+  assert(/fetch\(endpoint/.test(script));
+});
+
+test('the full results page ships every result and is generated from the same data', () => {
+  const template = fs.readFileSync(new URL('../results.html', import.meta.url), 'utf8');
+  const output = generateResults(template, data);
+  assert.equal(output, template, 'Run node build.mjs to refresh results.html');
+  assert.equal((template.match(/class="result-card"/g) || []).length, data.results.length);
+  assert(template.includes('href="index.html"') && template.includes('href="index.html#courses"'));
+  assert.match(template, /<script src="results\.js\?v=\d+"><\/script>/);
+  assert(!/<script>([\s\S]*?)<\/script>/.test(template), 'The results page keeps scripts external for CSP');
+  assert(!/style="/.test(template));
+});
+
+test('hidden demo labels let the owner preview sample data without the «Пример» wording', () => {
+  const preview = generate(html, { ...data, site: { ...data.site, demoMode: true, demoLabels: false } });
+  assert(!/demo-banner|demo-tag/.test(preview), 'The owner asked for no demo wording on the page');
+  assert(preview.includes('name="robots" content="noindex, nofollow"'), 'Sample data stays out of search while demo mode is on');
+  assert(html.includes('name="robots" content="noindex'), 'The published page is still the demo preview');
 });
