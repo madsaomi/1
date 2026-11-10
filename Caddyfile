@@ -9,7 +9,7 @@
 	header X-Content-Type-Options nosniff
 	header Referrer-Policy strict-origin-when-cross-origin
 	header X-Frame-Options DENY
-	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src https://yandex.ru https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src https://yandex.ru https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 	header Permissions-Policy "camera=(), microphone=(), geolocation=()"
 }
 
@@ -22,11 +22,24 @@
 	@static path /assets/*
 	header @static Cache-Control "public, max-age=86400, must-revalidate"
 
-	@mutable path / /index.html /content.js /script.js /theme-init.js /style.css /robots.txt
+	@mutable path / /index.html /results.html /career.html /content.js /script.js /results.js /career.js /theme-init.js /style.css /robots.txt
 	header @mutable Cache-Control no-cache
 
-	respond /healthz "ok" 200
-	file_server
+	# HR remains a separate service. Point this at its private address in production.
+	handle /career {
+		request_body {
+			max_size 4MB
+		}
+		reverse_proxy {$HR_API_UPSTREAM:127.0.0.1:8787} {
+			transport http {
+				response_header_timeout 40s
+			}
+		}
+	}
+	handle {
+		respond /healthz "ok" 200
+		file_server
+	}
 
 	# Branded 404 page; file_server keeps the 404 status inside handle_errors.
 	handle_errors {

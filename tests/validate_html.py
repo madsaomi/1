@@ -41,15 +41,16 @@ class Page(HTMLParser):
 
 
 def main():
-    page = Page()
-    page.feed((ROOT / 'index.html').read_text(encoding='utf-8'))
-    assert not page.errors, page.errors
-    assert not page.stack, page.stack
-    assert page.h1 == 1, 'Expected one H1'
-    assert all(count == 1 for count in Counter(page.ids).values()), 'Duplicate IDs'
-    assert set(page.anchors + page.labels) <= set(page.ids), 'Unresolved anchor or label'
-    assert all((ROOT / path).is_file() for path in page.files), 'Missing static resource'
-    assert not {'team', 'quiz', 'reviews', 'comparison', 'schedule', 'floating-island'} & set(page.ids)
+    for filename in ('index.html', 'results.html', 'career.html'):
+        page = Page()
+        page.feed((ROOT / filename).read_text(encoding='utf-8'))
+        assert not page.errors, (filename, page.errors)
+        assert not page.stack, (filename, page.stack)
+        assert page.h1 == 1, f'{filename}: Expected one H1'
+        assert all(count == 1 for count in Counter(page.ids).values()), f'{filename}: Duplicate IDs'
+        assert set(page.anchors + page.labels) <= set(page.ids), f'{filename}: Unresolved anchor or label'
+        assert all((ROOT / path).is_file() for path in page.files), f'{filename}: Missing static resource'
+        assert not {'team', 'quiz', 'reviews', 'comparison', 'schedule', 'floating-island'} & set(page.ids)
     html = (ROOT / 'index.html').read_text(encoding='utf-8')
     assert ('class="demo-banner"' in html) == ('class="demo-tag"' in html), 'Demo banner and «Пример» tags appear together'
     css = (ROOT / 'style.css').read_text(encoding='utf-8')

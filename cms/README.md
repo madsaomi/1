@@ -1,106 +1,128 @@
-# Админка содержимого (PLAN-044)
+# Управление сайтом Stanford
 
-Скрытая админка Django 6.1 + Unfold. Публичный сайт остается статикой; админка хранит данные в Postgres и
-(этап 4) будет публиковать `../content.js`.
+Сайт состоит из статических страниц, Django-админки и отдельного HR API.
+Администратор сохраняет записи, затем нажимает **«Опубликовать на сайт»**.
+Публикация проверяет данные, обрабатывает фото и собирает все три страницы во временной папке.
 
-## Локальный просмотр
-```bash
-python -m venv .venv
-.venv/Scripts/pip install -r requirements.txt   # Linux/macOS: .venv/bin/pip
-DJANGO_LOCAL=1 .venv/Scripts/python manage.py migrate
-DJANGO_LOCAL=1 .venv/Scripts/python manage.py import_content          # данные из ../content.js
-DJANGO_LOCAL=1 .venv/Scripts/python manage.py createsuperuser
-DJANGO_LOCAL=1 .venv/Scripts/python manage.py enable_2fa <логин>     # QR в .local-2fa/ → Google Authenticator
-DJANGO_LOCAL=1 .venv/Scripts/python manage.py runserver
-```
-Вход: http://127.0.0.1:8000/admin/ — логин, пароль и 6-значный код из приложения. Без `DJANGO_LOCAL=1` админка
-не запустится без серверных переменных — это намеренно (см. ниже). Технические страницы ошибок Django выключены
-всегда; для отладки — осознанно добавить `DJANGO_TRACEBACKS=1` (только вместе с `DJANGO_LOCAL=1`).
+## Ежедневная работа
 
-Песочница без `pip` (как в этом окружении): пакеты лежат в `cms/.venv/site`, запускать так:
-```powershell
-$env:PYTHONPATH="C:\Users\madsaomi\Desktop\1\cms\.venv\site"; $env:DJANGO_LOCAL="1"
-.\.venv\Scripts\python.exe manage.py test content
-```
+1. Откройте админку, войдите с паролем и кодом приложения.
+2. Выберите нужный раздел, измените или добавьте запись и нажмите «Сохранить».
+3. Поле «Порядок» задаёт расположение; «Показывать на сайте» позволяет временно скрыть запись.
+4. Нажмите «Опубликовать на сайт» на главной странице админки.
+5. При серверной публикации дождитесь успешного развёртывания Railway и проверьте сайт.
 
-## Импорт и экспорт content.js
-- `import_content [путь]` — по умолчанию `../content.js`. Без `--force` в непустую базу не пишет и просит
-  `--force`; `--dry-run` проверяет файл и показывает итог, но всегда откатывает изменения (можно запускать и
-  поверх заполненной базы). Импорт прогоняет `full_clean()` через валидаторы моделей, поэтому в базу не попадает
-  то, что потом не пройдет `node build.mjs`.
-- `export_content [--output ../content.js]` — собирает канонический `window.schoolContent = {…};` из базы
-  (2 пробела, стабильный порядок, первая строка-комментарий). Node не нужен. Экспортируются только
-  опубликованные курсы/преподаватели/результаты; контакты без канала при `verified=True` считаются ошибкой.
-- **Фото не участвуют в content.js** (`Location.photo`, `Teacher.photo` — загрузки админки). Их перенос в
-  `assets/` и ссылки на них — этап 4 вместе с публикацией через GitHub API; в этом репозитории этап 4 еще не
-  реализован (нужен токен владельца).
-- Кэшбэк (`cashback` в content.js) редактируется в разделах «Кэшбэк за баллы» и «Условия кэшбэка».
-- После экспорта/ручной правки контента прогнать `node build.mjs` и проверки сайта из корня репозитория.
+Доступны курсы и цены, программа курса, преподаватели и фото, результаты учеников,
+филиалы и карты, контакты, цифры, кэшбэк, FAQ, тексты главной, результатов и анкеты,
+подсказки формы и узбекские переводы. Коды новых курсов и филиалов создаются автоматически.
+
+В курсе нужен хотя бы один пункт программы; в филиале — ссылка карты.
+Фото JPG/PNG/WebP до 5 МБ переупаковываются в JPEG без метаданных и публикуются вместе с карточкой.
+В разделе «Тексты страницы» нельзя создавать произвольные места: они связаны с разметкой.
+Новые разделы дизайна, языки, категории и варианты HR-анкеты добавляются разработчиком;
+данные существующих разделов меняются в админке.
+
+Сейчас данные остаются демонстрационными по решению владельца. Перед финальным запуском замените
+примеры реальными данными, получите согласия учеников и выключите «Демо-режим».
+До этого все три страницы получают noindex. Изменить адрес canonical можно в «Настройках сайта».
+
+## Локальная работа на Windows
+
+Двойной щелчок по cms/start-admin.bat применяет миграции, добавляет новые места текста
+без перезаписи сохранённых записей и открывает http://127.0.0.1:8000/admin/.
+Локальные данные входа и QR аутентификатора хранятся только на компьютере владельца.
+
+Для первого запуска: создайте виртуальное окружение, установите requirements.txt, выполните
+migrate, import_content, createsuperuser и enable_2fa. Пример для PowerShell:
+
+    cd cms
+    python -m venv .venv
+    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+    $env:DJANGO_LOCAL='1'
+    .\.venv\Scripts\python.exe manage.py migrate
+    .\.venv\Scripts\python.exe manage.py import_content
+    .\.venv\Scripts\python.exe manage.py createsuperuser
+    .\.venv\Scripts\python.exe manage.py enable_2fa <логин>
+
+В этом окружении установленные пакеты лежат в cms/.venv/site; start-admin.bat задаёт PYTHONPATH сам.
+Локальная кнопка публикации обновляет файлы рядом с cms. Для просмотра из корня:
+
+    python -m http.server 8080 --bind 127.0.0.1
+
+Этот сервер не проксирует HR API. Отправка анкеты проверяется через Caddy с настроенным HR-сервисом.
+
+## Серверная админка и публикация в GitHub
+
+Админка развёртывается отдельным сервисом Railway с корнем cms/.
+Образ содержит Python и Node. Исходники сайта для каждой публикации скачиваются
+из текущего состояния явно выбранной ветки GitHub, чтобы сохранить актуальный дизайн.
+
+Обязательные серверные переменные:
+
+| Переменная | Значение |
+|---|---|
+| DJANGO_SECRET_KEY | Длинный случайный секрет |
+| ADMIN_PATH | Секретный путь от 12 символов, с / в конце; не admin/ |
+| DJANGO_ALLOWED_HOSTS | Домен админки без протокола |
+| DJANGO_CSRF_TRUSTED_ORIGINS | https://домен-админки |
+| POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST | Подключение к Postgres |
+| SITE_PUBLISH_TARGET | github |
+| SITE_GITHUB_REPOSITORY | владелец/репозиторий сайта |
+| SITE_GITHUB_BRANCH | Точная ветка, которую развёртывает сервис сайта |
+| SITE_GITHUB_TOKEN | Fine-grained токен только этого репозитория, Contents: read/write |
+| MEDIA_ROOT | /app/media |
+
+DJANGO_LOCAL на сервере не задавать. Токен вписывает владелец в Railway; его не нужно
+добавлять в файлы или передавать в браузер. Защищённая ветка должна разрешать публикации
+этому токену; админка не обходит защиту и не делает force push.
+
+Первое развёртывание:
+
+1. Подключить Postgres и постоянный том /app/media, доступный uid 10001.
+2. Задать переменные выше и включить резервные копии Postgres и тома.
+3. Выполнить в Railway Shell:
+
+       python manage.py migrate
+       python manage.py import_github_content --dry-run
+       python manage.py import_github_content
+       python manage.py createsuperuser
+       python manage.py enable_2fa <логин> --print
+
+4. Открыть секретный адрес, войти с 2FA, проверить данные.
+5. В сервисе публичного сайта включить автодеплой из SITE_GITHUB_BRANCH.
+6. Проверить публикацию, журнал развёртывания Railway и обновлённую страницу.
+
+Повторный import_github_content откажется перезаписывать заполненную базу.
+После обновления шаблонов добавить новые текстовые места без потери правок:
+
+    python manage.py migrate
+    python manage.py import_github_content --sync-texts
+
+Локальный эквивалент — manage.py sync_page_texts.
+Экспорт исходных данных — manage.py export_content --output <путь>/content.js.
+Полная резервная копия должна включать Postgres и MEDIA_ROOT: экспорт контента не заменяет фото,
+учётные записи и настройки аутентификатора.
+
+GitHub получает один коммит со всеми страницами, данными, переводами и новыми фото.
+Если ветку изменили во время сборки, публикация останавливается и просит повторить.
+Локальная публикация блокирует параллельный запуск и восстанавливает заменённые файлы при ошибке записи.
+Сообщение «Отправлено в GitHub» подтверждает запись в ветку; успешный деплой проверяется в Railway отдельно.
+При удалении карточки старый загруженный файл может сохраняться в истории Git и по старому пути;
+для удаления персонального фото обратитесь к администратору репозитория.
+
+## HR и безопасность
+
+Публичный Caddy проксирует /career на HR_API_UPSTREAM. Настройка HR — в ../hr-api/README.md.
+Админка требует пароль и TOTP; после пяти неправильных паролей логин блокируется на 15 минут.
+Сессия — до 8 часов; на сервере включены HTTPS, HSTS и защищённые cookies.
+Healthcheck /healthz публичный, остальных публичных маршрутов админки нет, кроме статики и загруженных фото.
+Поэтому загружайте только изображения, предназначенные для публичного сайта.
 
 ## Проверки
-```bash
-DJANGO_LOCAL=1 .venv/Scripts/python manage.py test content
-DJANGO_LOCAL=1 .venv/Scripts/python manage.py makemigrations --check --dry-run
-```
-В CI — те же тесты на Postgres и `check --deploy --fail-level WARNING` с серверными настройками.
 
-Локально без `psycopg` и `whitenoise` (offline-песочница) `check --deploy` с прод-env не поднимется: Django
-импортирует Postgres-драйвер даже для `check`. В CI с `pip install -r requirements.txt` это не проблема.
-Для локальной проверки можно подменить только `DATABASES` временным settings-модулем (остальные прод-настройки
-и fail-fast проверки при этом настоящие):
-```powershell
-@"
-from config.settings import *  # noqa
-DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}}
-"@ | Set-Content $env:TEMP\cms_check_settings.py -Encoding UTF8
-$env:PYTHONPATH="C:\Users\madsaomi\Desktop\1\cms\.venv\site;$env:TEMP"
-$env:DJANGO_LOCAL="0"; $env:ADMIN_PATH="ci-secret-path-0000/"
-$env:DJANGO_ALLOWED_HOSTS="cms.example.org"; $env:DJANGO_CSRF_TRUSTED_ORIGINS="https://cms.example.org"
-# + POSTGRES_* и случайный DJANGO_SECRET_KEY
-.\.venv\Scripts\python.exe manage.py check --settings cms_check_settings --deploy --fail-level WARNING
-```
+    DJANGO_LOCAL=1 python manage.py test content
+    DJANGO_LOCAL=1 python manage.py makemigrations --check --dry-run
 
-## Переменные окружения
-При `DJANGO_LOCAL=1` переменные не нужны (SQLite, `admin/`, plain HTTP). Вне локального режима старт падает,
-если чего-то не хватает: `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `POSTGRES_DB`, `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, `POSTGRES_HOST`; плюс обязательные `DJANGO_SECRET_KEY` (длинный случайный) и `ADMIN_PATH`
-(секретный путь, 12+ символов, с `/` в конце). `POSTGRES_PORT` по умолчанию `5432`.
-`DEBUG` включается только `DJANGO_TRACEBACKS=1` и только при `DJANGO_LOCAL=1`.
-`DJANGO_LOCAL=1` на Railway запрещен: если задан `RAILWAY_ENVIRONMENT` или `RAILWAY_PROJECT_ID`, старт падает.
-
-## Деплой (Railway, этап 5)
-1. Сервис с root directory `cms/`, Dockerfile `cms/Dockerfile` (python:3.13-slim, gunicorn, non-root).
-2. Подключить Postgres; в сервис добавить переменные из списка выше.
-3. Том Railway примонтировать в `/app/media` (фото филиалов и преподавателей). Контейнер работает под uid 10001,
-   а тома Railway обычно создаются от root: если фото не загружаются, проверьте права на `MEDIA_ROOT` (том должен
-   быть доступен на запись uid 10001) или смонтируйте пустой том — Railway выставит владельца при первом создании.
-4. Первый запуск (Railway Shell):
-   `python manage.py migrate` и, если база пустая, `python manage.py import_content`.
-5. Подключить аутентификатор владельцу: `python manage.py enable_2fa <логин> --print` в его терминале Railway —
-   ссылку с секретом видит только он; не публиковать вывод и очистить логи.
-6. Проверка живости: `GET /healthz` → `ok` (без авторизации, без редиректа; путь исключен из SSL-редиректа и
-   разрешен в `ALLOWED_HOSTS` для контейнерных healthcheck'ов).
-7. Статика: при сборке `collectstatic` (WhiteNoise `CompressedStaticFilesStorage`), в прод-режиме
-   `WhiteNoiseMiddleware` раздает `/static/`; `/media/` отдает Django (низкий трафик). `STATIC_ROOT` —
-   `cms/staticfiles`, в git не попадает.
-
-## Защита
-Код из приложения обязателен (django-otp); 5 неверных паролей — блокировка логина на 15 минут (django-axes);
-HTTPS, HSTS, secure cookies, сессия 8 часов, `X-Robots-Tag: noindex`; логи в stdout (INFO, включая
-`django.security` и `axes`); фото — только JPG/PNG/WebP до 5 МБ.
-
-## Валидация (как в build.mjs)
-- `SiteSettings.site_url` — только `https://`, без логина, `?query` и `#hash`; путь после домена можно.
-- `Course.price > 0`, `special_price > 0` и строго меньше `price`; `category` из
-  `languages/kids/subjects/exam`; `name` и `description` не пустые (в т.ч. без одних пробелов).
-- `Phone` — ровно `+998` и 9 цифр; `Contacts.verified=True` требует телефон или Telegram для записи;
-  `hr_telegram` не совпадает с Telegram для записи.
-- `CashbackTier`: экзамен `ielts/sat`, балл, целая выплата > 0, уникальная пара экзамен+балл;
-  `CashbackRule`: непустые шаг и пояснение.
-- Подтверждение контактов требует уже сохраненного канала: сначала выключите «Контакты подтверждены», добавьте
-  телефон/Telegram на той же странице, сохраните, затем включите галочку.
-
-## Еще не реализовано (этап 4)
-Публикация `content.js` коммитом через GitHub API и перенос фото из `MEDIA_ROOT` в `assets/` — нужен токен
-владельца (и его решение по репозиторию/ветке). Корневые `Dockerfile`/`Caddyfile`/`railway.json` и настройки
-Railway эта задача не трогает.
+В PowerShell используйте $env:DJANGO_LOCAL='1'.
+Корневые проверки сайта: npm run check. HR-тесты запускаются отдельно в hr-api.
+Контейнеры и серверные настройки дополнительно проверяются CI на Postgres.

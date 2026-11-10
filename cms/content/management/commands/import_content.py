@@ -10,9 +10,12 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import IntegrityError, transaction
 
-from content.models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Location,
-                            MapLink, Phone, SiteSettings, Stat, StudentResult, Teacher)
-from content.serialization import CONTENT_MODELS, read_content
+from pathlib import Path
+
+from content.models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Faq,
+                            Location, MapLink, PageText, Phone, SiteSettings, Stat, StudentResult, Teacher)
+from content.serialization import (CONTENT_MODELS, build_content, load_uz_strings, read_content, read_uz_strings,
+                                   sync_page_texts, validate_content)
 
 
 def _format_errors(error):
@@ -29,9 +32,13 @@ class Command(BaseCommand):
                             help='Путь к content.js (по умолчанию ../content.js).')
         parser.add_argument('--dry-run', action='store_true', help='Проверить файл и показать итог, ничего не сохраняя.')
         parser.add_argument('--force', action='store_true', help='Заменить уже загруженное содержимое.')
+        parser.add_argument('--uz', default=None,
+                            help='Словарь узбекского (по умолчанию assets/i18n/uz.js рядом с content.js, если есть).')
 
-    def handle(self, *args, path, dry_run=False, force=False, **options):
+    def handle(self, *args, path, dry_run=False, force=False, uz=None, **options):
         data = read_content(path)
+        uz_path = Path(uz) if uz else Path(path).resolve().parent / 'assets' / 'i18n' / 'uz.js'
+        strings = read_uz_strings(uz_path) if (uz or uz_path.is_file()) else None
         has_content = any(model.objects.exists() for model in CONTENT_MODELS)
         if has_content and not force and not dry_run:
             raise CommandError('В базе уже есть содержимое. Ничего не изменено: используйте --force для замены '
@@ -39,6 +46,11 @@ class Command(BaseCommand):
         try:
             with transaction.atomic():
                 summary = self._replace(data)
+                sync_page_texts(Path(path).resolve().parent)
+                summary['texts'] = PageText.objects.count()
+                validate_content(build_content())
+                if strings is not None:
+                    summary['uz'] = load_uz_strings(strings)
                 if dry_run:
                     transaction.set_rollback(True)
         except ValidationError as error:
@@ -51,11 +63,15 @@ class Command(BaseCommand):
         prefix = 'Пробный прогон (ничего не сохранено): ' if dry_run else 'Импортировано: '
         message = prefix + self._summary_text(summary)
         self.stdout.write(self.style.WARNING(message) if dry_run else self.style.SUCCESS(message))
+        if 'uz' in summary:
+            self.stdout.write(f"Узбекский: текстов страницы с переводом {summary['uz']['page_texts']}, "
+                              f"общих переводов {summary['uz']['translations']}.")
         self.stdout.write(f'Источник: {path}')
 
     @staticmethod
     def _summary_text(summary):
-        return (f"курсов {summary['courses']}, преподавателей {summary['teachers']}, "
+        return (f"текстов страницы {summary['texts']}, вопросов {summary['faq']}, "
+                f"курсов {summary['courses']}, преподавателей {summary['teachers']}, "
                 f"результатов {summary['results']}, филиалов {summary['locations']}, "
                 f"ступеней кэшбэка {summary['cashback']}.")
 
@@ -98,7 +114,8 @@ class Command(BaseCommand):
 
         for order, item in enumerate(data.get('teachers') or []):
             self._save(Teacher(order=order, name=item['name'], role=item['role'],
-                               qualification=item.get('qualification') or '', experience=item.get('experience') or ''))
+                               qualification=item.get('qualification') or '', experience=item.get('experience') or '',
+                               photo_path=item.get('photo') or ''))
 
         for order, item in enumerate(data.get('results') or []):
             self._save(StudentResult(order=order, score=item['score'], exam=item['exam'],
@@ -123,11 +140,18 @@ class Command(BaseCommand):
                 longitude, latitude = None, None
             location = self._save(Location(order=order, slug=item['id'], name=item['name'], address=item['address'],
                                            longitude=longitude, latitude=latitude,
-                                           google_embed=item.get('googleEmbed') or ''))
+                                           google_embed=item.get('googleEmbed') or '', photo_path=item.get('photo') or ''))
             for map_order, link in enumerate(item.get('maps') or []):
                 self._save(MapLink(location=location, order=map_order, provider=link['provider'], url=link['url']))
 
+        for order, item in enumerate(data.get('faq') or []):
+            self._save(Faq(order=order, question=item['question'], answer=item['answer']))
+        for order, (key, value) in enumerate((data.get('texts') or {}).items()):
+            self._save(PageText(order=order, key=key, text=value))
+
         return {
+            'texts': PageText.objects.count(),
+            'faq': Faq.objects.count(),
             'courses': Course.objects.count(),
             'teachers': Teacher.objects.count(),
             'results': StudentResult.objects.count(),

@@ -62,7 +62,8 @@ jobs:
   cms:
     name: Content admin (Django) on Postgres
     runs-on: ubuntu-latest
-    timeout-minutes: 30    services:
+    timeout-minutes: 30
+    services:
       postgres:
         image: postgres:17
         env:

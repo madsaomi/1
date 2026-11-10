@@ -4,8 +4,6 @@ from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
-from django.templatetags.static import static
-from django.urls import reverse_lazy
 
 try:  # WhiteNoise comes from requirements.txt; the offline sandbox may not have it installed.
     import whitenoise  # noqa: F401
@@ -48,7 +46,6 @@ if not LOCAL:
 CSRF_TRUSTED_ORIGINS = [origin for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if origin]
 
 INSTALLED_APPS = [
-    'unfold.apps.BasicAppConfig',  # templates and styles; the admin site itself comes from config.apps
     'config.apps.AdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -143,9 +140,6 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # fine: collectstatic then simply has nothing extra to copy. No prefix — prefixes break on Windows.
 SITE_ASSETS = SITE_ROOT / 'assets'
 STATICFILES_DIRS = [SITE_ASSETS] if SITE_ASSETS.is_dir() else []
-# The brand icon/favicon come from assets/; a cms-only image (Railway builds from cms/) has no assets directory,
-# so fall back to Unfold's default symbol instead of linking to a missing file.
-BRAND_ASSETS = {name for name in ('stanford-icon.svg', 'favicon.svg') if (SITE_ASSETS / name).is_file()}
 STORAGES = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
     'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
@@ -190,64 +184,3 @@ if not LOCAL:
 # Photos only: small, common formats (see content.validators); requests stay modest.
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
-
-
-def changelist(model):
-    return reverse_lazy(f'admin:content_{model}_changelist')
-
-
-def singleton(model):
-    return reverse_lazy(f'admin:content_{model}_change', args=[1])
-
-
-UNFOLD = {
-    'SITE_TITLE': 'Stanford — админка',
-    'SITE_HEADER': 'Stanford',
-    'SITE_SUBHEADER': 'Language Center',
-    'SITE_SYMBOL': 'school',
-    'SITE_URL': None,  # no «Return to site» link: the admin has no site of its own
-    'SITE_ICON': (lambda request: static('stanford-icon.svg')) if 'stanford-icon.svg' in BRAND_ASSETS else None,
-    'SITE_FAVICONS': ([{'rel': 'icon', 'type': 'image/svg+xml',
-                        'href': lambda request: static('favicon.svg')}]
-                      if 'favicon.svg' in BRAND_ASSETS else []),
-    'SHOW_HISTORY': True,
-    'SHOW_VIEW_ON_SITE': False,
-    'BORDER_RADIUS': '12px',
-    # Brand #FFB703 (oklch 82.5% .171 79.9). Unfold puts white text on primary-600 (buttons),
-    # so 600+ are deep amber steps that keep white text readable.
-    'COLORS': {
-        'primary': {
-            '50': 'oklch(98.5% .02 80)', '100': 'oklch(96.5% .05 80)', '200': 'oklch(93% .09 80)',
-            '300': 'oklch(89% .13 80)', '400': 'oklch(86% .16 80)', '500': 'oklch(82.5% .171 79.9)',
-            '600': 'oklch(50% .12 68)', '700': 'oklch(43% .1 66)', '800': 'oklch(37% .085 64)',
-            '900': 'oklch(31% .07 62)', '950': 'oklch(23% .05 60)',
-        },
-    },
-    'SIDEBAR': {
-        'show_search': False,
-        'show_all_applications': False,
-        'navigation': [
-            {'title': 'Сайт', 'items': [
-                {'title': 'Настройки и демо-режим', 'icon': 'tune', 'link': singleton('sitesettings')},
-                {'title': 'Цифры', 'icon': 'bar_chart', 'link': changelist('stat')},
-            ]},
-            {'title': 'Обучение', 'items': [
-                {'title': 'Курсы и цены', 'icon': 'menu_book', 'link': changelist('course')},
-                {'title': 'Кэшбэк за баллы', 'icon': 'payments', 'link': changelist('cashbacktier')},
-                {'title': 'Условия кэшбэка', 'icon': 'checklist', 'link': changelist('cashbackrule')},
-            ]},
-            {'title': 'Люди', 'items': [
-                {'title': 'Преподаватели', 'icon': 'group', 'link': changelist('teacher')},
-                {'title': 'Результаты студентов', 'icon': 'emoji_events', 'link': changelist('studentresult')},
-            ]},
-            {'title': 'Связь', 'items': [
-                {'title': 'Контакты', 'icon': 'call', 'link': singleton('contacts')},
-                {'title': 'Филиалы и карты', 'icon': 'location_on', 'link': changelist('location')},
-            ]},
-            {'title': 'Доступ', 'separator': True, 'items': [
-                {'title': 'Учетная запись', 'icon': 'person', 'link': reverse_lazy('admin:auth_user_changelist'),
-                 'permission': lambda request: request.user.is_superuser},
-            ]},
-        ],
-    },
-}

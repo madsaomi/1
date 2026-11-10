@@ -39,7 +39,7 @@ def page(src):
             tag = re.match(r'^<([\w-]+)', tok).group(1).lower()
             attrs = {m.group(1).lower(): decode(next((g for g in m.groups()[1:] if g is not None), ''))
                      for m in re.finditer(r'''([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?''', tok[len(tag)+1:])}
-            ignored = any(n['ignored'] for n in stack) or tag=='svg' or attrs.get('aria-hidden')=='true' \
+            ignored = any(n['ignored'] for n in stack) or tag=='svg' or attrs.get('aria-hidden')=='true' or 'data-text' in attrs \
                 or attrs.get('id') in ('theme-toggle','modal-close') or 'menu' in (attrs.get('class') or '').split()
             node = {'tag':tag,'ignored':ignored}
             if tag not in VOID and not tok.endswith('/>'): stack.append(node)
@@ -48,7 +48,7 @@ def page(src):
     return normalize(' '.join(words))
 
 def strip_frame(src):
-    src = re.sub(r'<!-- ([A-Z]+)_START -->[\s\S]*?<!-- \1_END -->', '', src)
+    src = re.sub(r'<!-- ([A-Z_]+)_START -->[\s\S]*?<!-- \1_END -->', '', src)
     return re.sub(r'<!-- CONTACT_START:([a-z]+) -->[\s\S]*?<!-- CONTACT_END:\1 -->', '', src)
 
 # Files whose exact bytes are fingerprinted in the baseline: changing them needs the owner's approval.

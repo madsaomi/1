@@ -27,10 +27,11 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let timer = null;
   let index = 0;
-  let paused = false;
+  let pointerActive = false;
+  let focusActive = false;
   const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
   const advance = () => {
-    if (!phone.matches || reduced.matches || paused || items.length < 2) return;
+    if (!phone.matches || reduced.matches || pointerActive || focusActive || items.length < 2) return;
     index = (index + 1) % items.length;
     const item = items[index];
     const left = item.getBoundingClientRect().left - grid.getBoundingClientRect().left + grid.scrollLeft;
@@ -38,13 +39,22 @@
   };
   const start = () => {
     stop();
-    if (!phone.matches || reduced.matches || items.length < 2) return;
+    if (!phone.matches || reduced.matches || pointerActive || focusActive || items.length < 2) return;
     timer = setInterval(advance, 4500);
   };
-  grid.addEventListener('pointerdown', () => { paused = true; stop(); });
-  grid.addEventListener('pointerup', () => { paused = false; });
-  grid.addEventListener('focusin', () => { paused = true; stop(); });
-  grid.addEventListener('focusout', () => { paused = false; start(); });
+  grid.addEventListener('pointerdown', () => { pointerActive = true; stop(); });
+  const releasePointer = () => {
+    if (!pointerActive) return;
+    pointerActive = false;
+    start();
+  };
+  window.addEventListener('pointerup', releasePointer);
+  window.addEventListener('pointercancel', releasePointer);
+  grid.addEventListener('focusin', () => { focusActive = true; stop(); });
+  grid.addEventListener('focusout', event => {
+    focusActive = Boolean(event.relatedTarget && grid.contains(event.relatedTarget));
+    start();
+  });
   phone.addEventListener('change', () => { index = 0; start(); });
   reduced.addEventListener('change', start);
   start();

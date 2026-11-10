@@ -1,0 +1,22 @@
+{% extends "admin/index.html" %}
+{% comment %}Stock Django index plus the «Опубликовать» button (config.sites.StanfordAdminSite.publish_view).{% endcomment %}
+
+{% block content %}
+{% if can_publish %}
+<form method="post" action="{% url 'admin:publish' %}" class="module" id="publish-form">
+  {% csrf_token %}
+  <h2>Публикация</h2>
+  {% if publish_target == 'github' %}
+  <p class="help">Сохраните изменения в разделах ниже и нажмите кнопку. Сайт будет проверен и отправлен в GitHub. После успешного развёртывания Railway изменения появятся на сайте.</p>
+  {% else %}
+  <p class="help">Сохраните изменения в разделах ниже и нажмите кнопку. Обновятся файлы сайта на этом компьютере. Отправка в GitHub выполняется отдельно.</p>
+  {% endif %}
+  <div class="submit-row">
+    <input type="submit" class="default" value="Опубликовать на сайт">
+  </div>
+</form>
+{% elif request.user.is_superuser %}
+<div class="module"><h2>Публикация не настроена</h2><p>Сохранять записи уже можно. Для публикации на сервере настройте подключение к репозиторию по инструкции cms/README.md.</p></div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

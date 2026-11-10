@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
+import { isIP } from 'node:net';
 import { ValidationError, validateApplication } from './validation.mjs';
 import { sanitizePhoto } from './photo.mjs';
 import { buildResume } from './pdf.mjs';
@@ -10,6 +11,21 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const HR_CHAT = process.env.TELEGRAM_HR_CHAT_ID || '';
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '';
 const DRY_RUN = process.env.HR_DRY_RUN === '1';
+const HOST = process.env.HOST || '0.0.0.0';
+const proxyHopsValue = process.env.HR_TRUST_PROXY_HOPS || '0';
+if (!/^\d+$/.test(proxyHopsValue) || Number(proxyHopsValue) > 10) {
+  throw new Error('HR_TRUST_PROXY_HOPS must be an integer from 0 to 10');
+}
+const TRUST_PROXY_HOPS = Number(proxyHopsValue);
+let originConfigured = false;
+if (ALLOWED_ORIGIN) {
+  try {
+    const origin = new URL(ALLOWED_ORIGIN);
+    originConfigured = ['https:', 'http:'].includes(origin.protocol) && origin.origin === ALLOWED_ORIGIN
+      && !origin.username && !origin.password;
+  } catch { /* An invalid configured origin cannot enable intake. */ }
+}
+const INTAKE_CONFIGURED = originConfigured && (DRY_RUN || Boolean(BOT_TOKEN.trim() && HR_CHAT.trim()));
 const MAX_BODY = 3.5 * 1024 * 1024;
 const RATE_WINDOW = 30 * 60 * 1000;
 const RATE_LIMIT = 4;
@@ -17,8 +33,13 @@ const RATE_LIMIT = 4;
 const attempts = new Map();
 
 function clientIp(request) {
-  const forwarded = String(request.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  return forwarded || request.socket.remoteAddress || 'unknown';
+  const remote = request.socket.remoteAddress || 'unknown';
+  if (TRUST_PROXY_HOPS === 0) return remote;
+  // Count from the nearest proxy. A supplied leftmost XFF must never select the rate-limit key.
+  const forwarded = String(request.headers['x-forwarded-for'] || '').split(',').map(value => value.trim());
+  const chain = [...forwarded, remote];
+  if (forwarded.some(value => !isIP(value)) || chain.length <= TRUST_PROXY_HOPS) return remote;
+  return chain[chain.length - 1 - TRUST_PROXY_HOPS];
 }
 
 function rateLimited(ip) {
@@ -43,7 +64,7 @@ function send(response, status, payload) {
 }
 
 function corsHeaders(origin) {
-  if (!ALLOWED_ORIGIN || origin !== ALLOWED_ORIGIN) return {};
+  if (!originConfigured || origin !== ALLOWED_ORIGIN) return {};
   return {
     'access-control-allow-origin': ALLOWED_ORIGIN,
     'access-control-allow-methods': 'POST, OPTIONS',
@@ -85,10 +106,17 @@ const server = http.createServer(async (request, response) => {
   const started = Date.now();
   const url = new URL(request.url || '/', 'http://localhost');
   const cors = corsHeaders(request.headers.origin || '');
+  response.setHeader('vary', 'Origin');
   for (const [key, value] of Object.entries(cors)) response.setHeader(key, value);
 
   if (request.method === 'OPTIONS' && url.pathname === '/career') {
-    response.writeHead(ALLOWED_ORIGIN ? 204 : 403);
+    if (!INTAKE_CONFIGURED) { send(response, 503, { ok: false, error: 'not_configured' }); return; }
+    const method = request.headers['access-control-request-method'];
+    const headers = String(request.headers['access-control-request-headers'] || '')
+      .toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
+    const allowed = request.headers.origin === ALLOWED_ORIGIN && method === 'POST'
+      && headers.every(header => ['content-type', 'x-career-request'].includes(header));
+    response.writeHead(allowed ? 204 : 403);
     response.end();
     return;
   }
@@ -101,6 +129,10 @@ const server = http.createServer(async (request, response) => {
     send(response, 404, { ok: false, error: 'not_found' });
     return;
   }
+  if (!INTAKE_CONFIGURED) {
+    send(response, 503, { ok: false, error: 'not_configured' });
+    return;
+  }
   if (!originAllowed(request) || request.headers['x-career-request'] !== '1') {
     send(response, 403, { ok: false, error: 'forbidden' });
     return;
@@ -111,10 +143,6 @@ const server = http.createServer(async (request, response) => {
   }
   if (rateLimited(clientIp(request))) {
     send(response, 429, { ok: false, error: 'rate_limited' });
-    return;
-  }
-  if (!BOT_TOKEN && !DRY_RUN) {
-    send(response, 503, { ok: false, error: 'not_configured' });
     return;
   }
 
@@ -149,8 +177,8 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`hr-api listening on ${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`hr-api listening on ${server.address().port}`);
 });
 
 function shutdown() {

@@ -3,16 +3,36 @@
 Validators mirror validateContent() in build.mjs so mistakes surface in the form, before publishing.
 """
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
+from django.utils.text import slugify
 
 from .validators import PHOTO_VALIDATORS
 
 slug_validator = RegexValidator(r'^[a-z0-9-]+$', 'Только строчные латинские буквы, цифры и дефис.')
 phone_validator = RegexValidator(r'^\+998\d{9}$', 'Формат +998 и 9 цифр, например +998913036001.')
 positive_validator = MinValueValidator(1, 'Значение должно быть больше нуля.')
+photo_path_validator = RegexValidator(
+    r'^assets/(?:[a-z0-9_-]+/)*[a-z0-9_-]+\.(?:jpg|jpeg|png|webp)$',
+    'Допустим только локальный путь assets/… к JPG, PNG или WebP.')
+
+
+def assign_slug(instance, fallback):
+    """Generate the public identifier once; changing the name never breaks existing links."""
+    if instance.slug:
+        return
+    limit = instance._meta.get_field('slug').max_length
+    stem = slugify(instance.name)[:limit].strip('-') or f'{fallback}-{uuid4().hex[:10]}'
+    candidate, suffix = stem, 2
+    others = type(instance).objects.exclude(pk=instance.pk)
+    while others.filter(slug=candidate).exists():
+        tail = f'-{suffix}'
+        candidate = stem[:limit - len(tail)].rstrip('-') + tail
+        suffix += 1
+    instance.slug = candidate
 
 
 def validate_https_site_url(value):
@@ -72,6 +92,11 @@ class SiteSettings(Singleton):
     def __str__(self):
         return 'Настройки сайта'
 
+    def clean(self):
+        if not self.demo_mode and StudentResult.objects.filter(is_published=True, consent=False).exists():
+            raise ValidationError({'demo_mode': 'Сначала подтвердите согласие для опубликованных результатов '
+                                                'студентов или скройте эти результаты.'})
+
 
 class Stat(Ordered):
     value = models.CharField('Цифра', max_length=12, help_text='Например: 2016, 5 000+, 25')
@@ -87,7 +112,7 @@ class Stat(Ordered):
 
 class Course(Ordered):
     CATEGORIES = [('languages', 'Языки'), ('kids', 'Для детей'), ('subjects', 'Математика'), ('exam', 'IELTS и SAT')]
-    slug = models.CharField('Код (в адресе)', max_length=60, unique=True, validators=[slug_validator])
+    slug = models.CharField('Код (в адресе)', max_length=60, unique=True, blank=True, validators=[slug_validator])
     name = models.CharField('Название', max_length=80)
     subtitle = models.CharField('Уточнение', max_length=80, blank=True, help_text='Например: на каракалпакском')
     category = models.CharField('Направление', max_length=20, choices=CATEGORIES)
@@ -107,6 +132,7 @@ class Course(Ordered):
         return ' '.join(filter(None, [self.name, self.subtitle]))
 
     def clean(self):
+        assign_slug(self, 'course')
         errors = {}
         # build.mjs rejects empty name/description and non-positive prices, so the form must too.
         if not (self.name or '').strip():
@@ -117,6 +143,10 @@ class Course(Ordered):
             errors['special_price'] = 'Семейная цена должна быть ниже обычной.'
         if errors:
             raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        assign_slug(self, 'course')
+        super().save(*args, **kwargs)
 
 
 class CourseSkill(Ordered):
@@ -185,7 +215,7 @@ class Contacts(Singleton):
         # build.mjs publishes verified contacts only with an admissions channel, and keeps HR separate.
         # Existing channels are read from the database: save the contacts once (verification can be off),
         # add a phone/Telegram on the same page, then enable «Контакты подтверждены».
-        if not self.verified or not self.pk:
+        if not self.verified or not self.pk or getattr(self, '_validate_inline_channels', False):
             return
         errors = {}
         phones = list(self.phones.values_list('number', flat=True))
@@ -223,7 +253,7 @@ class AdmissionsTelegram(Ordered):
 
 
 class Location(Ordered):
-    slug = models.CharField('Код', max_length=40, unique=True, validators=[slug_validator])
+    slug = models.CharField('Код', max_length=40, unique=True, blank=True, validators=[slug_validator])
     name = models.CharField('Название', max_length=80)
     address = models.CharField('Адрес', max_length=160)
     longitude = models.DecimalField('Долгота', max_digits=10, decimal_places=7, null=True, blank=True)
@@ -232,6 +262,8 @@ class Location(Ordered):
                                    help_text='Google Maps → Поделиться → Встраивание карт → ссылка из src. Без нее филиал не показывается на карте.')
     photo = models.ImageField('Фото входа', upload_to='branches/', blank=True, validators=PHOTO_VALIDATORS,
                               help_text='JPG, PNG или WebP до 5 МБ.')
+    photo_path = models.CharField('Фото из файлов сайта', max_length=240, blank=True, validators=[photo_path_validator],
+                                  help_text='Сохраняется при импорте. Загруженное фото имеет приоритет.')
 
     class Meta(Ordered.Meta):
         verbose_name = 'Филиал'
@@ -241,10 +273,15 @@ class Location(Ordered):
         return self.name
 
     def clean(self):
+        assign_slug(self, 'branch')
         if (self.longitude is None) != (self.latitude is None):
             raise ValidationError('Укажите обе координаты или ни одной.')
         if self.longitude is not None and (abs(self.longitude) > 180 or abs(self.latitude) > 90):
             raise ValidationError('Координаты вне допустимого диапазона.')
+
+    def save(self, *args, **kwargs):
+        assign_slug(self, 'branch')
+        super().save(*args, **kwargs)
 
 
 class MapLink(Ordered):
@@ -275,6 +312,8 @@ class Teacher(Ordered):
     experience = models.CharField('Опыт', max_length=40, blank=True, help_text='Например: 6 лет опыта')
     photo = models.ImageField('Фото', upload_to='teachers/', blank=True, validators=PHOTO_VALIDATORS,
                               help_text='Вертикальное 4:5, JPG/PNG/WebP до 5 МБ. Без фото — инициалы.')
+    photo_path = models.CharField('Фото из файлов сайта', max_length=240, blank=True, validators=[photo_path_validator],
+                                  help_text='Сохраняется при импорте. Загруженное фото имеет приоритет.')
     is_published = models.BooleanField('Показывать на сайте', default=True)
 
     class Meta(Ordered.Meta):
@@ -302,3 +341,102 @@ class StudentResult(Ordered):
 
     def __str__(self):
         return f'{self.score} {self.exam} — {self.student}'
+
+    def clean(self):
+        if self.is_published and not self.consent:
+            settings = SiteSettings.objects.filter(pk=1).first()
+            if settings is not None and not settings.demo_mode:
+                raise ValidationError({'consent': 'Для публикации реального результата нужно согласие студента.'})
+
+
+text_key_validator = RegexValidator(r'^[a-z0-9._-]+$', 'Только строчные латинские буквы, цифры, точка и дефис.')
+
+
+class PageText(models.Model):
+    """One editable text of the page frame: index.html marks its place with data-text="<key>" (build.mjs)."""
+    SECTIONS = [
+        ('meta', 'Заголовок вкладки и описание для поиска'), ('page', 'Служебные ссылки'), ('header', 'Шапка и меню'),
+        ('hero', 'Первый экран'), ('why', 'Почему Stanford'), ('courses', 'Курсы и цены'), ('cashback', 'Кэшбэк'),
+        ('about', 'Как начать заниматься'), ('clubs', 'Практика вне уроков'), ('partners', 'Партнёры и экзамены'),
+        ('faq', 'Вопросы: заголовок'), ('ielts', 'Вопрос про IELTS'), ('sat', 'Вопрос про SAT'),
+        ('enroll', 'Контакты'), ('footer', 'Подвал'), ('modal', 'Окно курса'),
+        ('results', 'Страница результатов'), ('career', 'Анкета для работы'),
+    ]
+    KINDS = {'title': 'Заголовок', 'text': 'Текст', 'link': 'Ссылка', 'button': 'Кнопка', 'question': 'Вопрос',
+             'item': 'Пункт списка', 'table': 'Таблица', 'label': 'Надпись', 'description': 'Описание для поиска',
+             'og_title': 'Заголовок для соцсетей', 'og_description': 'Описание для соцсетей'}
+    key = models.CharField('Код места', max_length=60, unique=True, validators=[text_key_validator])
+    section = models.CharField('Раздел', max_length=20, choices=SECTIONS, db_index=True, editable=False)
+    text = models.TextField('Текст', max_length=800)
+    uz = models.TextField('По-узбекски', max_length=800, blank=True,
+                          help_text='Показывается, когда посетитель выбирает UZ. Пусто — останется русский текст.')
+    order = models.PositiveIntegerField('Порядок на странице', default=0, db_index=True, editable=False)
+
+    class Meta:
+        ordering = ['order', 'pk']
+        verbose_name = 'Текст страницы'
+        verbose_name_plural = 'Тексты страницы'
+
+    def __str__(self):
+        return f'{self.get_section_display()} — {self.place()}'
+
+    def place(self):
+        """Human name of the slot, e.g. «Заголовок 2» for key why.title2."""
+        name = self.key.split('.', 1)[-1]
+        kind = name.rstrip('0123456789')
+        number = name[len(kind):]
+        return ' '.join(filter(None, [self.KINDS.get(kind, kind), number]))
+
+    def clean(self):
+        if not (self.text or '').strip():
+            raise ValidationError({'text': 'Текст не может быть пустым.'})
+
+    def save(self, *args, **kwargs):
+        section = self.key.split('.', 1)[0]
+        self.section = section if section in dict(self.SECTIONS) else 'page'
+        super().save(*args, **kwargs)
+
+
+class Faq(Ordered):
+    """A plain question of «Частые вопросы»; the IELTS and SAT entries are page texts."""
+    question = models.CharField('Вопрос', max_length=160)
+    answer = models.TextField('Ответ', max_length=800)
+    question_uz = models.CharField('Вопрос по-узбекски', max_length=160, blank=True)
+    answer_uz = models.TextField('Ответ по-узбекски', max_length=800, blank=True)
+    is_published = models.BooleanField('Показывать на сайте', default=True)
+
+    class Meta(Ordered.Meta):
+        verbose_name = 'Вопрос'
+        verbose_name_plural = 'Вопросы и ответы'
+
+    def __str__(self):
+        return self.question
+
+    def clean(self):
+        errors = {}
+        if not (self.question or '').strip():
+            errors['question'] = 'Укажите вопрос.'
+        if not (self.answer or '').strip():
+            errors['answer'] = 'Укажите ответ.'
+        if errors:
+            raise ValidationError(errors)
+
+
+class Translation(models.Model):
+    """Uzbek for texts that have no «По-узбекски» field of their own: courses, cashback, teachers, results, buttons."""
+    source = models.CharField('Текст на сайте (по-русски)', max_length=800, unique=True,
+                              help_text='Точно как на сайте: с теми же знаками и регистром.')
+    uz = models.CharField('По-узбекски', max_length=800)
+
+    class Meta:
+        ordering = ['source']
+        verbose_name = 'Перевод'
+        verbose_name_plural = 'Переводы на узбекский'
+
+    def __str__(self):
+        return self.source
+
+    def clean(self):
+        self.source = ' '.join((self.source or '').split())
+        if not self.source or not (self.uz or '').strip():
+            raise ValidationError('Заполните оба поля.')

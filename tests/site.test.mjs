@@ -2,10 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { readContent, validateContent, generate, generateResults, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { readContent, validateContent, generate, generateResults, generateCareer, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
 
-const data = readContent();
-const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const publishedData = readContent();
+const sourceHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const data = JSON.parse(fs.readFileSync(new URL('./fixtures/content.json', import.meta.url), 'utf8'));
+const html = generate(sourceHtml, data);
 
 // Minimal .dockerignore matcher for the default-deny context: patterns are relative to the
 // build context, `**` spans directories and the last matching rule decides.
@@ -64,6 +69,12 @@ test('every root COPY input and every asset file stays in the default-deny Docke
 });
 
 test('generated HTML is current, complete without JS, and generation is idempotent', () => {
+  assert.doesNotThrow(() => validateContent(publishedData));
+  assert.equal(generate(sourceHtml, publishedData), sourceHtml, 'Published home page must match actual admin content');
+  for (const [file, build] of [['results.html', generateResults], ['career.html', generateCareer]]) {
+    const source = fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+    assert.equal(build(source, publishedData), source, `Published ${file} must match actual content`);
+  }
   const output = generate(html, data);
   assert.equal(output, html);
   assert.equal(generate(output, data), output);
@@ -409,7 +420,7 @@ test('one lazy Google map has a static initial selection, accessible controls an
   assert(html.includes('Яндекс Карты'), 'Yandex remains available as a link');
 });
 
-test('CSP permits the map iframe origin while retaining restrictions on parent-page connections', () => {
+test('CSP permits same-origin HR requests and approved map frames while keeping scripts and objects restricted', () => {
   const caddy = fs.readFileSync(new URL('../Caddyfile', import.meta.url), 'utf8');
   const policy = caddy.match(/header Content-Security-Policy "([^"]+)"/)[1];
   const directives = new Map(policy.split(';').map(item => item.trim()).filter(Boolean).map(item => {
@@ -417,7 +428,7 @@ test('CSP permits the map iframe origin while retaining restrictions on parent-p
     return [name, values];
   }));
   assert.deepEqual([...directives.get('frame-src')].sort(), ['https://www.google.com', 'https://yandex.ru']);
-  assert.deepEqual(directives.get('connect-src'), ["'none'"]);
+  assert.deepEqual(directives.get('connect-src'), ["'self'"]);
   assert.deepEqual(directives.get('object-src'), ["'none'"]);
   assert.deepEqual(directives.get('frame-ancestors'), ["'none'"]);
   assert.deepEqual(directives.get('script-src'), ["'self'"]);
@@ -866,7 +877,7 @@ test('each course card shows the monthly price and the family price or its absen
 });
 
 test('discount conditions are visible without a popup, disclosure or JavaScript', () => {
-  assert(html.includes('<p class="discount-note" id="discounts">'));
+  assert(/<p class="discount-note" id="discounts"[^>]*>[^<]+<\/p>/.test(html));
   assert(!html.includes('discount-explainer'));
   assert(!html.includes('data-open-discounts'));
   assert(!html.includes('discount-tooltip'));
@@ -1012,8 +1023,8 @@ test('career form posts to the HR service without exposing a Telegram account', 
 test('the full results page ships every result and is generated from the same data', () => {
   const template = fs.readFileSync(new URL('../results.html', import.meta.url), 'utf8');
   const output = generateResults(template, data);
-  assert.equal(output, template, 'Run node build.mjs to refresh results.html');
-  assert.equal((template.match(/class="result-card"/g) || []).length, data.results.length);
+  assert.equal(generateResults(output, data), output);
+  assert.equal((output.match(/class="result-card"/g) || []).length, data.results.length);
   assert(template.includes('href="index.html"') && template.includes('href="index.html#courses"'));
   assert.match(template, /<script src="results\.js\?v=\d+"><\/script>/);
   assert(!/<script>([\s\S]*?)<\/script>/.test(template), 'The results page keeps scripts external for CSP');
@@ -1025,4 +1036,159 @@ test('hidden demo labels let the owner preview sample data without the «При�
   assert(!/demo-banner|demo-tag/.test(preview), 'The owner asked for no demo wording on the page');
   assert(preview.includes('name="robots" content="noindex, nofollow"'), 'Sample data stays out of search while demo mode is on');
   assert(html.includes('name="robots" content="noindex'), 'The published page is still the demo preview');
+});
+
+test('all public pages share indexing settings and use their own canonical URL after a domain change', () => {
+  const pages = [
+    { file: 'index.html', build: generate, suffix: '' },
+    { file: 'results.html', build: generateResults, suffix: '/results.html' },
+    { file: 'career.html', build: generateCareer, suffix: '/career.html' }
+  ];
+  for (const { file, build, suffix } of pages) {
+    const template = fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+    const configured = structuredClone(data);
+    configured.site.url = 'https://school.example/centre';
+    configured.site.demoMode = true;
+    let output = build(template, configured);
+    assert.match(output, /<meta name="robots" content="noindex, nofollow">/);
+    assert(output.includes(`rel="canonical" href="https://school.example/centre${suffix}"`), file);
+    assert(output.includes(`property="og:url" content="https://school.example/centre${suffix}"`), file);
+    assert(output.includes('property="og:image" content="https://school.example/centre/assets/stanford-logo.png"'), file);
+    configured.site.demoMode = false;
+    configured.results[0].consent = false;
+    assert.throws(() => build(template, configured), /consent/, `${file} must reject unconsented results`);
+    configured.results.forEach(result => { result.consent = true; });
+    output = build(template, configured);
+    assert(!output.includes('name="robots"'), file);
+    assert.equal(build(output, configured), output, `${file} generation must be idempotent`);
+  }
+});
+
+test('the admin can change auxiliary page copy and attributes without injecting HTML or changing form values', () => {
+  const career = fs.readFileSync(new URL('../career.html', import.meta.url), 'utf8');
+  const results = fs.readFileSync(new URL('../results.html', import.meta.url), 'utf8');
+  const configured = structuredClone(data);
+  configured.texts['career.title2'] = 'Работа <тест>';
+  configured.texts['career.placeholder1'] = 'Имя "полностью"';
+  configured.texts['career.meta1'] = 'Новая анкета';
+  configured.texts['results.title2'] = 'Новые результаты';
+  const output = generateCareer(career, configured);
+  assert(output.includes('data-text="career.title2">Работа &lt;тест&gt;</h1>'));
+  assert(output.includes('placeholder="Имя &quot;полностью&quot;"'));
+  const description = output.match(/<meta name="description"[^>]*>/)[0];
+  assert.equal((description.match(/\bcontent=/g) || []).length, 1);
+  assert(description.includes('content="Новая анкета"'));
+  assert(!output.includes('<тест>'));
+  const options = source => source.match(/<option\b[^>]*>[^<]*<\/option>/g);
+  assert.deepEqual(options(output), options(career), 'CMS headings cannot change the submitted HR choices');
+  assert(generateResults(results, configured).includes('data-text="results.title2">Новые результаты</h1>'));
+  assert.equal(applyTexts('<span data-text="career.text10">ФИО </span>', { 'career.text10': 'Имя' }),
+    '<span data-text="career.text10">Имя </span>', 'Preserve the space before required marks');
+  const phone = career.match(/<input\b[^>]*id="cf-phone"[^>]*>/)[0];
+  const maxlength = Number(phone.match(/maxlength="(\d+)"/)[1]);
+  const placeholder = phone.match(/placeholder="([^"]+)"/)[1];
+  assert(maxlength >= placeholder.length, 'The displayed phone format must fit the field');
+});
+
+test('publishing new data or translations gives only the changed file a new cache version', () => {
+  const template = '<script src="content.js?v=1"></script><script src="assets/i18n/uz.js?v=1"></script><script src="script.js?v=56"></script>';
+  const versions = output => [...output.matchAll(/src="([^"]+)"/g)].map(match => match[1]);
+  const first = versions(versionContentAssets(template, data, 'dictionary one'));
+  const configured = structuredClone(data);
+  configured.courses[0].price += 1000;
+  const changedContent = versions(versionContentAssets(template, configured, 'dictionary one'));
+  const changedTranslation = versions(versionContentAssets(template, data, 'dictionary two'));
+  assert.notEqual(first[0], changedContent[0]);
+  assert.equal(first[1], changedContent[1]);
+  assert.equal(first[0], changedTranslation[0]);
+  assert.notEqual(first[1], changedTranslation[1]);
+  assert.equal(first[2], changedContent[2]);
+  assert.equal(first[2], changedTranslation[2]);
+  assert.equal(versionContentAssets(versionContentAssets(template, data, 'dictionary one'), data, 'dictionary one'),
+    versionContentAssets(template, data, 'dictionary one'));
+});
+
+test('results carousel resumes after pointer release and cancellation while keyboard focus keeps it paused', () => {
+  const handlers = new Map();
+  const windowHandlers = new Map();
+  const timers = new Map();
+  let nextTimer = 0;
+  let scrolls = 0;
+  const focusTarget = {};
+  const grid = {
+    children: [{ getBoundingClientRect: () => ({ left: 0 }) }, { getBoundingClientRect: () => ({ left: 300 }) }],
+    scrollLeft: 0,
+    getBoundingClientRect: () => ({ left: 0 }),
+    scrollTo: () => { scrolls++; },
+    contains: target => target === focusTarget,
+    addEventListener: (event, handler) => handlers.set(event, handler)
+  };
+  const context = {
+    document: { documentElement: { dataset: {} }, querySelector: selector => selector === '.results-grid-page' ? grid : null },
+    window: { addEventListener: (event, handler) => windowHandlers.set(event, handler) },
+    matchMedia: query => ({ matches: query.includes('max-width'), addEventListener: () => {} }),
+    setInterval: handler => { const id = ++nextTimer; timers.set(id, handler); return id; },
+    clearInterval: id => timers.delete(id)
+  };
+  vm.runInNewContext(fs.readFileSync(new URL('../results.js', import.meta.url), 'utf8'), context);
+  assert.equal(timers.size, 1);
+  handlers.get('pointerdown')();
+  assert.equal(timers.size, 0);
+  windowHandlers.get('pointerup')();
+  assert.equal(timers.size, 1);
+  [...timers.values()][0]();
+  assert.equal(scrolls, 1);
+  handlers.get('pointerdown')();
+  windowHandlers.get('pointercancel')();
+  assert.equal(timers.size, 1);
+  handlers.get('focusin')();
+  handlers.get('pointerdown')();
+  windowHandlers.get('pointerup')();
+  assert.equal(timers.size, 0);
+  handlers.get('focusout')({ relatedTarget: focusTarget });
+  assert.equal(timers.size, 0);
+  handlers.get('focusout')({ relatedTarget: null });
+  assert.equal(timers.size, 1);
+});
+
+test('a staged build uses its own data and validates every page before replacing any output', () => {
+  const temporaryRoot = path.resolve(os.tmpdir());
+  const stage = fs.mkdtempSync(path.join(temporaryRoot, 'stanford-site-build-'));
+  try {
+    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html']) {
+      fs.copyFileSync(new URL(`../${file}`, import.meta.url), path.join(stage, file));
+    }
+    fs.mkdirSync(path.join(stage, 'assets', 'i18n'), { recursive: true });
+    fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'uz.js'), 'window.stanfordUz = { strings: {}, patterns: [] };\n');
+    const fixture = {
+      site: { url: 'https://staged.example', demoMode: false },
+      courses: [{ id: 'staged-course', name: 'Проверочный курс', category: 'languages', description: 'Описание курса',
+        skills: ['Программа курса'], price: 123000, target: '#courses' }],
+      contacts: { verified: false }, results: [], teachers: [], stats: [], faq: []
+    };
+    const contentPath = path.join(stage, 'content.js');
+    fs.writeFileSync(contentPath, `window.schoolContent = ${JSON.stringify(fixture)};\n`);
+    const build = () => spawnSync(process.execPath, [path.join(stage, 'build.mjs')], {
+      cwd: stage, encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+    });
+    let result = build();
+    assert.equal(result.status, 0, result.stderr);
+    const before = fs.readFileSync(path.join(stage, 'index.html'), 'utf8');
+    assert(before.includes('data-course-id="staged-course"'));
+    assert(before.includes('href="https://staged.example"'));
+    assert(!before.includes('name="robots"'));
+    assert(fs.readFileSync(path.join(stage, 'career.html'), 'utf8').includes('href="https://staged.example/career.html"'));
+    fixture.courses[0].price = 456000;
+    fs.writeFileSync(contentPath, `window.schoolContent = ${JSON.stringify(fixture)};\n`);
+    const careerPath = path.join(stage, 'career.html');
+    fs.writeFileSync(careerPath, fs.readFileSync(careerPath, 'utf8').replace('<!-- ROBOTS_START -->', '<!-- BROKEN_START -->'));
+    result = build();
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Missing generated block: ROBOTS/);
+    assert.equal(fs.readFileSync(path.join(stage, 'index.html'), 'utf8'), before, 'Failed preflight must not change the first page');
+  } finally {
+    const resolved = path.resolve(stage);
+    assert(resolved.startsWith(`${temporaryRoot}${path.sep}`) && path.basename(resolved).startsWith('stanford-site-build-'));
+    fs.rmSync(resolved, { recursive: true, force: true });
+  }
 });

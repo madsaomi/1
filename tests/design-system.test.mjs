@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import vm from 'node:vm';
+import { generate } from '../build.mjs';
 
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const baseline = JSON.parse(read('tests/page_baseline.json'));
 const html = read('index.html');
+const fixtureHtml = generate(html, JSON.parse(read('tests/fixtures/content.json')));
 const css = read('style.css');
 const script = read('script.js');
 const normalize = text => text.replace(/[↗↘↙↖↑↓←→☰×◐☀\uFE0E]/gu, '').replace(/\s+/gu, ' ').trim();
@@ -37,7 +39,7 @@ function page(source) {
       const tag = token.match(/^<([\w-]+)/)[1].toLowerCase();
       const attributes = Object.fromEntries([...token.slice(tag.length + 1).matchAll(/([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g)]
         .map(match => [match[1].toLowerCase(), decode(match[2] ?? match[3] ?? match[4] ?? '')]));
-      const ignored = stack.some(item => item.ignored) || tag === 'svg' || attributes['aria-hidden'] === 'true'
+      const ignored = stack.some(item => item.ignored) || tag === 'svg' || attributes['aria-hidden'] === 'true' || 'data-text' in attributes
         || ['theme-toggle', 'modal-close'].includes(attributes.id) || (attributes.class || '').split(/\s+/).includes('menu');
       const node = { tag, attributes, ignored, revealAncestor: stack.some(item => Object.hasOwn(item.attributes, 'data-reveal')) };
       nodes.push(node);
@@ -67,7 +69,7 @@ test('protected inputs match their approved baseline', () => {
 
 // PLAN-044: generated blocks hold admin-managed data; the copy contract covers the static frame around them.
 const staticFrame = source => source
-  .replace(/<!-- ([A-Z]+)_START -->[\s\S]*?<!-- \1_END -->/g, '')
+  .replace(/<!-- ([A-Z_]+)_START -->[\s\S]*?<!-- \1_END -->/g, '')
   .replace(/<!-- CONTACT_START:([a-z]+) -->[\s\S]*?<!-- CONTACT_END:\1 -->/g, '');
 
 test('all static page copy survives redesigns; admin-managed blocks are excluded', () => {
@@ -76,8 +78,8 @@ test('all static page copy survives redesigns; admin-managed blocks are excluded
 });
 
 test('existing navigation targets, destinations, alternative text and semantic labels survive presentation changes', () => {
-  const original = page(baseline.index).nodes;
-  const current = page(html).nodes;
+  const original = page(staticFrame(baseline.index)).nodes;
+  const current = page(staticFrame(html)).nodes;
   const keys = ['id', 'aria-label', 'aria-labelledby', 'aria-describedby', 'aria-controls', 'alt', 'title', 'for'];
   const semantics = nodes => nodes.flatMap(({ tag, attributes }) => {
     if (tag === 'svg' || tag === 'path' || tag === 'use') return [];
@@ -186,7 +188,7 @@ test('Inter is served as genuine local WOFF2 with a visible fallback during load
 });
 
 test('map content retains natural colors and SVG icons do not add accessible text or tab stops', () => {
-  const mapFrame = page(html).nodes.find(node => node.tag === 'iframe' && node.attributes.id === 'branch-map');
+  const mapFrame = page(fixtureHtml).nodes.find(node => node.tag === 'iframe' && node.attributes.id === 'branch-map');
   assert(mapFrame && !mapFrame.revealAncestor, 'A reveal animation on an ancestor must not change the provider map colors or opacity');
   const mapRules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(match => /\.(?:contact-section|contact-locations|location-map-layout|branch-map-panel|branch-map)(?![\w-])/.test(match[1]));

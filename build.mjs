@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const root = fileURLToPath(new URL('.', import.meta.url));
@@ -12,6 +13,7 @@ export function svgIcon(name) {
     external: 'M15 3h6v6 M10 14 21 3 M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5',
     'arrow-right': 'M5 12h14 M12 5l7 7-7 7',
     check: 'm5 12 4 4L19 6',
+    plus: 'M12 5v14 M5 12h14',
     camera: 'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3Z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
     phone: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z',
     telegram: 'm22 2-7 20-4-9-9-4Z M22 2 11 13',
@@ -112,6 +114,14 @@ export function validateContent(data) {
     if (!Array.isArray(cashback.rules ?? [])) throw new Error('Cashback rules must be an array');
     for (const rule of cashback.rules ?? []) if (!text(rule.title, 60) || !text(rule.text, 200)) throw new Error('Cashback rule needs a title and text');
   }
+  if (data.faq !== undefined) {
+    if (!Array.isArray(data.faq)) throw new Error('FAQ must be an array');
+    for (const item of data.faq) if (!text(item.question, 160) || !text(item.answer, 800)) throw new Error('FAQ entry needs a question and an answer');
+  }
+  if (data.texts !== undefined) {
+    if (!data.texts || typeof data.texts !== 'object' || Array.isArray(data.texts)) throw new Error('Texts must be an object');
+    for (const [key, value] of Object.entries(data.texts)) if (!/^[a-z0-9._-]+$/.test(key) || !text(value, 800)) throw new Error(`Text ${key} must be a non-empty string up to 800 characters`);
+  }
   if (data.site?.url) {
     let url;
     try { url = new URL(data.site.url); } catch { throw new Error('Site URL must be a valid public HTTPS address'); }
@@ -146,6 +156,21 @@ const showDemo = site => Boolean(site?.demoMode && site?.demoLabels !== false);
 // Samples must not be indexed: while demo mode is on, search engines are asked to skip the page.
 export function renderRobots(site) {
   return site?.demoMode ? '<meta name="robots" content="noindex, nofollow">' : '';
+}
+
+export function renderMetadata(site, page = '') {
+  if (!site?.url) return '';
+  const base = site.url.endsWith('/') ? site.url : `${site.url}/`;
+  const canonical = page ? new URL(page, base).href : site.url;
+  return `<link rel="canonical" href="${escapeHTML(canonical)}">\n<meta property="og:url" content="${escapeHTML(canonical)}">\n<meta property="og:image" content="${escapeHTML(new URL('assets/stanford-logo.png', base).href)}">`;
+}
+
+// A publication changes these URLs whenever the data or translations change, even if the old files are cached.
+export function versionContentAssets(html, data, dictionary = fs.readFileSync(new URL('./assets/i18n/uz.js', import.meta.url))) {
+  const version = value => parseInt(createHash('sha256').update(value).digest('hex').slice(0, 12), 16).toString();
+  const versions = { 'content.js': version(JSON.stringify(data)), 'assets/i18n/uz.js': version(dictionary) };
+  return html.replace(/\b(src|href)="(content\.js|assets\/i18n\/uz\.js)(?:\?v=[^"]*)?"/g,
+    (_, attribute, file) => `${attribute}="${file}?v=${versions[file]}"`);
 }
 
 export function renderDemoBanner(site) {
@@ -301,6 +326,34 @@ export function renderFilters(courses) {
   }).join('\n');
 }
 
+// Plain FAQ entries come from the admin; numbers are CSS counters, so the exam entries after them stay in order.
+export function renderFaq(faq = []) {
+  return faq.map(item => `          <details name="stanford-faq"><summary><span class="faq-num" aria-hidden="true"></span>${escapeHTML(item.question)}${svgIcon('plus')}</summary><p>${escapeHTML(item.answer)}</p></details>`).join('\n');
+}
+
+// Editable page texts: every element marked data-text="key" gets the text stored under that key in content.js.
+// A slot without a stored text keeps what is already in the HTML, so a missing key never blanks the page.
+const escapeText = value => String(value).replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[char]);
+export function applyTexts(html, texts = {}) {
+  html = html.replace(/<[a-z][a-z0-9]*\b[^<>]*>/g, opening => {
+    for (const [, attribute, key] of opening.matchAll(/\sdata-text-(placeholder|title|aria-label|alt)="([a-z0-9._-]+)"/g)) {
+      if (!Object.hasOwn(texts, key)) continue;
+      const pattern = new RegExp(`\\s${attribute}="[^"]*"`);
+      const replacement = ` ${attribute}="${escapeHTML(texts[key])}"`;
+      opening = pattern.test(opening) ? opening.replace(pattern, () => replacement) : opening.replace(/>$/, () => `${replacement}>`);
+    }
+    return opening;
+  });
+  return html.replace(/<([a-z][a-z0-9]*)\b([^>]*?)\sdata-text="([a-z0-9._-]+)"([^>]*)>(?:([^<]*)(<\/\1>))?/g, (match, tag, before, key, after, inner, close) => {
+    if (!Object.hasOwn(texts, key)) return match;
+    if (tag === 'meta') return `<meta${before.replace(/\scontent="[^"]*"/, '')} data-text="${key}"${after.replace(/\scontent="[^"]*"/, '')} content="${escapeHTML(texts[key])}">`;
+    if (close === undefined) return match;
+    const leading = inner.match(/^\s*/)[0];
+    const trailing = inner.match(/\s*$/)[0];
+    return `<${tag}${before} data-text="${key}"${after}>${leading}${escapeText(texts[key].trim())}${trailing}${close}`;
+  });
+}
+
 function replaceBlock(html, name, body) {
   const pattern = new RegExp(`<!-- ${name}_START -->[\\s\\S]*?<!-- ${name}_END -->`);
   if (!pattern.test(html)) throw new Error(`Missing generated block: ${name}`);
@@ -323,35 +376,50 @@ export function generate(html, data) {
   html = replaceBlock(html, 'REWARD', renderHeroReward(data.cashback));
   html = replaceBlock(html, 'FAB', renderContactFab(data.contacts));
   html = replaceBlock(html, 'NAVCTA', renderNavCta(data.contacts));
+  html = replaceBlock(html, 'FAQ', renderFaq(data.faq));
+  html = applyTexts(html, data.texts);
   html = replaceBlock(html, 'OPTIONS', data.courses.map(course => `<option value="${escapeHTML(course.id)}">${escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '))}</option>`).join(''));
-  const siteURL = data.site?.url;
-  const metadata = siteURL ? `<link rel="canonical" href="${escapeHTML(siteURL)}">\n<meta property="og:url" content="${escapeHTML(siteURL)}">\n<meta property="og:image" content="${escapeHTML(new URL('assets/stanford-logo.png', siteURL.endsWith('/') ? siteURL : `${siteURL}/`).href)}">` : '';
-  html = replaceBlock(html, 'SEO', metadata);
+  html = replaceBlock(html, 'SEO', renderMetadata(data.site));
   html = html.replace(/<!-- CONTACT_START:([a-z]+) -->[\s\S]*?<!-- CONTACT_END:\1 -->/g, (_, key) => `<!-- CONTACT_START:${key} -->\n${renderContacts(data.contacts, { compact: key === 'dialog' })}\n<!-- CONTACT_END:${key} -->`);
-  return html;
+  html = replaceBlock(html, 'ASSET_VERSIONS', '<script src="content.js"></script><script src="assets/i18n/uz.js"></script>');
+  return versionContentAssets(html, data);
 }
 
 // The full results page grows with the admin data: every published result becomes a card.
 export function generateResults(html, data) {
   html = html.replace(/\r\n/g, '\n');
   validateContent(data);
-  return replaceBlock(html, 'RESULTS_LIST', renderResultCards(data.results));
+  html = replaceBlock(html, 'RESULTS_LIST', renderResultCards(data.results));
+  html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'results.html'));
+  return versionContentAssets(applyTexts(html, data.texts), data);
+}
+
+export function generateCareer(html, data) {
+  html = html.replace(/\r\n/g, '\n');
+  validateContent(data);
+  html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'career.html'));
+  return versionContentAssets(applyTexts(html, data.texts), data);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
   const data = readContent();
   const pages = [
     { file: new URL('./index.html', import.meta.url), build: generate, label: 'index.html' },
-    { file: new URL('./results.html', import.meta.url), build: generateResults, label: 'results.html' }
+    { file: new URL('./results.html', import.meta.url), build: generateResults, label: 'results.html' },
+    { file: new URL('./career.html', import.meta.url), build: generateCareer, label: 'career.html' }
   ];
   let stale = false;
-  for (const page of pages) {
+  const generated = pages.map(page => {
     const source = fs.readFileSync(page.file, 'utf8');
-    const output = page.build(source, data);
+    return { ...page, source, output: page.build(source, data) };
+  });
+  for (const { file, source, output, label } of generated) {
     if (process.argv.includes('--check')) {
-      if (output !== source) { console.error(`Generated ${page.label} is stale. Run node build.mjs`); stale = true; }
+      if (output !== source) { console.error(`Generated ${label} is stale. Run node build.mjs`); stale = true; }
     } else {
-      fs.writeFileSync(page.file, output);
+      fs.writeFileSync(file, output);
     }
   }
   if (process.argv.includes('--check')) {

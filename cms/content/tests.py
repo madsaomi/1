@@ -27,6 +27,7 @@ from .models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, C
 from .serialization import build_content, write_content
 from .validators import photo_extension_validator, photo_size_validator
 
+CONTENT_FIXTURE = Path(__file__).resolve().parent / 'fixtures' / 'site-content.js'
 PASSWORD = 'correct-horse-battery-9'
 PSYCOPG_AVAILABLE = importlib.util.find_spec('psycopg') is not None
 PRODUCTION_ENV = {
@@ -208,7 +209,7 @@ class ContentValidationTests(TestCase):
 class ImportContentTests(TestCase):
     def setUp(self):
         self.output = io.StringIO()
-        self.content_path = settings.SITE_ROOT / 'content.js'
+        self.content_path = CONTENT_FIXTURE
 
     def import_content(self, *args, **options):
         return call_command('import_content', *args, stdout=self.output, **options)
@@ -295,7 +296,7 @@ class ImportContentTests(TestCase):
 class ExportContentTests(TestCase):
     def setUp(self):
         self.output = io.StringIO()
-        call_command('import_content', stdout=self.output)
+        call_command('import_content', str(CONTENT_FIXTURE), stdout=self.output)
 
     def test_export_fails_when_published_contacts_have_no_channel(self):
         Phone.objects.all().delete()
@@ -337,7 +338,7 @@ class AdminTestCase(TestCase):
     """Password + one-time code login, shared by the access and form-saving tests."""
 
     def setUp(self):
-        call_command('import_content', stdout=io.StringIO())
+        call_command('import_content', str(CONTENT_FIXTURE), stdout=io.StringIO())
         self.user = User.objects.create_superuser('owner', 'owner@example.org', PASSWORD)
         self.device = TOTPDevice.objects.create(user=self.user, name='Authenticator', confirmed=True)
         self.login_url = reverse('admin:login')
@@ -497,3 +498,87 @@ class EnableTwoFactorTests(TestCase):
         self.assertIn('otpauth://totp/', stdout.getvalue())
         self.assertIn('секрет', stderr.getvalue().lower())
         self.assertIn('логи', stderr.getvalue().lower())
+
+
+class PageTextsAndTranslationsTests(AdminTestCase):
+    """Texts, FAQ and Uzbek translations edited in the admin reach content.js and uz.js."""
+
+    def test_page_texts_and_faq_are_imported_and_exported(self):
+        from .models import Faq, PageText
+        data = read_content(CONTENT_FIXTURE)
+        self.assertEqual(PageText.objects.count(), len(data['texts']))
+        self.assertEqual(Faq.objects.count(), len(data['faq']))
+        text = PageText.objects.get(key='hero.text1')
+        self.assertEqual(text.section, 'hero')
+        self.assertEqual(text.place(), 'Текст 1')
+        text.text = 'Новый текст первого экрана'
+        text.save()
+        Faq.objects.create(question='Новый вопрос?', answer='Новый ответ.', order=99)
+        exported = build_content()
+        self.assertEqual(exported['texts']['hero.text1'], 'Новый текст первого экрана')
+        self.assertEqual(exported['faq'][-1], {'question': 'Новый вопрос?', 'answer': 'Новый ответ.'})
+
+    def test_page_texts_cannot_be_added_or_deleted_but_are_saved_through_the_form(self):
+        from .models import PageText
+        self.login()
+        text = PageText.objects.get(key='why.title1')
+        self.assertEqual(self.client.get(reverse('admin:content_pagetext_add')).status_code, 403)
+        self.assertEqual(self.client.post(reverse('admin:content_pagetext_delete', args=[text.pk]), {'post': 'yes'}).status_code, 403)
+        response = self.client.post(reverse('admin:content_pagetext_change', args=[text.pk]),
+                                    {'text': 'Почему мы', 'uz': 'Nega biz'})
+        self.assertEqual(response.status_code, 302, response.context and response.context['adminform'].errors)
+        text.refresh_from_db()
+        self.assertEqual((text.text, text.uz, text.key), ('Почему мы', 'Nega biz', 'why.title1'))
+        response = self.client.post(reverse('admin:content_pagetext_change', args=[text.pk]), {'text': '   ', 'uz': ''})
+        self.assertEqual(response.status_code, 200)  # an empty text is refused
+
+    def test_uz_dictionary_round_trip_keeps_patterns_and_reads_both_quote_styles(self):
+        from .serialization import build_uz_strings, load_uz_strings, read_uz_strings, write_uz_strings
+        source = ("window.stanfordUz = {\n  strings: {\n    // comment: 'not a pair'\n"
+                  "    'Курсы и цены': 'Kurslar va narxlar',\n    \"Он сказал: \\\"да\\\"\": 'U \\'ha\\' dedi',\n"
+                  "    'АК': 'AK', 'ДЮ': 'DY'\n  },\n\n  // numbers\n  patterns: [\n    [/^(\\d+) сум$/, m => `${m[1]} söm`]\n  ]\n};\n")
+        with content_path() as path:
+            path.write_text(source, encoding='utf-8')
+            strings = read_uz_strings(path)
+            self.assertEqual(strings, {'Курсы и цены': 'Kurslar va narxlar', 'Он сказал: "да"': "U 'ha' dedi",
+                                       'АК': 'AK', 'ДЮ': 'DY'})
+            summary = load_uz_strings(strings)
+            self.assertGreaterEqual(summary['page_texts'], 1)  # «Курсы и цены» is a page text
+            built = build_uz_strings()
+            self.assertEqual({key: built[key] for key in strings}, strings)
+            write_uz_strings(path, built)
+            written = path.read_text(encoding='utf-8')
+            self.assertIn('patterns: [\n    [/^(\\d+) сум$/, m => `${m[1]} söm`]', written)
+            self.assertEqual(read_uz_strings(path), built)
+
+    def test_publish_needs_post_and_reports_a_missing_node_without_touching_files(self):
+        from unittest import mock
+        self.login()
+        publish_url = reverse('admin:publish')
+        self.assertEqual(self.client.get(publish_url).status_code, 405)
+        content = (settings.SITE_ROOT / 'content.js').read_bytes()
+        with mock.patch('content.publish.find_node', return_value=None):
+            response = self.client.post(publish_url, follow=True)
+        self.assertContains(response, 'Не найден Node.js')
+        self.assertEqual((settings.SITE_ROOT / 'content.js').read_bytes(), content)
+
+    def test_failed_build_restores_the_site_files(self):
+        from types import SimpleNamespace
+        from unittest import mock
+        from .models import PageText
+        from .publish import PublishError, publish_site
+        PageText.objects.filter(key='hero.text1').update(text='Черновик, который не должен попасть на сайт')
+        paths = [settings.SITE_ROOT / 'content.js', settings.SITE_ROOT / 'assets' / 'i18n' / 'uz.js']
+        before = [path.read_bytes() for path in paths]
+        failed = SimpleNamespace(returncode=1, stdout='', stderr='Error: Text hero.text1 is too long\n')
+        with mock.patch('content.publish.find_node', return_value='node'), \
+                mock.patch('content.publish.subprocess.run', return_value=failed):
+            with self.assertRaisesMessage(PublishError, 'Text hero.text1 is too long'):
+                publish_site()
+        self.assertEqual([path.read_bytes() for path in paths], before)
+
+    def test_publish_is_hidden_from_staff_who_are_not_the_owner(self):
+        self.user.is_superuser = False
+        self.user.save()
+        self.login()
+        self.assertNotContains(self.client.get(self.index_url), 'publish-form')
