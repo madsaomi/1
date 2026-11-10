@@ -2,6 +2,7 @@
 !Dockerfile
 !requirements.txt
 !manage.py
+!entrypoint.sh
 !config/
 !config/**
 !content/

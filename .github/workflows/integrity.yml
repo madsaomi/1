@@ -115,6 +115,34 @@ jobs:
       - name: Build the admin image
         run: docker build -t stanford-cms .
 
+      - name: Smoke-test media ownership and dropped privileges
+        run: |
+          set -euo pipefail
+          task_media_volume="stanford-cms-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker volume create "$task_media_volume"
+          trap 'docker volume rm "$task_media_volume"' EXIT
+          docker run --rm --entrypoint sh \
+            --mount "type=volume,source=$task_media_volume,target=/app/media" \
+            stanford-cms -c 'chown 0:0 /app/media; chmod 0700 /app/media; printf before > /app/media/before.txt'
+          docker run --rm \
+            --mount "type=volume,source=$task_media_volume,target=/app/media" \
+            stanford-cms python -c 'import os; from pathlib import Path; media = Path("/app/media"); assert os.geteuid() == 10001; assert media.stat().st_uid == 10001; assert (media / "before.txt").stat().st_uid == 10001; assert (media / "before.txt").read_text() == "before"; (media / "written.txt").write_text("ok"); (media / "external-link").symlink_to("/etc"); print("PASS: uid 10001 can write the root-owned mounted volume")'
+          if docker run --rm \
+            --mount "type=volume,source=$task_media_volume,target=/app/media" \
+            stanford-cms true; then
+            echo "The entrypoint unexpectedly accepted a media symlink" >&2
+            exit 1
+          fi
+          if docker run --rm --env MEDIA_ROOT=/tmp stanford-cms true; then
+            echo "The entrypoint unexpectedly accepted a different media path" >&2
+            exit 1
+          fi
+          if docker run --rm --entrypoint sh stanford-cms \
+            -c 'rmdir /app/media; ln -s /tmp /app/media; exec /usr/local/bin/stanford-entrypoint true'; then
+            echo "The entrypoint unexpectedly accepted a symlink as its media root" >&2
+            exit 1
+          fi
+
   hr:
     name: HR API (career form)
     runs-on: ubuntu-latest
