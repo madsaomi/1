@@ -23,7 +23,6 @@
 
   const form = document.querySelector('#career-form');
   const result = document.querySelector('#career-result');
-  const summary = document.querySelector('#career-summary');
   const status = document.querySelector('#career-status');
   const submit = document.querySelector('#career-submit');
   const about = document.querySelector('#cf-about');
@@ -33,7 +32,7 @@
   const photoEmpty = document.querySelector('#photo-empty');
   const photoRemove = document.querySelector('#photo-remove');
   const endpointMeta = document.querySelector('meta[name="career-endpoint"]');
-  if (!form || !result || !summary) return;
+  if (!form || !result) return;
 
   let photoData = '';
   let sending = false;
@@ -128,6 +127,13 @@
   photoRemove?.addEventListener('click', clearPhoto);
 
   const wordLimits = { name: 6, education: 12, certificates: 12, about: 60 };
+  form.elements.phone?.addEventListener('paste', event => {
+    event.preventDefault();
+    let digits = (event.clipboardData?.getData('text') || '').replace(/\D/g, '');
+    if (digits.length > 9 && digits.startsWith('998')) digits = digits.slice(3);
+    form.elements.phone.value = digits.slice(0, 9);
+    validateField(form.elements.phone);
+  });
   const validateField = field => {
     const text = field.value.trim();
     let message = '';
@@ -135,7 +141,7 @@
       if (text && !/\p{L}/u.test(text)) message = 'Введите текст, а не только цифры.';
       if (text.split(/\s+/u).filter(Boolean).length > wordLimits[field.name]) message = `Максимум ${wordLimits[field.name]} слов.`;
     }
-    if (field.name === 'phone' && text && !/^\+?998\d{9}$/.test(text.replace(/[\s()-]/g, ''))) message = 'Введите номер +998 и 9 цифр.';
+    if (field.name === 'phone' && text && !/^\d{9}$/.test(text)) message = 'Введите номер +998 и 9 цифр.';
     if (field.name === 'telegram' && text && !/^@?[A-Za-z][A-Za-z0-9_]{4,31}$/.test(text)) message = 'Введите @username: 5–32 символа, первая — буква.';
     field.setCustomValidity(message);
   };
@@ -143,7 +149,12 @@
     const field = form.elements[name];
     field?.addEventListener('input', () => {
       if (name === 'name') field.value = field.value.replace(/[^\p{L}\s'’.\-]/gu, '');
-      if (name === 'phone') field.value = field.value.replace(/[^\d+\s()-]/g, '');
+      if (name === 'phone') {
+        let digits = field.value.replace(/\D/g, '');
+        if (digits.length > 9 && digits.startsWith('998')) digits = digits.slice(3);
+        field.value = digits.slice(0, 9);
+      }
+      if (name === 'telegram') field.value = field.value.replace(/[^A-Za-z0-9_@]/g, '').replace(/(?!^)@/g, '');
       validateField(field);
     });
   });
@@ -152,34 +163,17 @@
     if (aboutCount) aboutCount.textContent = String(about.value.length);
   });
 
-  const buildSummary = () => [
-    'Анкета Stanford Language Center',
-    `Дата: ${new Date().toLocaleDateString('ru-RU')}`,
-    '',
-    `ФИО: ${value('name')}`,
-    `Телефон: ${value('phone')}`,
-    value('telegram') ? `Telegram: ${value('telegram')}` : null,
-    `Вакансия: ${value('position')}`,
-    `Опыт преподавания: ${value('experience')}`,
-    `Уровень английского: ${value('level')}`,
-    value('education') ? `Образование: ${value('education')}` : null,
-    value('certificates') ? `Сертификаты: ${value('certificates')}` : null,
-    '',
-    'О себе:',
-    value('about')
-  ].filter(line => line !== null).join('\n');
-
   const showResult = () => {
-    summary.textContent = buildSummary();
+    document.querySelector('.career-head')?.setAttribute('hidden', '');
     form.hidden = true;
     result.hidden = false;
     result.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-    summary.focus?.();
+    document.querySelector('#career-success-title')?.focus();
   };
 
   const payload = () => ({
     name: value('name'),
-    phone: value('phone'),
+    phone: '+998' + value('phone'),
     telegram: value('telegram'),
     position: value('position'),
     experience: value('experience'),

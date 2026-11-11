@@ -449,7 +449,7 @@ window.schoolContent = {
     "career.text3": "На главную",
     "career.text4": "Stanford Language Center",
     "career.title2": "Работа в Stanford",
-    "career.text5": "Заполните анкету — отдел кадров получит готовое PDF-резюме.",
+    "career.text5": "Заполните анкету — отдел кадров получит ваше резюме.",
     "career.alt1": "Предпросмотр фото",
     "career.text6": "Фото",
     "career.text7": "Портрет для резюме. JPG, PNG или WebP.",

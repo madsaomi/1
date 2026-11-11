@@ -1416,18 +1416,12 @@ html[data-theme] .course-special { background: var(--dark-panel); color: var(--o
 .form-note a { color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .career-result { display: grid; gap: var(--space-3); }
 .career-result .section-top { margin-bottom: 0; }
-.career-summary {
-  margin: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
-  color: var(--ink);
-  font: 400 var(--text-14)/1.6 var(--font);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.career-summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.career-home { justify-self: start; margin-top: var(--space-2); }
+.career-phone { display: flex; align-items: center; border: 1px solid var(--glass-border); border-radius: 14px; background: var(--glass-bg); overflow: hidden; }
+.career-phone > span { padding-left: var(--space-2); font-weight: 600; color: var(--ink); }
+.form-field .career-phone input { min-width: 0; border: 0; border-radius: 0; background: transparent; }
+.career-phone:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.form-field .career-phone input:focus-visible { outline: none; }
 #career-status { min-height: 1.5em; }
 @media (min-width: 768px) {
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
