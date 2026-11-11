@@ -278,22 +278,6 @@ window.schoolContent = {
             "url": "https://yandex.uz/maps/-/CXbaBC64"
           }
         ]
-      },
-      {
-        "id": "youth-center",
-        "name": "Филиал «Жазлар ораый»",
-        "address": "Центр молодёжи",
-        "coordinates": [
-          59.604319,
-          42.4576377
-        ],
-        "googleEmbed": "https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d735.9002264880083!2d59.6037444!3d42.4575069!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x41dd9bfa1b8a33fd%3A0x5ee2e3a48c877e81!2sJaslar%20oray%C4%B1!5e0!3m2!1sen!2s!4v1793096759095!5m2!1sen!2s",
-        "maps": [
-          {
-            "provider": "google",
-            "url": "https://maps.app.goo.gl/gpwS4FxMVecFB4T4A"
-          }
-        ]
       }
     ]
   },
