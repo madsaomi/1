@@ -77,7 +77,7 @@
     const image = new Image();
     image.onload = () => {
       URL.revokeObjectURL(url);
-      const max = 1200;
+      const max = 800;
       const scale = Math.min(1, max / Math.max(image.naturalWidth, image.naturalHeight));
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(200, Math.round(image.naturalWidth * scale));
@@ -85,13 +85,13 @@
       const context = canvas.getContext('2d');
       if (!context) { reject(new Error('image')); return; }
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      let quality = 0.82;
+      let quality = 0.75;
       let data = canvas.toDataURL('image/jpeg', quality);
-      while (data.length > 700 * 1024 && quality > 0.5) {
+      while (data.length > 250 * 1024 && quality > 0.4) {
         quality -= 0.08;
         data = canvas.toDataURL('image/jpeg', quality);
       }
-      if (data.length < 3000 || data.length > 1.2 * 1024 * 1024) {
+      if (data.length < 100 || data.length > 350 * 1024) {
         reject(new Error('image'));
         return;
       }
@@ -126,6 +126,27 @@
     }
   });
   photoRemove?.addEventListener('click', clearPhoto);
+
+  const wordLimits = { name: 6, education: 12, certificates: 12, about: 60 };
+  const validateField = field => {
+    const text = field.value.trim();
+    let message = '';
+    if (wordLimits[field.name]) {
+      if (text && !/\p{L}/u.test(text)) message = 'Введите текст, а не только цифры.';
+      if (text.split(/\s+/u).filter(Boolean).length > wordLimits[field.name]) message = `Максимум ${wordLimits[field.name]} слов.`;
+    }
+    if (field.name === 'phone' && text && !/^\+?998\d{9}$/.test(text.replace(/[\s()-]/g, ''))) message = 'Введите номер +998 и 9 цифр.';
+    if (field.name === 'telegram' && text && !/^@?[A-Za-z][A-Za-z0-9_]{4,31}$/.test(text)) message = 'Введите @username: 5–32 символа, первая — буква.';
+    field.setCustomValidity(message);
+  };
+  ['name', 'phone', 'telegram', 'education', 'certificates', 'about'].forEach(name => {
+    const field = form.elements[name];
+    field?.addEventListener('input', () => {
+      if (name === 'name') field.value = field.value.replace(/[^\p{L}\s'’.\-]/gu, '');
+      if (name === 'phone') field.value = field.value.replace(/[^\d+\s()-]/g, '');
+      validateField(field);
+    });
+  });
 
   about?.addEventListener('input', () => {
     if (aboutCount) aboutCount.textContent = String(about.value.length);
@@ -180,6 +201,7 @@
       setStatus('Добавьте фото.', 'error');
       return;
     }
+    ['name', 'phone', 'telegram', 'education', 'certificates', 'about'].forEach(name => validateField(form.elements[name]));
     if (!form.reportValidity()) return;
     sending = true;
     submit?.setAttribute('disabled', '');

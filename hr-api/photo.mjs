@@ -38,12 +38,12 @@ export async function sanitizePhoto(dataUrl) {
   try {
     output = await sharp(input)
       .rotate()
-      .resize(900, 900, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 82, mozjpeg: true })
+      .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 75, mozjpeg: true })
       .toBuffer();
   } catch {
     throw new ValidationError('photo', 'Не удалось обработать фото');
   }
-  if (!output.length || output.length > 700 * 1024) throw new ValidationError('photo', 'Фото слишком большое');
+  if (!output.length || output.length > 250 * 1024) throw new ValidationError('photo', 'Фото слишком большое');
   return output;
 }

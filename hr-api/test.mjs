@@ -48,6 +48,14 @@ test('photo is re-encoded and capped', async () => {
   await assert.rejects(() => sanitizePhoto('data:image/png;base64,AAAA'), ValidationError);
 });
 
+test('field types and word limits reject numeric prose and malformed contacts', () => {
+  for (const patch of [
+    { education: '23112123' }, { about: '1'.repeat(30) },
+    { name: 'Имя '.repeat(7).trim() }, { about: 'я '.repeat(61).trim() },
+    { phone: '+998901234567abc' }, { telegram: '21321312213' }
+  ]) assert.throws(() => validateApplication({ ...base, ...patch }), ValidationError);
+});
+
 test('resume PDF is generated in memory', async () => {
   const source = await sharp({ create: { width: 600, height: 800, channels: 3, background: '#ffb703' } }).jpeg().toBuffer();
   const photo = await sanitizePhoto(`data:image/jpeg;base64,${source.toString('base64')}`);

@@ -1,10 +1,10 @@
 // Strict validation for the career form: only known fields, short texts and safe characters.
 export const LIMITS = {
-  name: { min: 2, max: 60 },
+  name: { min: 2, max: 60, words: 6 },
   telegram: { max: 32 },
-  education: { max: 80 },
-  certificates: { max: 80 },
-  about: { min: 20, max: 400 }
+  education: { max: 80, words: 12 },
+  certificates: { max: 80, words: 12 },
+  about: { min: 20, max: 400, words: 60 }
 };
 
 export const POSITIONS = [
@@ -31,7 +31,7 @@ export class ValidationError extends Error {
   }
 }
 
-export function cleanText(value, { field, min = 0, max, label, pattern } = {}) {
+export function cleanText(value, { field, min = 0, max, words, label, pattern } = {}) {
   if (typeof value !== 'string') throw new ValidationError(field, `${label}: неверный формат`);
   const clean = value
     .replace(CONTROL, ' ')
@@ -40,12 +40,15 @@ export function cleanText(value, { field, min = 0, max, label, pattern } = {}) {
     .trim();
   if (clean.length < min) throw new ValidationError(field, `${label}: слишком коротко (минимум ${min})`);
   if (clean.length > max) throw new ValidationError(field, `${label}: слишком длинно (максимум ${max})`);
+  if (words && clean.split(/\s+/u).filter(Boolean).length > words) throw new ValidationError(field, `${label}: максимум ${words} слов`);
+  if (clean && !/\p{L}/u.test(clean)) throw new ValidationError(field, `${label}: введите текст`);
   if (pattern && !pattern.test(clean)) throw new ValidationError(field, `${label}: недопустимые символы`);
   return clean;
 }
 
 export function normalizePhone(value) {
   if (typeof value !== 'string') throw new ValidationError('phone', 'Телефон: неверный формат');
+  if (!/^\+?[\d\s()-]+$/.test(value)) throw new ValidationError('phone', 'Телефон: допустимы только цифры и знаки форматирования');
   const digits = value.replace(/[^\d]/g, '');
   if (/^998\d{9}$/.test(digits)) return `+${digits}`;
   throw new ValidationError('phone', 'Телефон: нужен номер в формате +998 XX XXX XX XX');
@@ -55,7 +58,7 @@ export function normalizeTelegram(value) {
   if (value === undefined || value === '') return '';
   if (typeof value !== 'string') throw new ValidationError('telegram', 'Telegram: неверный формат');
   const name = value.trim().replace(/^@/, '');
-  if (!/^[A-Za-z0-9_]{5,32}$/.test(name)) throw new ValidationError('telegram', 'Telegram: ссылка или @username от 5 до 32 символов');
+  if (!/^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(name)) throw new ValidationError('telegram', 'Telegram: username от 5 до 32 символов, начинается с буквы');
   return `@${name}`;
 }
 
