@@ -3,7 +3,7 @@ FROM caddy:2-alpine
 WORKDIR /srv
 
 COPY Caddyfile /etc/caddy/Caddyfile
-COPY index.html results.html career.html content.js results.js career.js script.js theme-init.js style.css robots.txt ./
+COPY index.html results.html career.html teachers.html content.js results.js career.js script.js theme-init.js style.css robots.txt ./
 COPY assets/ ./assets/
 
 RUN caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

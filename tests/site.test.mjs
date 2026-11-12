@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readContent, validateContent, generate, generateResults, generateCareer, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
+import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
 
 const publishedData = readContent();
 const sourceHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -890,7 +890,7 @@ test('PLAN-053: no direction strip under the first screen; filters live in the c
 
 test('stats, teachers and results are generated from content and demo mode controls every sample marker', () => {
   const demo = { ...data.site, demoMode: true, demoLabels: true };
-  const live = { ...data.site, demoMode: false, demoLabels: false };
+  const live = { ...data.site, url: 'https://stanford.example/', demoMode: false, demoLabels: false };
   assert.match(renderDemoBanner(demo), /class="demo-banner"/);
   assert.equal(renderDemoBanner(live), '');
   assert.match(renderStats(data.stats, demo), /class="demo-tag">Пример<\/span><dl>/);
@@ -920,6 +920,44 @@ test('stats, teachers and results are generated from content and demo mode contr
   assert(liveHtml.includes('href="#teachers"') && liveHtml.includes('id="teachers"'));
 });
 
+test('featured teachers and results: index shows only admin-configured tops, results.html keeps everyone', () => {
+  const live = { ...data.site, url: 'https://stanford.example/', demoMode: false, demoLabels: false };
+  // Three featured teachers (1st, 2nd and 4th) among four: featuredOnly keeps them in order.
+  const tops = renderTeachers(data.teachers, live, { featuredOnly: true });
+  const topNames = [...tops.matchAll(/<h3>([^<]+)<\/h3>/g)].map(match => match[1]);
+  assert.deepEqual(topNames, ['Азиз Каримов', 'Дилноза Юсупова', 'Рустем Жумабаев']);
+  assert(tops.includes('href="teachers.html"'), 'The home page links to the full teachers list');
+  // A single-card grid stretches across the row, so mixed lists never leave gaps.
+  assert(!tops.includes('Айгуль'));
+  // Full list (results.html): everyone stays, featured first.
+  const full = renderTeachers(data.teachers, live);
+  assert.equal((full.match(/class="teacher-card"/g) || []).length, data.teachers.length);
+  assert([...full.matchAll(/<h3>([^<]+)<\/h3>/g)].map(match => match[1]).indexOf('Рустем Жумабаев') < [...full.matchAll(/<h3>([^<]+)<\/h3>/g)].map(match => match[1]).indexOf('Айгуль Бекмуратова'));
+  // Fallback: with no featured teacher the section shows everyone instead of an empty grid.
+  const none = renderTeachers(data.teachers.map(teacher => ({ ...teacher, featured: undefined })), live, { featuredOnly: true });
+  assert.equal((none.match(/class="teacher-card"/g) || []).length, data.teachers.length);
+  assert(!none.includes('href="teachers.html"'), 'No link when the full list is already shown');
+  // Results: featured first on the home page, all cards on results.html.
+  const resultTops = renderResults(data.results, live, { featuredOnly: true });
+  assert.equal((resultTops.match(/class="result-card"/g) || []).length, 2);
+  assert([...resultTops.matchAll(/class="result-name">([^<·]+)/g)].map(match => match[1].trim()).indexOf('Малика Т.') === 0);
+  const allResults = renderResults(data.results, live);
+  assert.equal((allResults.match(/class="result-card"/g) || []).length, data.results.length);
+  // The published pages follow the same rules.
+  const indexHtml = generate(html, { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
+  const teachersSection = indexHtml.slice(indexHtml.indexOf('<!-- TEACHERS_START -->'), indexHtml.indexOf('<!-- TEACHERS_END -->'));
+  assert.equal((teachersSection.match(/class="teacher-card"/g) || []).length, 3, 'index keeps only featured teachers');  const resultsSection = indexHtml.slice(indexHtml.indexOf('<!-- RESULTS_START -->'), indexHtml.indexOf('<!-- RESULTS_END -->'));
+  assert.equal((resultsSection.match(/class="result-card"/g) || []).length, 2, 'index keeps only featured results');
+  // The dedicated teachers page lists everyone (featured first) with its own canonical URL,
+  // while results.html stays about students only.
+  const teachersPage = generateTeachers(fs.readFileSync(new URL('../teachers.html', import.meta.url), 'utf8'), { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
+  assert.equal((teachersPage.match(/class="teacher-card"/g) || []).length, data.teachers.length);
+  assert(teachersPage.includes('rel="canonical" href="https://stanford.example/teachers.html"'));
+  assert(!teachersPage.includes('result-card'), 'The teachers page does not mix in student results');
+  const resultsPage = generateResults(fs.readFileSync(new URL('../results.html', import.meta.url), 'utf8'), { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
+  assert(!resultsPage.includes('teacher-card'), 'The results page does not mix in teachers');
+});
+
 test('content validation guards stats, teachers, results, photos and student consent', () => {
   const valid = () => structuredClone(data);
   assert.doesNotThrow(() => validateContent(valid()));
@@ -929,6 +967,8 @@ test('content validation guards stats, teachers, results, photos and student con
     content => { content.teachers[0].name = ''; },
     content => { content.teachers[0].photo = 'https://example.org/p.jpg'; },
     content => { content.teachers[0].photo = 'assets/uploads/missing.webp'; },
+    content => { content.teachers[0].featured = 'yes'; },
+    content => { content.results[0].featured = 1; },
     content => { content.results[0].quote = ''; },
     content => { content.site.demoMode = 'yes'; },
     content => { content.teachers = {}; }
@@ -1155,7 +1195,7 @@ test('a staged build uses its own data and validates every page before replacing
   const temporaryRoot = path.resolve(os.tmpdir());
   const stage = fs.mkdtempSync(path.join(temporaryRoot, 'stanford-site-build-'));
   try {
-    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html']) {
+    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html']) {
       fs.copyFileSync(new URL(`../${file}`, import.meta.url), path.join(stage, file));
     }
     fs.mkdirSync(path.join(stage, 'assets', 'i18n'), { recursive: true });

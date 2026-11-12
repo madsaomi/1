@@ -314,6 +314,8 @@ class Teacher(Ordered):
                               help_text='Вертикальное 4:5, JPG/PNG/WebP до 5 МБ. Без фото — инициалы.')
     photo_path = models.CharField('Фото из файлов сайта', max_length=240, blank=True, validators=[photo_path_validator],
                                   help_text='Сохраняется при импорте. Загруженное фото имеет приоритет.')
+    featured = models.BooleanField('Топ', default=False,
+                                   help_text='Отмеченные показываются в секции «Преподаватели» на главной; полный список — на странице результатов.')
     is_published = models.BooleanField('Показывать на сайте', default=True)
 
     class Meta(Ordered.Meta):
@@ -333,6 +335,8 @@ class StudentResult(Ordered):
     course = models.CharField('Курс и срок', max_length=60, blank=True, help_text='Например: IELTS, 4 месяца')
     consent = models.BooleanField('Есть согласие студента', default=False,
                                   help_text='Без согласия реальный отзыв не публикуется (вне демо-режима).')
+    featured = models.BooleanField('Топ', default=False,
+                                   help_text='Отмеченные показываются в блоке «Результаты студентов» на главной; полный список — на странице результатов.')
     is_published = models.BooleanField('Показывать на сайте', default=True)
 
     class Meta(Ordered.Meta):

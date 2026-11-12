@@ -220,7 +220,7 @@ class FullPublicationIntegrationTests(TestCase):
     def copy_site(self, root):
         site = root / 'site'
         site.mkdir()
-        for name in ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html',
+        for name in ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html',
                      'script.js', 'results.js', 'career.js', 'theme-init.js', 'style.css', 'robots.txt'):
             shutil.copyfile(settings.SITE_ROOT / name, site / name)
         shutil.copytree(settings.SITE_ROOT / 'assets', site / 'assets')

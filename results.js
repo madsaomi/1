@@ -21,7 +21,7 @@
 
   // Phones: the result cards rotate one by one; desktop keeps the full grid.
   const grid = document.querySelector('.results-grid-page');
-  if (!grid) return;
+  if (!grid || document.querySelector('.directory-page')) return;
   const items = [...grid.children];
   const phone = matchMedia('(max-width: 767px)');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');

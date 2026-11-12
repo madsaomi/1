@@ -115,12 +115,13 @@ class Command(BaseCommand):
         for order, item in enumerate(data.get('teachers') or []):
             self._save(Teacher(order=order, name=item['name'], role=item['role'],
                                qualification=item.get('qualification') or '', experience=item.get('experience') or '',
-                               photo_path=item.get('photo') or ''))
+                               featured=bool(item.get('featured')), photo_path=item.get('photo') or ''))
 
         for order, item in enumerate(data.get('results') or []):
             self._save(StudentResult(order=order, score=item['score'], exam=item['exam'],
                                      level=item.get('level') or '', quote=item['quote'], student=item['student'],
-                                     course=item.get('course') or '', consent=item.get('consent', False)))
+                                     course=item.get('course') or '', featured=bool(item.get('featured')),
+                                     consent=item.get('consent', False)))
 
         source = data.get('contacts') or {}
         contacts = Contacts(verified=source.get('verified', False), hr_telegram=source.get('hrTelegram') or '',

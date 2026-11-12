@@ -1,0 +1,74 @@
+name: stanford-local
+services:
+  prepare:
+    image: node:22-bookworm-slim
+    network_mode: none
+    volumes:
+      - .:/source:ro
+      - local_site:/site
+    command: [sh, -c, 'node /source/docker/local/prepare.mjs && chown -R 10001:10001 /site']
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: stanford_local
+      POSTGRES_USER: stanford_local
+      POSTGRES_PASSWORD: local-development-only
+    volumes:
+      - local_db:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U stanford_local -d stanford_local']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [local]
+  cms:
+    build: ./cms
+    environment:
+      DJANGO_LOCAL: '1'
+      SITE_LOCAL_ROOT: /site
+      SITE_PUBLISH_TARGET: local
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      POSTGRES_DB: stanford_local
+      POSTGRES_USER: stanford_local
+      POSTGRES_PASSWORD: local-development-only
+      POSTGRES_HOST: db
+      MEDIA_ROOT: /app/media
+    volumes:
+      - local_site:/site
+      - local_media:/app/media
+      - ./.cache/docker-local:/local-state
+      - ./docker/local/bootstrap.py:/local-bootstrap.py:ro
+    command: [sh, -c, 'python /local-bootstrap.py && exec python manage.py runserver 0.0.0.0:8000 --noreload']
+    depends_on:
+      db: {condition: service_healthy}
+      prepare: {condition: service_completed_successfully}
+    networks: [local]
+  hr-api:
+    build: ./hr-api
+    environment:
+      PORT: '8787'
+      ALLOWED_ORIGIN: http://localhost:8080
+      HR_DRY_RUN: '1'
+      HR_TRUST_PROXY_HOPS: '1'
+    networks: [local]
+  site:
+    image: caddy:2-alpine
+    ports: ['127.0.0.1:8080:8080', '127.0.0.1:8000:8000']
+    environment:
+      HR_API_UPSTREAM: hr-api:8787
+    volumes:
+      - local_site:/srv:ro
+      - ./Caddyfile:/etc/caddy/site.Caddyfile:ro
+      - ./docker/local/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      prepare: {condition: service_completed_successfully}
+      hr-api: {condition: service_healthy}
+    networks: [local, entry]
+networks:
+  entry:
+  local:
+    internal: true
+volumes:
+  local_site:
+  local_db:
+  local_media:

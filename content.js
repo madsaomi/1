@@ -183,13 +183,15 @@ window.schoolContent = {
       "name": "Азиз Каримов",
       "role": "General English · IELTS",
       "qualification": "IELTS 8.5",
-      "experience": "6 лет опыта"
+      "experience": "6 лет опыта",
+      "featured": true
     },
     {
       "name": "Дилноза Юсупова",
       "role": "Kids English",
       "qualification": "CELTA",
-      "experience": "5 лет опыта"
+      "experience": "5 лет опыта",
+      "featured": true
     },
     {
       "name": "Айгуль Бекмуратова",
@@ -201,7 +203,8 @@ window.schoolContent = {
       "name": "Рустем Жумабаев",
       "role": "Математика · SAT",
       "qualification": "SAT Math 780",
-      "experience": "7 лет опыта"
+      "experience": "7 лет опыта",
+      "featured": true
     }
   ],
   "results": [
@@ -211,7 +214,8 @@ window.schoolContent = {
       "level": "C1",
       "quote": "За четыре месяца Writing вырос с 6.0 до 7.5: каждое эссе разбирали с преподавателем.",
       "student": "Малика Т.",
-      "course": "IELTS, 4 месяца"
+      "course": "IELTS, 4 месяца",
+      "featured": true
     },
     {
       "score": "7.5",
@@ -227,7 +231,8 @@ window.schoolContent = {
       "level": "из 1600",
       "quote": "Math подтянул с Supporter, Reading — на пробных тестах каждую неделю.",
       "student": "Нурлан К.",
-      "course": "SAT, 5 месяцев"
+      "course": "SAT, 5 месяцев",
+      "featured": true
     }
   ],
   "contacts": {

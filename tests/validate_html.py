@@ -41,7 +41,7 @@ class Page(HTMLParser):
 
 
 def main():
-    for filename in ('index.html', 'results.html', 'career.html'):
+    for filename in ('index.html', 'results.html', 'career.html', 'teachers.html'):
         page = Page()
         page.feed((ROOT / filename).read_text(encoding='utf-8'))
         assert not page.errors, (filename, page.errors)

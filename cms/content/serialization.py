@@ -78,7 +78,7 @@ class _PageTextParser(HTMLParser):
 def read_page_texts(site_root):
     """Read slots from available site pages next to an imported content.js, in page order."""
     slots = {}
-    for name in ('index.html', 'results.html', 'career.html'):
+    for name in ('index.html', 'results.html', 'career.html', 'teachers.html'):
         path = Path(site_root) / name
         if not path.is_file():
             continue
@@ -230,6 +230,8 @@ def _teachers_data(photo_files=None):
             item['qualification'] = teacher.qualification
         if teacher.experience:
             item['experience'] = teacher.experience
+        if teacher.featured:
+            item['featured'] = True
         photo = _photo_data(teacher, photo_files)
         if photo:
             item['photo'] = photo
@@ -248,6 +250,8 @@ def _results_data():
             item['course'] = result.course
         if result.consent:
             item['consent'] = True
+        if result.featured:
+            item['featured'] = True
         results.append(item)
     return results
 

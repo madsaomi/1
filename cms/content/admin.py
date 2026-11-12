@@ -193,11 +193,11 @@ class LocationAdmin(ModelAdmin):
 
 @admin.register(Teacher)
 class TeacherAdmin(ModelAdmin):
-    list_display = ['photo_preview', 'name', 'role', 'qualification', 'experience', 'is_published', 'order']
+    list_display = ['photo_preview', 'name', 'role', 'qualification', 'experience', 'featured', 'is_published', 'order']
     list_display_links = ['photo_preview', 'name']
-    list_editable = ['is_published', 'order']
+    list_editable = ['featured', 'is_published', 'order']
     search_fields = ['name', 'role']
-    fields = ['name', 'role', 'qualification', 'experience', 'photo', 'photo_path', 'is_published', 'order']
+    fields = ['name', 'role', 'qualification', 'experience', 'photo', 'photo_path', 'featured', 'is_published', 'order']
 
     @admin.display(description='Фото')
     def photo_preview(self, obj):
@@ -206,13 +206,13 @@ class TeacherAdmin(ModelAdmin):
 
 @admin.register(StudentResult)
 class StudentResultAdmin(ModelAdmin):
-    list_display = ['score', 'exam', 'level', 'student', 'consent', 'is_published', 'order']
-    list_editable = ['is_published', 'order']
-    list_filter = ['exam', 'consent', 'is_published']
+    list_display = ['score', 'exam', 'level', 'student', 'featured', 'consent', 'is_published', 'order']
+    list_editable = ['featured', 'is_published', 'order']
+    list_filter = ['exam', 'featured', 'consent', 'is_published']
     fieldsets = [
         ('Результат', {'fields': [('score', 'exam', 'level')]}),
         ('Отзыв', {'fields': ['quote', ('student', 'course')]}),
-        ('Публикация', {'fields': ['consent', 'is_published', 'order']}),
+        ('Публикация', {'fields': ['featured', 'consent', 'is_published', 'order']}),
     ]
 
 

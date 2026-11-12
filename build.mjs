@@ -97,10 +97,12 @@ export function validateContent(data) {
   for (const stat of stats) if (!text(stat.value, 12) || !text(stat.label, 40)) throw new Error('Stat needs a short value and label');
   for (const teacher of teachers) {
     if (!text(teacher.name, 60) || !text(teacher.role, 80) || !optionalText(teacher.qualification, 40) || !optionalText(teacher.experience, 40)) throw new Error('Teacher needs a name, role and short optional details');
+    if (teacher.featured !== undefined && typeof teacher.featured !== 'boolean') throw new Error('Teacher featured must be true or false');
     validatePhoto(teacher.photo, 'Use an existing local teacher photo');
   }
   for (const result of results) {
     if (!text(result.score, 8) || !text(result.exam, 20) || !optionalText(result.level, 20) || !text(result.quote, 240) || !text(result.student, 40) || !optionalText(result.course, 60)) throw new Error('Result needs a score, exam, quote and student');
+    if (result.featured !== undefined && typeof result.featured !== 'boolean') throw new Error('Result featured must be true or false');
     // Real student results are published only with the student's consent; demo samples are announced as examples instead.
     if (!demo && result.consent !== true) throw new Error('Publish a real student result only with consent');
   }
@@ -187,18 +189,32 @@ export function initials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
 }
 
-export function renderTeachers(teachers = [], site) {
-  const heading = `<div class="section-top"><h2 id="teachers-title">Преподаватели${demoTag(site)}</h2></div>`;
-  if (!teachers.length) return heading;
-  const cards = teachers.map(teacher => {
+export function renderTeachers(teachers = [], site, { featuredOnly = false, heading = true, profile = false } = {}) {
+  const head = heading ? `<div class="section-top"><h2 id="teachers-title">Преподаватели${demoTag(site)}</h2></div>\n` : '';
+  // Featured (admin-configured tops) come first; the original order is kept inside each group.
+  const sorted = [...teachers].sort((a, b) => (b.featured === true) - (a.featured === true));
+  let shown = sorted;
+  if (featuredOnly) {
+    const featured = sorted.filter(teacher => teacher.featured === true);
+    // Graceful fallback: with no featured teacher configured the section keeps showing everyone.
+    shown = featured.length ? featured : sorted;
+  }
+  if (!teachers.length) return heading ? `${head}` : '';
+  const cards = shown.map(teacher => {
     const name = escapeHTML(teacher.name);
     const portrait = teacher.photo
       ? `<img class="teacher-photo" src="${escapeHTML(teacher.photo)}" alt="Фото: ${name}" width="600" height="750" loading="lazy" decoding="async">`
       : `<div class="teacher-initials" aria-hidden="true">${escapeHTML(initials(teacher.name))}</div>`;
-    const chips = [teacher.qualification && `<li class="teacher-chip-key">${escapeHTML(teacher.qualification)}</li>`, teacher.experience && `<li>${escapeHTML(teacher.experience)}</li>`].filter(Boolean).join('');
-    return `<article class="teacher-card">${portrait}<div class="teacher-body"><h3>${name}</h3><p>${escapeHTML(teacher.role)}</p>${chips ? `<ul class="teacher-chips">${chips}</ul>` : ''}</div></article>`;
+    const chipIcons = {
+      qualification: '<svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="9" r="5"/><path d="M8.5 13.5 7 21l5-2.8L17 21l-1.5-7.5"/></svg>',
+      experience: '<svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+    };
+    const chips = [teacher.qualification && `<li class="teacher-chip-key">${chipIcons.qualification}${escapeHTML(teacher.qualification)}</li>`, teacher.experience && `<li>${chipIcons.experience}${escapeHTML(teacher.experience)}</li>`].filter(Boolean).join('');
+    // The full list uses the tilt card of assets/ui.js; the home section keeps the plain card.
+    return `<article class="teacher-card"${profile ? ' data-tilt' : ''}>${profile ? '<span class="result-shine" aria-hidden="true"></span>' : ''}${portrait}<div class="teacher-body"><h3>${name}</h3><p>${escapeHTML(teacher.role)}</p>${chips ? `<ul class="teacher-chips">${chips}</ul>` : ''}</div></article>`;
   }).join('');
-  return `${heading}\n<div class="team-grid">${cards}</div>`;
+  const more = featuredOnly && shown.length < sorted.length ? `\n<a class="text-link results-more" href="teachers.html">Все преподаватели${svgIcon('arrow-right')}</a>` : '';
+  return `${head}<div class="team-grid">${cards}</div>${more}`;
 }
 
 // One card per published student result; reused by the home section and the full results page.
@@ -206,11 +222,19 @@ export function renderResultCards(results = []) {
   return results.map(result => `<article class="result-card"><div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></article>`).join('');
 }
 
-export function renderResults(results = [], site) {
+export function renderResults(results = [], site, { featuredOnly = false } = {}) {
   if (!results.length) return '';
+  // Featured (admin-configured tops) come first; the original order is kept inside each group.
+  const sorted = [...results].sort((a, b) => (b.featured === true) - (a.featured === true));
+  let shown = sorted;
+  if (featuredOnly) {
+    const featured = sorted.filter(result => result.featured === true);
+    // Graceful fallback: with no featured result configured the section keeps showing everything.
+    shown = featured.length ? featured : sorted;
+  }
   return `<section data-reveal class="section wrap results-section" id="results" aria-labelledby="results-title">
 <div class="section-top"><h2 id="results-title">Результаты студентов${demoTag(site)}</h2></div>
-<div class="results-grid">${renderResultCards(results)}</div>
+<div class="results-grid">${renderResultCards(shown)}</div>
 <a class="text-link results-more" href="results.html">Все результаты${svgIcon('arrow-right')}</a>
 </section>`;
 }
@@ -370,8 +394,8 @@ export function generate(html, data) {
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
   html = replaceBlock(html, 'BANNER', renderDemoBanner(data.site));
   html = replaceBlock(html, 'STATS', renderStats(data.stats, data.site));
-  html = replaceBlock(html, 'TEACHERS', renderTeachers(data.teachers, data.site));
-  html = replaceBlock(html, 'RESULTS', renderResults(data.results, data.site));
+  html = replaceBlock(html, 'TEACHERS', renderTeachers(data.teachers, data.site, { featuredOnly: true }));
+  html = replaceBlock(html, 'RESULTS', renderResults(data.results, data.site, { featuredOnly: true }));
   html = replaceBlock(html, 'CASHBACK', renderCashback(data.cashback));
   html = replaceBlock(html, 'REWARD', renderHeroReward(data.cashback));
   html = replaceBlock(html, 'FAB', renderContactFab(data.contacts));
@@ -386,12 +410,91 @@ export function generate(html, data) {
 }
 
 // The full results page grows with the admin data: every published result becomes a card.
+// --- Results page showcase -------------------------------------------------------------------------------------------
+// Everything here is derived from the published results, so the page never states a figure the list does not contain.
+const numericScore = result => Number(String(result.score).replace(',', '.'));
+function bestByExam(results = []) {
+  const best = new Map();
+  for (const result of results) {
+    const value = numericScore(result);
+    if (!Number.isFinite(value)) continue;
+    if (!best.has(result.exam) || value > numericScore(best.get(result.exam))) best.set(result.exam, result);
+  }
+  return [...best.values()];
+}
+const scoreLabels = results => [...new Set(results.map(result => `${result.exam} ${result.score}`))];
+
+// Profile cards of the full list: the same texts as the home cards plus an initials avatar and a highlight layer.
+export function renderResultProfiles(results = []) {
+  return results.map(result => `<article class="result-card" data-tilt><span class="result-shine" aria-hidden="true"></span><div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><div class="result-person"><span class="result-avatar" aria-hidden="true">${escapeHTML(initials(result.student))}</span><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></div></article>`).join('');
+}
+
+// Decorative line of scores that take turns (assets/ui.js); the cards below carry the same facts for everyone.
+function loopMarkup(labels) {
+  if (!labels.length) return '';
+  return `<p class="text-loop" data-loop aria-hidden="true">${labels.map((label, index) => `<span${index ? '' : ' class="is-active"'}>${escapeHTML(label)}</span>`).join('')}</p>`;
+}
+export function renderResultLoop(results = []) {
+  return loopMarkup(scoreLabels(results));
+}
+
+// Best published score per exam, as rolling counters.
+export function renderResultSummary(results = []) {
+  const best = bestByExam(results);
+  if (!best.length) return '';
+  return `<dl class="score-tiles">${best.map(result => `<div><dt>${escapeHTML(result.exam)}</dt><dd data-roll>${escapeHTML(result.score)}</dd></div>`).join('')}</dl>`;
+}
+
+export function renderResultBadge(results = []) {
+  const top = results[0];
+  return top ? `<span class="lanyard-score">${escapeHTML(`${top.exam} ${top.score}`)}</span>` : '';
+}
+
+// Two rows that move only while the page scrolls: large labels, then brand marks between short labels.
+function bandMarkup(large, small) {
+  if (!large.length || !small.length) return '';
+  const fill = (items, minimum) => Array.from({ length: Math.max(minimum, items.length) }, (_, index) => items[index % items.length]);
+  const first = fill(large, 8).map(label => `<span>${escapeHTML(label)}</span>`).join('');
+  const second = fill(small, 8).map(label => `<span class="band-mark"><img src="assets/stanford-icon.svg" alt="" width="32" height="32"></span><span>${escapeHTML(label)}</span>`).join('');
+  // Each track holds its content twice, so the row can loop without a visible seam.
+  return `<div class="scroll-band" data-scroll-band aria-hidden="true"><div class="scroll-row"><div class="scroll-track scroll-track-scores">${first}${first}</div></div><div class="scroll-row"><div class="scroll-track scroll-track-marks">${second}${second}</div></div></div>`;
+}
+export function renderResultBand(results = []) {
+  return bandMarkup(scoreLabels(results), [...new Set(results.map(result => result.exam))]);
+}
+
+// Teachers page: the same decoration built from the published qualifications (e.g. «IELTS 8.5», «CELTA»).
+const qualifications = teachers => [...new Set(teachers.map(teacher => teacher.qualification).filter(Boolean))];
+export function renderTeacherLoop(teachers = []) {
+  return loopMarkup(qualifications(teachers));
+}
+export function renderTeacherBand(teachers = []) {
+  const labels = qualifications(teachers);
+  return bandMarkup(labels, [...labels].reverse());
+}
+
 export function generateResults(html, data) {
   html = html.replace(/\r\n/g, '\n');
   validateContent(data);
-  html = replaceBlock(html, 'RESULTS_LIST', renderResultCards(data.results));
+  html = replaceBlock(html, 'RESULTS_LIST', renderResultProfiles(data.results));
+  html = replaceBlock(html, 'LOOP', renderResultLoop(data.results));
+  html = replaceBlock(html, 'SUMMARY', renderResultSummary(data.results));
+  html = replaceBlock(html, 'BADGE', renderResultBadge(data.results));
+  html = replaceBlock(html, 'BAND', renderResultBand(data.results));
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'results.html'));
+  return versionContentAssets(applyTexts(html, data.texts), data);
+}
+
+// The teachers page lists everyone (featured first); the home page shows only the admin-configured tops.
+export function generateTeachers(html, data) {
+  html = html.replace(/\r\n/g, '\n');
+  validateContent(data);
+  html = replaceBlock(html, 'TEACHERS', renderTeachers(data.teachers, data.site, { heading: false, profile: true }));
+  html = replaceBlock(html, 'LOOP', renderTeacherLoop(data.teachers));
+  html = replaceBlock(html, 'BAND', renderTeacherBand(data.teachers));
+  html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'teachers.html'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
 
@@ -408,6 +511,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(proces
   const pages = [
     { file: new URL('./index.html', import.meta.url), build: generate, label: 'index.html' },
     { file: new URL('./results.html', import.meta.url), build: generateResults, label: 'results.html' },
+    { file: new URL('./teachers.html', import.meta.url), build: generateTeachers, label: 'teachers.html' },
     { file: new URL('./career.html', import.meta.url), build: generateCareer, label: 'career.html' }
   ];
   let stale = false;

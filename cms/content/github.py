@@ -18,8 +18,8 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-SOURCE_FILES = ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'assets/i18n/uz.js')
-OUTPUT_FILES = frozenset(('content.js', 'index.html', 'results.html', 'career.html', 'assets/i18n/uz.js'))
+SOURCE_FILES = ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'assets/i18n/uz.js')
+OUTPUT_FILES = frozenset(('content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'assets/i18n/uz.js'))
 PHOTO_PATH = re.compile(r'assets/[a-z0-9/_-]+\.(?:jpe?g|webp|png)\Z')
 
 
