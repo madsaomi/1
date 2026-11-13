@@ -20,6 +20,7 @@ if not Course.objects.exists():
     call_command('import_content', '/site/content.js')
 else:
     call_command('sync_page_texts')
+call_command('sync_translations')
 from content.publish import publish_site
 publish_site()
 state = Path('/local-state')

@@ -6,6 +6,7 @@
 //   data-tilt          card that leans towards the pointer with a moving highlight (Profile Card)
 //   data-scroll-band   rows of large text and logos that move only while the page scrolls (Scroll Velocity, Logo Loop)
 //   data-swing         hanging badge that follows the pointer a little (Lanyard)
+//   data-countdown     event date with an explicit UTC offset; counts down to the real instant
 (() => {
   if (typeof document === 'undefined') return;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -22,6 +23,63 @@
       observer.observe(element);
     } catch { run(); }
   };
+
+  // Events keep their published date visible without JavaScript. Only changed values animate,
+  // and timers sleep while the document or event is out of view.
+  each('[data-countdown]', element => {
+    const raw = element.getAttribute('data-countdown') || '';
+    if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(raw)) return;
+    const target = Date.parse(raw);
+    if (!Number.isFinite(target)) return;
+    const units = ['days', 'hours', 'minutes', 'seconds'];
+    const cells = units.map(unit => element.querySelector(`[data-unit="${unit}"]`));
+    if (cells.some(cell => !cell)) return;
+    const status = element.closest('.event-card')?.querySelector('[data-countdown-status]');
+    let timer;
+    let visible = true;
+    let initialized = false;
+    let finished = false;
+    const stop = () => { clearTimeout(timer); timer = undefined; };
+    const render = () => {
+      stop();
+      const seconds = Math.max(0, Math.ceil((target - Date.now()) / 1000));
+      const values = [Math.floor(seconds / 86400), Math.floor(seconds / 3600) % 24,
+        Math.floor(seconds / 60) % 60, seconds % 60];
+      cells.forEach((cell, index) => {
+        const text = String(values[index]).padStart(2, '0');
+        if (cell.textContent === text) return;
+        cell.textContent = text;
+        if (initialized && !reduced.matches) {
+          cell.classList.add('is-changing');
+          setTimeout(() => cell.classList.remove('is-changing'), 350);
+        }
+      });
+      initialized = true;
+      finished = seconds === 0;
+      if (finished) {
+        element.classList.add('has-started');
+        if (status) status.textContent = element.getAttribute('data-started-label') || 'Событие началось';
+      } else if (visible && !document.hidden) {
+        // Align to the wall clock, so delayed background tabs never accumulate timer drift.
+        timer = setTimeout(render, 1000 - Date.now() % 1000 + 10);
+      }
+    };
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stop();
+      else if (visible && !finished) render();
+    });
+    if (typeof IntersectionObserver !== 'undefined') {
+      try {
+        const observer = new IntersectionObserver(entries => {
+          visible = entries.some(entry => entry.isIntersecting);
+          if (!visible) stop();
+          else if (!finished) render();
+        });
+        observer.observe(element);
+      } catch { /* The countdown still works when observers are unavailable. */ }
+    }
+    render();
+  });
 
   // Counter: each digit rolls up to its value once the number is on screen.
   each('[data-roll]', element => {

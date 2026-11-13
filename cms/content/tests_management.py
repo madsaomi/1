@@ -165,7 +165,9 @@ class PhotoPublicationTests(TestCase):
                                  'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'}})
     def test_file_with_image_extension_but_invalid_bytes_cannot_be_published(self):
         teacher = Teacher.objects.first()
-        teacher.photo.save('fake.jpg', ContentFile(b'not an image'))
+        # Simulate a damaged legacy file; new uploads are rejected at the save boundary.
+        path = teacher.photo.field.storage.save('fake.jpg', ContentFile(b'not an image'))
+        Teacher.objects.filter(pk=teacher.pk).update(photo=path)
         with self.assertRaisesMessage(CommandError, 'Не удалось подготовить фото'):
             build_content()
 
@@ -237,7 +239,10 @@ class FullPublicationIntegrationTests(TestCase):
 
     def test_real_node_build_publishes_owner_text_and_sanitized_uploaded_photo(self):
         from .publish import publish_site
+        from .models import PageText
+        from .serialization import read_translation_strings
         teacher = self.edit_draft_and_upload_photo()
+        PageText.objects.filter(key='hero.text1').update(uz='Nashr sinovi', kaa='Járiyalaw sınawı')
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             site = self.copy_site(root)
@@ -248,6 +253,10 @@ class FullPublicationIntegrationTests(TestCase):
             data = read_content(site / 'content.js')
             self.assertEqual(data['texts']['hero.text1'], 'Текст интеграционного теста публикации')
             self.assertIn('Текст интеграционного теста публикации', (site / 'index.html').read_text(encoding='utf-8'))
+            for code, expected in (('uz', 'Nashr sinovi'), ('kaa', 'Járiyalaw sınawı')):
+                dictionary = site / 'assets' / 'i18n' / f'{code}.js'
+                self.assertEqual(read_translation_strings(dictionary)['Текст интеграционного теста публикации'], expected)
+                self.assertRegex((site / 'index.html').read_text(encoding='utf-8'), rf'assets/i18n/{code}\.js\?v=\d+')
             photo = next(item['photo'] for item in data['teachers'] if item['name'] == teacher.name)
             self.assertRegex(photo, r'^assets/uploads/[0-9a-f]{64}\.jpg$')
             self.assertTrue((site / photo).is_file())

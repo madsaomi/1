@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
+import http from 'node:http';
 import sharp from 'sharp';
 
 const directory = fileURLToPath(new URL('.', import.meta.url));
@@ -41,6 +42,22 @@ function submit(base, headers = {}, body = '{}') {
     origin, 'content-type': 'application/json', 'x-career-request': '1', ...headers
   }, body });
 }
+
+test('a malformed absolute request target returns 400 without terminating the API process', async t => {
+  const base = new URL(await startApi(t));
+  const response = await new Promise((resolve, reject) => {
+    const request = http.request({ hostname: base.hostname, port: base.port, path: 'http://[', method: 'GET' }, response => {
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => resolve({ status: response.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+    });
+    request.on('error', reject);
+    request.end();
+  });
+  assert.equal(response.status, 400);
+  assert.equal(JSON.parse(response.body).error, 'invalid_url');
+  assert.equal((await fetch(new URL('/healthz', base))).status, 200);
+});
 
 test('intake fails closed without origin or delivery configuration, while health remains available', async t => {
   for (const overrides of [

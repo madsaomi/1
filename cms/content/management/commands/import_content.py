@@ -9,12 +9,15 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import IntegrityError, transaction
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 
 from pathlib import Path
 
-from content.models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Faq,
-                            Location, MapLink, PageText, Phone, SiteSettings, Stat, StudentResult, Teacher)
-from content.serialization import (CONTENT_MODELS, build_content, load_uz_strings, read_content, read_uz_strings,
+from content.models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Event, Faq,
+                            Location, MapLink, PageText, Phone, Practice, SiteSettings, Stat, StudentResult, Teacher)
+from content.serialization import (CONTENT_MODELS, TRANSLATION_LANGUAGES, build_content, build_translation_strings,
+                                   load_translation_strings, read_content, read_translation_strings,
                                    sync_page_texts, validate_content)
 
 
@@ -34,23 +37,32 @@ class Command(BaseCommand):
         parser.add_argument('--force', action='store_true', help='Заменить уже загруженное содержимое.')
         parser.add_argument('--uz', default=None,
                             help='Словарь узбекского (по умолчанию assets/i18n/uz.js рядом с content.js, если есть).')
+        parser.add_argument('--kaa', default=None,
+                            help='Словарь каракалпакского (по умолчанию assets/i18n/kaa.js рядом с content.js, если есть).')
 
-    def handle(self, *args, path, dry_run=False, force=False, uz=None, **options):
+    def handle(self, *args, path, dry_run=False, force=False, uz=None, kaa=None, **options):
         data = read_content(path)
-        uz_path = Path(uz) if uz else Path(path).resolve().parent / 'assets' / 'i18n' / 'uz.js'
-        strings = read_uz_strings(uz_path) if (uz or uz_path.is_file()) else None
+        incoming = {}
+        for language, explicit in (('uz', uz), ('kaa', kaa)):
+            dictionary = Path(explicit) if explicit else Path(path).resolve().parent / 'assets' / 'i18n' / f'{language}.js'
+            if explicit or dictionary.is_file():
+                incoming[language] = read_translation_strings(dictionary)
         has_content = any(model.objects.exists() for model in CONTENT_MODELS)
         if has_content and not force and not dry_run:
             raise CommandError('В базе уже есть содержимое. Ничего не изменено: используйте --force для замены '
                                'или --dry-run для проверки файла.')
         try:
             with transaction.atomic():
+                # A content-only restore must not discard translations in the other language.
+                preserved = {language: build_translation_strings(language) for language in TRANSLATION_LANGUAGES}
                 summary = self._replace(data)
                 sync_page_texts(Path(path).resolve().parent)
                 summary['texts'] = PageText.objects.count()
                 validate_content(build_content())
-                if strings is not None:
-                    summary['uz'] = load_uz_strings(strings)
+                for language, strings in preserved.items():
+                    load_translation_strings(strings, language)
+                for language, strings in incoming.items():
+                    summary[language] = load_translation_strings(strings, language)
                 if dry_run:
                     transaction.set_rollback(True)
         except ValidationError as error:
@@ -63,9 +75,10 @@ class Command(BaseCommand):
         prefix = 'Пробный прогон (ничего не сохранено): ' if dry_run else 'Импортировано: '
         message = prefix + self._summary_text(summary)
         self.stdout.write(self.style.WARNING(message) if dry_run else self.style.SUCCESS(message))
-        if 'uz' in summary:
-            self.stdout.write(f"Узбекский: текстов страницы с переводом {summary['uz']['page_texts']}, "
-                              f"общих переводов {summary['uz']['translations']}.")
+        for language, label in (('uz', 'Узбекский'), ('kaa', 'Каракалпакский')):
+            if language in summary:
+                self.stdout.write(f"{label}: текстов страницы с переводом {summary[language]['page_texts']}, "
+                                  f"общих переводов {summary[language]['translations']}.")
         self.stdout.write(f'Источник: {path}')
 
     @staticmethod
@@ -73,7 +86,7 @@ class Command(BaseCommand):
         return (f"текстов страницы {summary['texts']}, вопросов {summary['faq']}, "
                 f"курсов {summary['courses']}, преподавателей {summary['teachers']}, "
                 f"результатов {summary['results']}, филиалов {summary['locations']}, "
-                f"ступеней кэшбэка {summary['cashback']}.")
+                f"ступеней кэшбэка {summary['cashback']}, событий {summary['events']}, занятий {summary['practices']}.")
 
     @staticmethod
     def _save(obj):
@@ -83,12 +96,15 @@ class Command(BaseCommand):
         return obj
 
     def _replace(self, data):
+        practices = data.get('practices', [])
+        if not isinstance(practices, list) or len(practices) > 100:
+            raise ValueError('Практика вне уроков должна быть списком до 100 занятий.')
         # Children are listed before their parents; see CONTENT_MODELS.
         for model in CONTENT_MODELS:
             model.objects.all().delete()
 
         site = data.get('site') or {}
-        self._save(SiteSettings(demo_mode=site.get('demoMode', True), demo_labels=site.get('demoLabels', True),
+        self._save(SiteSettings(demo_mode=site.get('demoMode', False), demo_labels=site.get('demoLabels', True),
                                 site_url=site.get('url') or '', city=site.get('city') or ''))
 
         for order, stat in enumerate(data.get('stats') or []):
@@ -122,6 +138,18 @@ class Command(BaseCommand):
                                      level=item.get('level') or '', quote=item['quote'], student=item['student'],
                                      course=item.get('course') or '', featured=bool(item.get('featured')),
                                      consent=item.get('consent', False)))
+
+        for order, item in enumerate(data.get('events') or []):
+            starts_at = parse_datetime(item['startsAt'])
+            if starts_at is None or timezone.is_naive(starts_at):
+                raise ValueError('У события нужна дата startsAt с часовым поясом.')
+            self._save(Event(order=order, title=item['title'], description=item.get('description') or '',
+                             starts_at=starts_at, url=item.get('url') or ''))
+
+        for order, item in enumerate(practices):
+            self._save(Practice(order=order, slug=item['id'], title=item['title'], description=item['description'],
+                                label=item.get('label') or '', photo_path=item.get('photo') or '',
+                                photo_alt=item.get('photoAlt') or '', is_published=True))
 
         source = data.get('contacts') or {}
         contacts = Contacts(verified=source.get('verified', False), hr_telegram=source.get('hrTelegram') or '',
@@ -158,4 +186,6 @@ class Command(BaseCommand):
             'results': StudentResult.objects.count(),
             'locations': Location.objects.count(),
             'cashback': cashback_tiers,
+            'events': Event.objects.count(),
+            'practices': Practice.objects.count(),
         }

@@ -1,9 +1,9 @@
-// Shared language enhancement for the results and career pages.
+// Shared language enhancement for the directory and career pages.
 (() => {
 function setupLanguage() {
-  const pack = window.stanfordUz;
-  const button = document.querySelector('#lang-toggle');
-  if (!pack || !button || typeof MutationObserver === 'undefined') return;
+  const packs = { uz: window.stanfordUz, kaa: window.stanfordKaa };
+  const select = document.querySelector('#lang-toggle');
+  if (!select) return;
   const attributes = ['aria-label', 'alt', 'title', 'placeholder', 'content'];
   const cyrillic = /[А-Яа-яЁё]/;
   const texts = new Map();
@@ -12,9 +12,11 @@ function setupLanguage() {
   const translate = value => {
     const raw = value.trim();
     if (!raw) return value;
+    const pack = packs[lang];
+    if (!pack) return value;
     let out = pack.strings[raw.replace(/\s+/g, ' ')];
     if (out === undefined) {
-      for (const [pattern, build] of pack.patterns) {
+      for (const [pattern, build] of pack.patterns || []) {
         const match = raw.match(pattern);
         if (match) { out = build(match, translate); break; }
       }
@@ -28,14 +30,14 @@ function setupLanguage() {
     const next = translate(value);
     if (next === value) return;
     if (!attrs.has(element)) attrs.set(element, {});
-    attrs.get(element)[name] = value;
+    attrs.get(element)[name] = { source: value, translated: next };
     element.setAttribute(name, next);
   };
   const translateNode = node => {
     if (node.nodeType === Node.TEXT_NODE) {
       if (!cyrillic.test(node.data)) return;
       const next = translate(node.data);
-      if (next !== node.data) { texts.set(node, node.data); node.data = next; }
+      if (next !== node.data) { texts.set(node, { source: node.data, translated: next }); node.data = next; }
       return;
     }
     if (node.nodeType !== Node.ELEMENT_NODE || node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return;
@@ -43,13 +45,15 @@ function setupLanguage() {
     node.childNodes.forEach(translateNode);
   };
   const restore = () => {
-    texts.forEach((original, node) => { node.data = original; });
-    attrs.forEach((values, element) => Object.entries(values).forEach(([name, value]) => element.setAttribute(name, value)));
+    texts.forEach((entry, node) => { if (node.data === entry.translated) node.data = entry.source; });
+    attrs.forEach((values, element) => Object.entries(values).forEach(([name, entry]) => {
+      if (element.getAttribute(name) === entry.translated) element.setAttribute(name, entry.source);
+    }));
     texts.clear();
     attrs.clear();
   };
-  const observer = new MutationObserver(records => {
-    if (lang !== 'uz') return;
+  const observer = typeof MutationObserver === 'undefined' ? null : new MutationObserver(records => {
+    if (lang === 'ru') return;
     records.forEach(record => {
       if (record.type === 'childList') record.addedNodes.forEach(translateNode);
       else if (record.type === 'characterData') translateNode(record.target);
@@ -57,24 +61,23 @@ function setupLanguage() {
     });
     observer.takeRecords(); // our own replacements need no second pass
   });
-  observer.observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: attributes });
+  observer?.observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: attributes });
   const setLanguage = next => {
-    lang = next;
-    if (next === 'uz') translateNode(document.documentElement); else restore();
-    document.documentElement.lang = next;
-    button.textContent = next === 'uz' ? 'RU' : 'UZ';
-    button.lang = next === 'uz' ? 'ru' : 'uz';
-    button.setAttribute('aria-label', next === 'uz' ? 'Русский язык' : 'Özbek tili');
-    observer.takeRecords();
+    // Always translate from the Russian source, including a direct UZ ↔ QQ change.
+    restore();
+    lang = next === 'ru' || (Object.hasOwn(packs, next) && packs[next]) ? next : 'ru';
+    if (lang !== 'ru') translateNode(document.documentElement);
+    document.documentElement.lang = lang;
+    select.value = lang;
+    observer?.takeRecords();
   };
-  button.addEventListener('click', () => {
-    const next = lang === 'uz' ? 'ru' : 'uz';
-    setLanguage(next);
-    try { localStorage.setItem('stanford-lang', next); } catch { /* Keep the choice for this visit only. */ }
+  select.addEventListener('change', () => {
+    setLanguage(select.value);
+    try { localStorage.setItem('stanford-lang', lang); } catch { /* Keep the choice for this visit only. */ }
   });
   let saved;
   try { saved = localStorage.getItem('stanford-lang'); } catch { /* Settings are optional. */ }
-  if (saved === 'uz') setLanguage('uz');
+  setLanguage(saved || 'ru');
 }
 setupLanguage();
 })();

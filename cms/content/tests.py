@@ -45,12 +45,8 @@ PRODUCTION_ENV = {
 
 @contextmanager
 def content_path():
-    """A throwaway content.js path in the project root.
-
-    The sandbox denies writes inside directories created at runtime (and system temp is not writable), so
-    tests create a file in an existing project directory and remove it afterwards.
-    """
-    handle, name = tempfile.mkstemp(prefix='.test-content-', suffix='.js', dir=settings.BASE_DIR)
+    """A throwaway content file, including in containers with read-only source mounts."""
+    handle, name = tempfile.mkstemp(prefix='.test-content-', suffix='.js')
     os.close(handle)
     path = Path(name)
     path.unlink()
@@ -157,10 +153,10 @@ class ContentValidationTests(TestCase):
         contacts.hr_telegram = 'https://t.me/hrstanfordlc'
         contacts.full_clean()
 
-    def test_family_price_must_be_lower_than_the_standard_price(self):
+    def test_legacy_family_price_does_not_restrict_the_active_monthly_price(self):
         for special_price in (100, 200):
-            self.assertInvalid(Course(slug='x', name='X', category='languages', description='d', price=100,
-                                      special_price=special_price))
+            Course(slug='x', name='X', category='languages', description='d', price=100,
+                   special_price=special_price).full_clean()
         Course(slug='x', name='X', category='languages', description='d', price=100, special_price=99).full_clean()
 
     def test_course_fields_must_be_publishable(self):
@@ -191,6 +187,9 @@ class ContentValidationTests(TestCase):
         location = Location.objects.create(slug='a', name='A', address='Addr')
         self.assertInvalid(MapLink(location=location, provider='google', url='https://yandex.uz/maps/-/CXbaBL5l'))
         MapLink(location=location, provider='yandex', url='https://yandex.uz/maps/-/CXbaBL5l').full_clean()
+        MapLink(location=location, provider='google', url='https://www.google.com/maps/search/?api=1&query=42.455094%2C59.62766').full_clean()
+        self.assertInvalid(MapLink(location=location, provider='google', url='https://www.google.com.evil.example/maps/search/?api=1&query=42,59'))
+        self.assertInvalid(MapLink(location=location, provider='google', url='https://www.google.com/maps/search/?api=1&query=42,59&redirect=https://evil.example'))
         self.assertInvalid(Location(slug='b', name='B', address='Addr', longitude=59.6))
 
     @unittest.skipUnless(settings.MAX_UPLOAD_BYTES == 5 * 1024 * 1024, 'размер загрузки переопределен')
@@ -235,13 +234,17 @@ class ImportContentTests(TestCase):
             for obj in model.objects.all():
                 obj.full_clean()
 
-    def test_missing_demo_mode_defaults_to_demo(self):
+    def test_missing_demo_mode_defaults_to_release_and_cannot_publish_samples_without_consent(self):
         data = read_content(self.content_path)
         data['site'].pop('demoMode', None)
         with content_path() as path:
             write_content(data, path)
+            with self.assertRaises(CommandError):
+                self.import_content(str(path))
+            data['results'] = []
+            write_content(data, path)
             self.import_content(str(path))
-        self.assertTrue(SiteSettings.load().demo_mode)
+        self.assertFalse(SiteSettings.load().demo_mode)
 
     def test_import_refuses_a_non_empty_database_without_force(self):
         self.import_content(str(self.content_path))
@@ -279,6 +282,9 @@ class ImportContentTests(TestCase):
 
     def test_import_export_round_trip_keeps_the_content(self):
         original = read_content(self.content_path)
+        original.setdefault('practices', [])
+        for course in original['courses']:
+            course.pop('specialPrice', None)
         self.import_content(str(self.content_path))
         with content_path() as exported_path:
             call_command('export_content', '--output', str(exported_path), stdout=io.StringIO())
@@ -417,10 +423,12 @@ class AdminFormSaveTests(AdminTestCase):
         self.assertContains(response, 'Только https://')
         self.assertEqual(SiteSettings.load().site_url, 'https://1-production-8f16.up.railway.app')
 
-    def test_admin_saves_a_course_and_rejects_a_family_price_above_the_standard_one(self):
+    def test_admin_edits_only_the_monthly_price_and_ignores_posted_legacy_discounts(self):
         self.login()
         course = Course.objects.get(slug='general-english')
         url = reverse('admin:content_course_change', args=[course.pk])
+        old_legacy_price = course.special_price
+        self.assertNotContains(self.client.get(url), 'name="special_price"')
         data = {'name': course.name, 'subtitle': course.subtitle, 'category': course.category,
                 'description': course.description, 'price': '700000', 'special_price': '650000',
                 'target': course.target, 'slug': course.slug, 'is_published': 'on', 'order': str(course.order),
@@ -429,12 +437,12 @@ class AdminFormSaveTests(AdminTestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 302, response.context and response.context['adminform'].form.errors)
         course.refresh_from_db()
-        self.assertEqual((course.price, course.special_price), (700000, 650000))
-        response = self.client.post(url, dict(data, special_price='800000'))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'должна быть ниже обычной')
+        self.assertEqual((course.price, course.special_price), (700000, old_legacy_price))
+        response = self.client.post(url, dict(data, price='400000', special_price='800000'))
+        self.assertEqual(response.status_code, 302)
         course.refresh_from_db()
-        self.assertEqual(course.special_price, 650000)
+        self.assertEqual(course.price, 400000)
+        self.assertEqual(course.special_price, old_legacy_price)
 
 
 LEAKS = ('admin', 'Django', 'Traceback', 'urlpatterns', 'URLconf', 'DEBUG', 'settings')
@@ -456,8 +464,9 @@ class ErrorPageTests(TestCase):
             self.assertNeutral(self.client.get(url), 404, 'Страница не найдена')
 
     def test_path_traversal_gets_a_neutral_400(self):
-        for url in ('/static/../config/settings.py', '/media/../db.sqlite3'):
-            self.assertNeutral(self.client.get(url), 400, 'Некорректный запрос')
+        self.assertNeutral(self.client.get('/static/../config/settings.py'), 400, 'Некорректный запрос')
+        # Anonymous media requests disclose neither files nor their existence.
+        self.assertNeutral(self.client.get('/media/../db.sqlite3'), 404, 'Страница не найдена')
 
     def test_bad_host_gets_a_neutral_400(self):
         self.assertNeutral(self.client.get(reverse('admin:login'), HTTP_HOST='evil.example'), 400, 'Некорректный запрос')
@@ -480,7 +489,9 @@ class EnableTwoFactorTests(TestCase):
     def test_command_replaces_the_device_and_writes_qr_and_link(self):
         user = User.objects.create_superuser('owner', 'owner@example.org', PASSWORD)
         TOTPDevice.objects.create(user=user, name='old', confirmed=True)
-        output = settings.BASE_DIR / '.local-2fa-test'
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        output = Path(temporary.name) / 'two-factor'
         try:
             call_command('enable_2fa', 'owner', output=output, stdout=io.StringIO())
             self.assertEqual(TOTPDevice.objects.filter(user=user).count(), 1)

@@ -10,7 +10,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from content.serialization import build_content, build_uz_strings, validate_content, write_content, write_uz_strings
+from content.serialization import (build_content, build_translation_strings, validate_content,
+                                   write_content, write_translation_strings)
 
 
 class Command(BaseCommand):
@@ -21,16 +22,19 @@ class Command(BaseCommand):
                             help='Куда записать content.js (по умолчанию ../content.js).')
         parser.add_argument('--uz-output', default=None,
                             help='Какой uz.js обновить (по умолчанию assets/i18n/uz.js рядом с content.js, если есть).')
+        parser.add_argument('--kaa-output', default=None,
+                            help='Какой kaa.js обновить (по умолчанию assets/i18n/kaa.js рядом с content.js, если есть).')
 
-    def handle(self, *args, output, uz_output=None, **options):
-        uz_path = Path(uz_output) if uz_output else Path(output).resolve().parent / 'assets' / 'i18n' / 'uz.js'
+    def handle(self, *args, output, uz_output=None, kaa_output=None, **options):
         try:
             with transaction.atomic():
                 data = build_content()
                 validate_content(data)
                 write_content(data, output)
-                if uz_output or uz_path.is_file():
-                    write_uz_strings(uz_path, build_uz_strings())
+                for language, explicit in (('uz', uz_output), ('kaa', kaa_output)):
+                    dictionary = Path(explicit) if explicit else Path(output).resolve().parent / 'assets' / 'i18n' / f'{language}.js'
+                    if explicit or dictionary.is_file():
+                        write_translation_strings(dictionary, build_translation_strings(language))
         except CommandError:
             raise
         except OSError as error:
@@ -42,7 +46,7 @@ class Command(BaseCommand):
             shown = path
         self.stdout.write(self.style.SUCCESS(
             f'Экспортировано: курсов {len(data["courses"])}, преподавателей {len(data["teachers"])}, '
-            f'результатов {len(data["results"])}, филиалов {len(data["contacts"]["locations"])}, '
+            f'результатов {len(data["results"])}, занятий {len(data.get("practices", []))}, филиалов {len(data["contacts"]["locations"])}, '
             f'ступеней кэшбэка {sum(len(data.get("cashback", {}).get(exam, [])) for exam in ("ielts", "sat"))}.'))
         self.stdout.write(f'Файл: {shown}')
         self.stdout.write('Для сборки страниц и переноса загруженных фото используйте кнопку публикации в админке.')

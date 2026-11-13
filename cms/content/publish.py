@@ -3,6 +3,8 @@ import os
 import shutil
 import subprocess
 import tempfile
+import logging
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -10,9 +12,12 @@ from django.conf import settings
 from django.core.management.base import CommandError
 from django.db import connection, transaction
 
-from .github import GitHubClient, GitHubError, OUTPUT_FILES, SOURCE_FILES, allowed_photo
-from .serialization import (build_content, build_uz_strings, missing_uz,
-                            validate_content, write_content, write_uz_strings)
+from .github import GitHubClient, GitHubError, MANAGED_PHOTO, OUTPUT_FILES, SOURCE_FILES, allowed_photo
+from .serialization import (TRANSLATION_LANGUAGES, build_content, build_translation_strings, missing_translations,
+                            read_content, validate_content, write_content, write_translation_strings)
+from .media import audit_media
+
+logger = logging.getLogger(__name__)
 
 
 class PublishError(Exception):
@@ -70,8 +75,26 @@ def publication_lock():
 
 
 def photo_paths(data):
-    return {item['photo'] for item in [*data.get('teachers', []), *data.get('contacts', {}).get('locations', [])]
+    return {item['photo'] for item in [*data.get('teachers', []), *data.get('practices', []), *data.get('contacts', {}).get('locations', [])]
             if item.get('photo')}
+
+
+def cleanup_public_photos(keep, *, now=None):
+    """Only old hashed exports; current and previous releases remain available for rollback."""
+    root = settings.SITE_ROOT.resolve()
+    directory = root / 'assets' / 'uploads'
+    if not directory.exists() or any(path.is_symlink() for path in (directory, directory.parent)):
+        return 0
+    cutoff = (time.time() if now is None else now) - 24 * 3600
+    removed = 0
+    for path in directory.iterdir():
+        relative = path.relative_to(root).as_posix()
+        if (not MANAGED_PHOTO.fullmatch(relative) or relative in keep or path.is_symlink()
+                or not path.is_file() or not path.resolve().is_relative_to(root) or path.stat().st_mtime > cutoff):
+            continue
+        path.unlink(missing_ok=True)
+        removed += 1
+    return removed
 
 
 def copy_local_sources(stage, paths):
@@ -91,6 +114,8 @@ def atomic_write(path, content):
     try:
         with os.fdopen(descriptor, 'wb') as output:
             output.write(content)
+        # These are public site assets, also read by Caddy and the unprivileged CMS process.
+        os.chmod(temporary, 0o644)
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
@@ -155,8 +180,8 @@ def publish_site():
                 photos = {}
                 data = build_content(photo_files=photos)
                 validate_content(data)
-                translations = build_uz_strings()
-                missing = missing_uz()
+                translations = {language: build_translation_strings(language) for language in TRANSLATION_LANGUAGES}
+                missing = {language: missing_translations(language) for language in TRANSLATION_LANGUAGES}
             paths = photo_paths(data) - photos.keys()
             if any(not allowed_photo(path) for path in paths):
                 raise PublishError('Небезопасный путь фотографии.')
@@ -167,12 +192,15 @@ def publish_site():
                 snapshot = client.snapshot(stage, paths) if client else None
                 if not client:
                     copy_local_sources(stage, paths)
+                previous = read_content(stage / 'content.js')
+                retained_photos = photo_paths(previous) | photo_paths(data)
                 for path, content in photos.items():
                     destination = stage / path
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     destination.write_bytes(content)
                 write_content(data, stage / 'content.js')
-                write_uz_strings(stage / 'assets/i18n/uz.js', translations)
+                for language, strings in translations.items():
+                    write_translation_strings(stage / f'assets/i18n/{language}.js', strings)
                 result = subprocess.run([node, 'build.mjs'], cwd=stage, capture_output=True, text=True,
                                         encoding='utf-8', errors='replace', timeout=120,
                                         env={**{key: value for key, value in os.environ.items()
@@ -184,9 +212,22 @@ def publish_site():
                     raise PublishError(f'Сайт не принял данные: {reason[:300]}')
                 files = {path: (stage / path).read_bytes() for path in sorted(OUTPUT_FILES)}
                 files.update(photos)
-                release = client.publish(snapshot, files) if client else publish_local(files)
+                if client:
+                    obsolete = {path for path in snapshot['entries'] if MANAGED_PHOTO.fullmatch(path) and path not in retained_photos}
+                    release = client.publish(snapshot, files, delete_paths=obsolete)
+                else:
+                    release = publish_local(files)
+                    try:
+                        cleanup_public_photos(retained_photos)
+                    except OSError:
+                        logger.warning('Published pages are valid; old exported photos could not be collected.', exc_info=True)
+                try:
+                    audit_media(apply=True)
+                except (OSError, ValueError):
+                    logger.warning('Published pages are valid; orphaned uploads could not be collected.', exc_info=True)
             return {'texts': len(data.get('texts', {})), 'courses': len(data['courses']),
-                    'missing_uz': missing, 'target': target, 'demo': data['site'].get('demoMode', False), **release}
+                    'missing_uz': missing['uz'], 'missing_kaa': missing['kaa'],
+                    'target': target, 'demo': data['site'].get('demoMode', False), **release}
     except PublishError:
         raise
     except (CommandError, GitHubError) as error:

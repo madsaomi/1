@@ -1,0 +1,56 @@
+/* Scoped actions: Django's dashboard table rules must not size this list. */
+#quick-edit > p {
+  margin: 0;
+  padding: 12px 16px;
+  line-height: 1.55;
+}
+
+#quick-edit .quick-edit-actions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#quick-edit .quick-edit-actions > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--hairline-color);
+  list-style: none;
+}
+
+#quick-edit .quick-edit-actions a {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--darkened-bg);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+#quick-edit .quick-edit-actions span {
+  min-width: 0;
+  align-self: center;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+@media (min-width: 768px) {
+  #quick-edit .quick-edit-actions > li {
+    grid-template-columns: minmax(180px, 0.9fr) minmax(0, 1.4fr);
+  }
+}

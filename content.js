@@ -3,27 +3,10 @@ window.schoolContent = {
   "site": {
     "url": "https://1-production-8f16.up.railway.app",
     "city": "Нукус",
-    "demoMode": true,
+    "demoMode": false,
     "demoLabels": false
   },
-  "stats": [
-    {
-      "value": "2016",
-      "label": "год основания"
-    },
-    {
-      "value": "5 000+",
-      "label": "выпускников"
-    },
-    {
-      "value": "3",
-      "label": "филиала"
-    },
-    {
-      "value": "25",
-      "label": "преподавателей"
-    }
-  ],
+  "stats": [],
   "cashback": {
     "ielts": [
       {
@@ -94,7 +77,6 @@ window.schoolContent = {
         "Книги, материалы и Supporter включены"
       ],
       "price": 590000,
-      "specialPrice": 500000,
       "target": "#prices",
       "id": "general-english"
     },
@@ -109,7 +91,6 @@ window.schoolContent = {
         "Supporter — второй преподаватель"
       ],
       "price": 540000,
-      "specialPrice": 450000,
       "target": "#prices",
       "id": "general-english-kaa"
     },
@@ -122,7 +103,6 @@ window.schoolContent = {
         "Supporter — второй преподаватель"
       ],
       "price": 690000,
-      "specialPrice": 585000,
       "target": "#prices",
       "id": "kids-english"
     },
@@ -135,7 +115,6 @@ window.schoolContent = {
         "Supporter — второй преподаватель"
       ],
       "price": 540000,
-      "specialPrice": 450000,
       "target": "#prices",
       "id": "math"
     },
@@ -178,63 +157,8 @@ window.schoolContent = {
       "id": "sat"
     }
   ],
-  "teachers": [
-    {
-      "name": "Азиз Каримов",
-      "role": "General English · IELTS",
-      "qualification": "IELTS 8.5",
-      "experience": "6 лет опыта",
-      "featured": true
-    },
-    {
-      "name": "Дилноза Юсупова",
-      "role": "Kids English",
-      "qualification": "CELTA",
-      "experience": "5 лет опыта",
-      "featured": true
-    },
-    {
-      "name": "Айгуль Бекмуратова",
-      "role": "Немецкий язык",
-      "qualification": "Goethe B2",
-      "experience": "4 года опыта"
-    },
-    {
-      "name": "Рустем Жумабаев",
-      "role": "Математика · SAT",
-      "qualification": "SAT Math 780",
-      "experience": "7 лет опыта",
-      "featured": true
-    }
-  ],
-  "results": [
-    {
-      "score": "8.0",
-      "exam": "IELTS",
-      "level": "C1",
-      "quote": "За четыре месяца Writing вырос с 6.0 до 7.5: каждое эссе разбирали с преподавателем.",
-      "student": "Малика Т.",
-      "course": "IELTS, 4 месяца",
-      "featured": true
-    },
-    {
-      "score": "7.5",
-      "exam": "IELTS",
-      "level": "C1",
-      "quote": "Speaking Club помог перестать бояться говорить. На экзамене было спокойно.",
-      "student": "Бекзод А.",
-      "course": "General English и IELTS, 6 месяцев"
-    },
-    {
-      "score": "1450",
-      "exam": "SAT",
-      "level": "из 1600",
-      "quote": "Math подтянул с Supporter, Reading — на пробных тестах каждую неделю.",
-      "student": "Нурлан К.",
-      "course": "SAT, 5 месяцев",
-      "featured": true
-    }
-  ],
+  "teachers": [],
+  "results": [],
   "contacts": {
     "verified": true,
     "phones": [
@@ -279,24 +203,12 @@ window.schoolContent = {
         "googleEmbed": "https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d2943.71432776504!2d59.625085076114246!3d42.45509397118431!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zNDLCsDI3JzE4LjMiTiA1OcKwMzcnMzkuNiJF!5e0!3m2!1sen!2s!4v1793096816414!5m2!1sen!2s",
         "maps": [
           {
+            "provider": "google",
+            "url": "https://www.google.com/maps/search/?api=1&query=42.455094%2C59.62766"
+          },
+          {
             "provider": "yandex",
             "url": "https://yandex.uz/maps/-/CXbaBC64"
-          }
-        ]
-      },
-      {
-        "id": "youth-center",
-        "name": "Филиал «Жазлар ораый»",
-        "address": "Центр молодёжи",
-        "coordinates": [
-          59.604319,
-          42.4576377
-        ],
-        "googleEmbed": "https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d735.9002264880083!2d59.6037444!3d42.4575069!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x41dd9bfa1b8a33fd%3A0x5ee2e3a48c877e81!2sJaslar%20oray%C4%B1!5e0!3m2!1sen!2s!4v1793096759095!5m2!1sen!2s",
-        "maps": [
-          {
-            "provider": "google",
-            "url": "https://maps.app.goo.gl/gpwS4FxMVecFB4T4A"
           }
         ]
       }
@@ -339,11 +251,10 @@ window.schoolContent = {
     "why.text3": "Учебник и печатные материалы входят в стоимость обучения.",
     "why.title4": "Практика вне уроков",
     "why.text4": "Speaking Club, Movie Club и пробные экзамены.",
-    "why.title5": "Три филиала",
-    "why.text5": "На Сараева, на Абдирова и в «Жазлар ораый».",
+    "why.title5": "Два филиала",
+    "why.text5": "На Сараева и на Абдирова.",
     "courses.title1": "Курсы и цены",
-    "courses.text1": "Стоимость в месяц, скидка и программа — в каждой карточке.",
-    "courses.text2": "Скидка действует, если из одной семьи занимаются 2 ученика или один ученик записан на 2 курса. Условия и итоговую стоимость подтвердите перед оплатой.",
+    "courses.text1": "Стоимость в месяц и программа — в каждой карточке.",
     "courses.button1": "Все курсы",
     "courses.text3": "Все программы",
     "cashback.label1": "Мотивация и гарантия",
@@ -361,15 +272,6 @@ window.schoolContent = {
     "about.text4": "Группу подбирают по уровню. Оплата — в течение первых трёх занятий по договору; после оплаты выдаётся учебник.",
     "clubs.title1": "Практика вне уроков",
     "clubs.text1": "Даты и условия участия уточняются отдельно.",
-    "clubs.label1": "Speaking",
-    "clubs.title2": "Speaking Club",
-    "clubs.text2": "Разговорная практика и обсуждение тем на английском.",
-    "clubs.label2": "Movie",
-    "clubs.title3": "Movie Club",
-    "clubs.text3": "Просмотр фильмов, разбор выражений и обсуждение сюжета.",
-    "clubs.label3": "Exams",
-    "clubs.title4": "Пробные экзамены",
-    "clubs.text4": "Знакомство с форматом заданий и проверка подготовки.",
     "partners.title1": "Партнёры и экзамены",
     "partners.text1": "Официальные ресурсы и экзаменационные центры.",
     "partners.label1": "British Council",
@@ -426,7 +328,7 @@ window.schoolContent = {
     "modal.text2": "Запись согласовывается напрямую с центром. Эта страница не собирает имя и телефон.",
     "meta.description": "Курсы Stanford: английский и немецкий, IELTS и SAT, занятия для детей и математика. Программы, цены и адреса филиалов.",
     "meta.og_title": "Stanford — курсы английского, IELTS и SAT",
-    "meta.og_description": "Языки, IELTS, SAT и математика. Программы, цены и три филиала Stanford.",
+    "meta.og_description": "Языки, IELTS, SAT и математика. Программы, цены и два филиала Stanford.",
     "results.title1": "Результаты студентов — Stanford",
     "results.meta1": "Баллы и отзывы выпускников Stanford Language Center: IELTS, SAT и другие программы.",
     "results.meta2": "Результаты студентов — Stanford",
@@ -489,6 +391,28 @@ window.schoolContent = {
     "career.aria_label2": "Навигация в подвале",
     "career.text26": "Курсы и цены",
     "career.text27": "Контакты",
-    "career.text28": "Наверх"
-  }
+    "career.text28": "Наверх",
+    "teachers.empty": "Информация о преподавателях пока не опубликована.",
+    "results.empty": "Результаты пока не опубликованы."
+  },
+  "practices": [
+    {
+      "id": "speaking-club",
+      "title": "Speaking Club",
+      "label": "Speaking",
+      "description": "Разговорная практика и обсуждение тем на английском."
+    },
+    {
+      "id": "movie-club",
+      "title": "Movie Club",
+      "label": "Movie",
+      "description": "Просмотр фильмов, разбор выражений и обсуждение сюжета."
+    },
+    {
+      "id": "mock-exams",
+      "title": "Пробные экзамены",
+      "label": "Exams",
+      "description": "Знакомство с форматом заданий и проверка подготовки."
+    }
+  ]
 };

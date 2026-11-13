@@ -56,7 +56,11 @@ def main():
     css = (ROOT / 'style.css').read_text(encoding='utf-8')
     assert css.count('{') == css.count('}'), 'Unbalanced CSS braces'
     assert css.count(':root {') == 1, 'Expected one token definition'
-    for match in re.finditer(r'#[0-9a-fA-F]{3,8}\b', css):
+    # The requested multicolour map illustration has four scoped tokens; UI colours stay branded.
+    palette_css = css
+    for name, value in {'red': 'ea4335', 'blue': '4285f4', 'green': '34a853', 'yellow': 'fbbc04'}.items():
+        palette_css = palette_css.replace(f'--map-{name}: #{value};', '')
+    for match in re.finditer(r'#[0-9a-fA-F]{3,8}\b', palette_css):
         value = match[0][1:]
         value = ''.join(char * 2 for char in value) if len(value) in (3, 4) else value
         rgb = value[:6].lower()

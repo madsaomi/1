@@ -9,25 +9,25 @@ collect_photo_files() returns bytes for publication without changing working fil
 import json
 import re
 import hashlib
-import io
-import warnings
 from pathlib import Path
 from html.parser import HTMLParser
 
-from PIL import Image, ImageOps, UnidentifiedImageError
 from django.conf import settings
 from django.core.exceptions import SuspiciousFileOperation, ValidationError
 from django.core.management.base import CommandError
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
+from .media import normalize_image
 
-from .models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Faq, Location,
-                     MapLink, PageText, Phone, SiteSettings, Stat, StudentResult, Teacher, Translation,
+from .models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Event, Faq, Location,
+                     MapLink, PageText, Phone, Practice, SiteSettings, Stat, StudentResult, Teacher, Translation,
                      photo_path_validator, validate_https_site_url)
 
 PREFIX = 'window.schoolContent = '
 BANNER = '// Данные сайта. Публикуются из админки (PLAN-044); при ручной правке затем запустить node build.mjs.\n'
 
 # Everything import_content replaces; order is also the deletion order for children before parents.
-CONTENT_MODELS = (CashbackTier, CashbackRule, CourseSkill, Course, Stat, Teacher, StudentResult,
+CONTENT_MODELS = (CashbackTier, CashbackRule, CourseSkill, Course, Stat, Teacher, StudentResult, Event, Practice,
                   MapLink, Location, Phone, AdmissionsTelegram, Contacts, SiteSettings, Faq, PageText)
 
 
@@ -164,8 +164,6 @@ def _courses_data():
             'skills': list(course.skills.values_list('text', flat=True)),
             'price': course.price,
         })
-        if course.special_price is not None:
-            item['specialPrice'] = course.special_price
         item.update({'target': course.target, 'id': course.slug})
         courses.append(item)
     return courses
@@ -183,30 +181,8 @@ def _photo_data(obj, files=None):
     try:
         with obj.photo.open('rb') as source:
             raw = source.read(settings.MAX_UPLOAD_BYTES + 1)
-        if len(raw) > settings.MAX_UPLOAD_BYTES:
-            raise ValueError('Фото превышает допустимый размер.')
-        with warnings.catch_warnings():
-            warnings.simplefilter('error', Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(raw)) as probe:
-                if probe.format not in {'JPEG', 'PNG', 'WEBP'} or probe.width * probe.height > 16_000_000:
-                    raise ValueError('Недопустимый формат или слишком большое разрешение фото.')
-                probe.verify()
-            with Image.open(io.BytesIO(raw)) as source:
-                image = ImageOps.exif_transpose(source)
-                image.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
-                if image.mode in {'RGBA', 'LA'} or 'transparency' in image.info:
-                    rgba = image.convert('RGBA')
-                    clean = Image.new('RGB', image.size, 'white')
-                    clean.paste(rgba, mask=rgba.getchannel('A'))
-                else:
-                    clean = image.convert('RGB')
-                output = io.BytesIO()
-                clean_image = Image.new('RGB', clean.size)
-                clean_image.paste(clean)
-                clean_image.save(output, 'JPEG', quality=88, optimize=True)
-                encoded = output.getvalue()
-    except (OSError, ValueError, SyntaxError, SuspiciousFileOperation, UnidentifiedImageError, Image.DecompressionBombError,
-            Image.DecompressionBombWarning) as error:
+        encoded = normalize_image(raw)
+    except (OSError, ValueError, SyntaxError, SuspiciousFileOperation, ValidationError) as error:
         raise CommandError(f'Не удалось подготовить фото «{obj}»: загрузите исправный JPG, PNG или WebP до 5 МБ.') from error
     path = f'assets/uploads/{hashlib.sha256(encoded).hexdigest()}.jpg'
     if files is not None:
@@ -217,7 +193,7 @@ def _photo_data(obj, files=None):
 def collect_photo_files():
     """Return {asset path: sanitized JPEG bytes} for photos needed by published content."""
     files = {}
-    for obj in [*Teacher.objects.filter(is_published=True), *Location.objects.all()]:
+    for obj in [*Teacher.objects.filter(is_published=True), *Practice.objects.filter(is_published=True), *Location.objects.all()]:
         _photo_data(obj, files)
     return files
 
@@ -254,6 +230,21 @@ def _results_data():
             item['featured'] = True
         results.append(item)
     return results
+
+
+def _practices_data(photo_files=None):
+    practices = []
+    for practice in Practice.objects.filter(is_published=True):
+        item = {'id': practice.slug, 'title': practice.title, 'description': practice.description}
+        if practice.label:
+            item['label'] = practice.label
+        photo = _photo_data(practice, photo_files)
+        if photo:
+            item['photo'] = photo
+        if practice.photo_alt:
+            item['photoAlt'] = practice.photo_alt
+        practices.append(item)
+    return practices
 
 
 def _contacts_data(photo_files=None):
@@ -297,6 +288,17 @@ def build_content(photo_files=None):
     data['courses'] = _courses_data()
     data['teachers'] = _teachers_data(photo_files)
     data['results'] = _results_data()
+    data['practices'] = _practices_data(photo_files)
+    events = []
+    for event in Event.objects.filter(is_published=True):
+        item = {'title': event.title, 'startsAt': event.starts_at.isoformat()}
+        if event.description:
+            item['description'] = event.description
+        if event.url:
+            item['url'] = event.url
+        events.append(item)
+    if events:
+        data['events'] = events
     data['contacts'] = _contacts_data(photo_files)
     faq = [{'question': item.question, 'answer': item.answer} for item in Faq.objects.filter(is_published=True)]
     if faq:
@@ -324,6 +326,39 @@ def validate_content(data):
             problems.append('Telegram для работы совпадает с Telegram для записи.')
     if not data.get('courses'):
         problems.append('Опубликуйте хотя бы один курс.')
+    practices = data.get('practices', [])
+    if not isinstance(practices, list) or len(practices) > 100:
+        problems.append('Практика вне уроков должна быть списком до 100 занятий.')
+    else:
+        seen = set()
+        for item in practices:
+            try:
+                if not isinstance(item, dict) or item.get('id') in seen:
+                    raise ValueError('Коды занятий должны быть уникальными.')
+                practice = Practice(slug=item.get('id', ''), title=item.get('title', ''),
+                                    description=item.get('description', ''), label=item.get('label', ''),
+                                    photo_path=item.get('photo', ''), photo_alt=item.get('photoAlt', ''))
+                if not practice.slug:
+                    raise ValueError('У занятия нужен код.')
+                practice.full_clean(validate_unique=False)
+                seen.add(practice.slug)
+            except (ValidationError, ValueError, TypeError) as error:
+                problems.append('Некорректное занятие: ' + str(error))
+    events = data.get('events', [])
+    if not isinstance(events, list):
+        problems.append('События должны быть списком.')
+    else:
+        for item in events:
+            try:
+                if not isinstance(item, dict) or not isinstance(item.get('startsAt'), str):
+                    raise ValueError('У события нужна дата с часовым поясом.')
+                starts_at = parse_datetime(item['startsAt'])
+                if starts_at is None or timezone.is_naive(starts_at):
+                    raise ValueError('У события нужна дата с часовым поясом.')
+                Event(title=item.get('title', ''), description=item.get('description', ''),
+                      starts_at=starts_at, url=item.get('url', '')).full_clean()
+            except (ValidationError, ValueError, TypeError) as error:
+                problems.append('Некорректное событие: ' + str(error))
     for course in data.get('courses') or []:
         if not course.get('skills') or any(not skill.strip() for skill in course['skills']):
             problems.append(f'У курса «{course.get("name", "")}» нужен хотя бы один пункт программы.')
@@ -337,12 +372,13 @@ def validate_content(data):
         raise CommandError('content.js не пройдет публикацию: ' + '; '.join(problems))
 
 
-# --- Uzbek dictionary (assets/i18n/uz.js) -----------------------------------------------------------------------
+# --- Translation dictionaries (assets/i18n/{uz,kaa}.js) -------------------------------------------------------
 # The site script reads `strings: { "русский текст": "o‘zbekcha" }` and a hand-written `patterns` list for texts
 # with numbers. The admin owns only the strings block; patterns and the rest of the file are left untouched.
 UZ_BLOCK = re.compile(r'(\bstrings:\s*\{\n)([\s\S]*?)(\n  \},\s*\n(?:\s*//[^\n]*\n)*\s*patterns:)')
 _JS_STRING = r"""'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*\""""
 UZ_PAIR = re.compile(rf'({_JS_STRING})\s*:\s*({_JS_STRING})')
+TRANSLATION_LANGUAGES = ('uz', 'kaa')
 
 
 def normalize_text(value):
@@ -358,8 +394,8 @@ def _unquote_js(literal):
     return json.loads(f'"{inner}"')
 
 
-def read_uz_strings(path):
-    """Russian → Uzbek pairs from the strings block of uz.js."""
+def read_translation_strings(path):
+    """Read Russian → translated pairs while leaving the handwritten dynamic patterns alone."""
     try:
         text = Path(path).read_text(encoding='utf-8')
     except OSError as error:
@@ -374,8 +410,8 @@ def read_uz_strings(path):
         raise CommandError(f'{path}: не удалось разобрать словарь ({error})') from error
 
 
-def write_uz_strings(path, strings):
-    """Replace only the strings block of uz.js; a file without that block is left alone and reported."""
+def write_translation_strings(path, strings):
+    """Replace only strings; patterns and other JavaScript remain untouched."""
     path = Path(path)
     text = path.read_text(encoding='utf-8')
     if not UZ_BLOCK.search(text):
@@ -387,48 +423,91 @@ def write_uz_strings(path, strings):
                     encoding='utf-8', newline='\n')
 
 
-def build_uz_strings():
-    """Every Russian → Uzbek pair the admin knows: general translations first, page texts and FAQ win on conflict."""
-    strings = {normalize_text(item.source): item.uz.strip() for item in Translation.objects.all()}
-    for item in PageText.objects.exclude(uz=''):
-        strings[normalize_text(item.text)] = item.uz.strip()
+def _translation_language(language):
+    if language not in TRANSLATION_LANGUAGES:
+        raise ValueError('Неподдерживаемый язык перевода.')
+    return language
+
+
+def build_translation_strings(language):
+    """General translations first; dedicated page text and FAQ fields win on conflicts."""
+    language = _translation_language(language)
+    strings = {normalize_text(item.source): getattr(item, language).strip() for item in Translation.objects.all()}
+    for item in PageText.objects.exclude(**{language: ''}):
+        strings[normalize_text(item.text)] = getattr(item, language).strip()
     for item in Faq.objects.all():
-        if item.question_uz.strip():
-            strings[normalize_text(item.question)] = item.question_uz.strip()
-        if item.answer_uz.strip():
-            strings[normalize_text(item.answer)] = item.answer_uz.strip()
+        for field in ('question', 'answer'):
+            value = getattr(item, f'{field}_{language}').strip()
+            if value:
+                strings[normalize_text(getattr(item, field))] = value
     return {key: value for key, value in strings.items() if key and value}
 
 
-def load_uz_strings(strings):
-    """Spread an imported dictionary over the admin: page texts and FAQ get their own field, the rest become
-    general translations. Returns how many pairs went where."""
+def load_translation_strings(strings, language, *, overwrite=True):
+    """Import one language without deleting omitted drafts or changing the other language.
+
+    overwrite=False seeds a new language pack while preserving every existing owner translation.
+    """
+    language = _translation_language(language)
+    strings = {normalize_text(key): value.strip() for key, value in strings.items()
+               if isinstance(key, str) and isinstance(value, str) and key.strip() and value.strip()
+               and len(normalize_text(key)) <= 800 and len(value.strip()) <= 800}
     used = set()
     page_texts = 0
     for item in PageText.objects.all():
         key = normalize_text(item.text)
         if key in strings:
-            item.uz = strings[key]
-            item.save(update_fields=['uz'])
+            if overwrite or not getattr(item, language).strip():
+                setattr(item, language, strings[key])
+                item.save(update_fields=[language])
             used.add(key)
             page_texts += 1
     for item in Faq.objects.all():
-        question, answer = normalize_text(item.question), normalize_text(item.answer)
-        item.question_uz = strings.get(question, '')
-        item.answer_uz = strings.get(answer, '')
-        item.save(update_fields=['question_uz', 'answer_uz'])
-        used.update(key for key in (question, answer) if key in strings)
-    Translation.objects.all().delete()
-    rest = [Translation(source=key, uz=value) for key, value in strings.items()
-            if key not in used and key.strip() and value.strip() and len(key) <= 800 and len(value) <= 800]
-    Translation.objects.bulk_create(rest)
+        updated = []
+        for field in ('question', 'answer'):
+            key = normalize_text(getattr(item, field))
+            translated_field = f'{field}_{language}'
+            if key in strings:
+                limit = item._meta.get_field(translated_field).max_length
+                if len(strings[key]) > limit:
+                    raise CommandError(f'Перевод вопроса или ответа слишком длинный: {key[:60]}.')
+                if overwrite or not getattr(item, translated_field).strip():
+                    setattr(item, translated_field, strings[key])
+                    updated.append(translated_field)
+                used.add(key)
+        if updated:
+            item.save(update_fields=updated)
+    rest = {key: value for key, value in strings.items() if key not in used}
+    for key, value in rest.items():
+        item, created = Translation.objects.get_or_create(source=key, defaults={language: value})
+        if not created and (overwrite or not getattr(item, language).strip()):
+            setattr(item, language, value)
+            item.save(update_fields=[language])
     return {'page_texts': page_texts, 'translations': len(rest)}
 
 
-def missing_uz():
-    """Counts of admin texts that will stay Russian on the Uzbek version."""
+def missing_translations(language):
+    """Counts of dedicated admin texts that will stay Russian in the selected language."""
+    language = _translation_language(language)
     return {
-        'page_texts': PageText.objects.filter(uz='').exclude(text__regex=r'^[^А-Яа-яЁё]*$').count(),
+        'page_texts': PageText.objects.filter(**{language: ''}).exclude(text__regex=r'^[^А-Яа-яЁё]*$').count(),
         'faq': sum(1 for item in Faq.objects.filter(is_published=True)
-                   if not item.question_uz.strip() or not item.answer_uz.strip()),
+                   if not getattr(item, f'question_{language}').strip() or not getattr(item, f'answer_{language}').strip()),
     }
+
+
+# Keep the established Uzbek API for older integrations and tests.
+read_uz_strings = read_translation_strings
+write_uz_strings = write_translation_strings
+
+
+def build_uz_strings():
+    return build_translation_strings('uz')
+
+
+def load_uz_strings(strings):
+    return load_translation_strings(strings, 'uz')
+
+
+def missing_uz():
+    return missing_translations('uz')
