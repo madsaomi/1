@@ -42,7 +42,10 @@ class PrivateMediaTests(TestCase):
         response = self.client.get('/media/portrait.jpg')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(b''.join(response.streaming_content), b'private draft image')
-        response.close()
+        # The test client's streaming wrapper closes the response on exhaustion.
+        # A second close emits request_finished outside that wrapper and closes
+        # PostgreSQL while TestCase still owns its surrounding transaction.
+        self.assertTrue(response.closed)
         self.assertIn('private', response['Cache-Control'])
         self.assertIn('no-store', response['Cache-Control'])
         self.assertEqual(response['X-Robots-Tag'], 'noindex, nofollow')
