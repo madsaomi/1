@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { POSITIONS, EXPERIENCES, LEVELS, validateApplication } from '../hr-api/validation.mjs';
 
 const read = path => fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const implementations = ['script.js', 'assets/i18n/language.js'];
@@ -60,11 +61,11 @@ const element = (tagName, values = {}, childNodes = []) => {
 };
 const text = data => ({ nodeType: 3, data });
 
-function languageHarness(name, { saved = 'ru', blockedStorage = false, observe = true } = {}) {
+function languageHarness(name, { saved = 'ru', blockedStorage = false, observe = true, nodes = [], packs = {} } = {}) {
   const known = text('Кнопка');
   const unknown = text('Новый текст владельца без перевода');
   const field = element('INPUT', { placeholder: 'Имя' });
-  const root = element('HTML', {}, [known, unknown, field]);
+  const root = element('HTML', {}, [known, unknown, field, ...nodes]);
   const select = element('SELECT', { 'aria-label': 'Язык сайта' });
   const handlers = {};
   select.addEventListener = (type, callback) => { handlers[type] = callback; };
@@ -77,8 +78,8 @@ function languageHarness(name, { saved = 'ru', blockedStorage = false, observe =
   assert(from >= 0 && to > from);
   vm.runInNewContext(source.slice(from, to), {
     window: {
-      stanfordUz: { strings: { 'Кнопка': 'Tugma', 'Имя': 'Ism', 'Новый текст': 'Yangi matn', 'Язык сайта': 'Sayt tili' }, patterns: [] },
-      stanfordKaa: { strings: { 'Кнопка': 'Túyme', 'Имя': 'Atı', 'Новый текст': 'Jańa tekst', 'Язык сайта': 'Sayt tili' }, patterns: [] }
+      stanfordUz: packs.uz || { strings: { 'Кнопка': 'Tugma', 'Имя': 'Ism', 'Новый текст': 'Yangi matn', 'Язык сайта': 'Sayt tili' }, patterns: [] },
+      stanfordKaa: packs.kaa || { strings: { 'Кнопка': 'Túyme', 'Имя': 'Atı', 'Новый текст': 'Jańa tekst', 'Язык сайта': 'Sayt tili' }, patterns: [] }
     },
     document: { documentElement: root, querySelector: () => select },
     Node: { TEXT_NODE: 3, ELEMENT_NODE: 1 },
@@ -170,5 +171,77 @@ test('all pages and the reusable template offer a labelled native three-language
     }
     assert.match(page, /<script src="assets\/i18n\/uz\.js\?v=\d+"><\/script>/);
     assert.match(page, /<script src="assets\/i18n\/kaa\.js\?v=\d+"><\/script>/);
+  }
+});
+
+const careerEnums = { position: POSITIONS, experience: EXPERIENCES, level: LEVELS };
+
+function careerOptions(name) {
+  const html = read('career.html');
+  const select = html.match(new RegExp(`<select\\b[^>]*\\bname="${name}"[^>]*>([\\s\\S]*?)<\\/select>`));
+  assert(select, `Missing career select: ${name}`);
+  return [...select[1].matchAll(/<option\b([^>]*)>([^<]*)<\/option>/g)].map(([, attributes, label]) => ({
+    value: attributes.match(/\bvalue="([^"]*)"/)?.[1], label, attributes
+  }));
+}
+
+test('every career option has a stable explicit value matching the HR API enum', () => {
+  for (const [name, expected] of Object.entries(careerEnums)) {
+    const options = careerOptions(name);
+    assert.equal(options[0].value, '', `${name}: disabled placeholder submits no enum`);
+    assert.match(options[0].attributes, /\bdisabled\b/);
+    for (const option of options) assert.notEqual(option.value, undefined, `${name}: option needs an explicit value`);
+    assert.deepEqual(options.slice(1).map(option => option.value), expected, `${name}: HTML and HR enums must agree`);
+  }
+});
+
+test('translated career labels and later owner edits never change the submitted HR enums', () => {
+  const packs = {};
+  for (const language of ['uz', 'kaa']) {
+    const context = { window: {} };
+    vm.runInNewContext(read(`assets/i18n/${language}.js`), context, { timeout: 1000 });
+    packs[language] = Object.values(context.window)[0];
+  }
+  for (const implementation of implementations) {
+    const fields = Object.fromEntries(Object.keys(careerEnums).map(name => {
+      const options = careerOptions(name).map(({ value, label }) => {
+        const option = element('OPTION', value === undefined ? {} : { value }, [text(label)]);
+        // Native HTMLOptionElement.value falls back to its current text when the
+        // attribute is missing. This reproduces the translation regression.
+        Object.defineProperty(option, 'value', { get: () => option.getAttribute('value')
+          ?? option.childNodes.map(node => node.data).join('').trim().replace(/\s+/g, ' ') });
+        return option;
+      });
+      const field = element('SELECT', { name }, options);
+      field.selectedIndex = 1;
+      Object.defineProperty(field, 'value', { get: () => options[field.selectedIndex].value });
+      return [name, field];
+    }));
+    const page = languageHarness(implementation, { nodes: Object.values(fields), packs });
+    const payload = () => ({ name: 'Тестовый кандидат', phone: '+998901234567',
+      about: 'Достаточно длинное описание опыта преподавания.', consent: true,
+      photo: 'data:image/jpeg;base64,dGVzdA==',
+      ...Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, field.value])) });
+    for (const language of ['ru', 'uz', 'kaa', 'uz', 'ru']) {
+      page.choose(language);
+      const before = payload();
+      assert.doesNotThrow(() => validateApplication(before), `${implementation}: ${language} payload stays valid`);
+      for (const [name, expected] of Object.entries(careerEnums)) {
+        expected.forEach((value, index) => {
+          fields[name].selectedIndex = index + 1;
+          assert.equal(fields[name].value, value, `${name}: ${language} option value stays canonical`);
+        });
+        fields[name].selectedIndex = 1;
+      }
+      const label = fields.position.childNodes[1].childNodes[0].data;
+      assert.equal(/[А-Яа-яЁё]/.test(label), language === 'ru', `Visible ${language} label must translate`);
+      assert.deepEqual(payload(), before, 'Selecting another UI language keeps the request unchanged');
+    }
+    const label = fields.position.childNodes[1].childNodes[0];
+    label.data = 'Новая подпись вакансии владельца';
+    page.notify([{ type: 'characterData', target: label }]);
+    page.choose('kaa');
+    assert.equal(fields.position.value, POSITIONS[0], 'Owner label changes cannot change the API enum');
+    assert.doesNotThrow(() => validateApplication(payload()));
   }
 });
