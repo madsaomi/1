@@ -309,7 +309,8 @@ window.stanfordKaa = {
     "Не удалось отправить анкету. Попробуйте позже.": "Anketanı jiberiw múmkin bolmadı. Keyinirek qayta urınıp kóriń.",
     "Не удалось отправить анкету. Проверьте интернет и попробуйте снова.": "Anketanı jiberiw múmkin bolmadı. Internet baylanısın tekserip, qayta urınıp kóriń.",
     "Стоимость в месяц и программа — в каждой карточке.": "Aylıq baha hám baǵdarlama — hár bir kartochkada.",
-    "Стоимость обучения": "Oqıw bahası"
+    "Стоимость обучения": "Oqıw bahası",
+    "Готово": "Tayar"
   },
   patterns: [
     [/^(.+)\. Программ: (\d+)\.$/, (m, t) => `${t(m[1])}. Baǵdarlamalar: ${m[2]}.`],

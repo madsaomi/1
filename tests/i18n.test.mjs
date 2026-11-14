@@ -6,6 +6,31 @@ import vm from 'node:vm';
 const read = path => fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const implementations = ['script.js', 'assets/i18n/language.js'];
 
+test('default UI and text attributes from all four pages are covered in UZ and QQ', () => {
+  // A stable UI catalogue keeps owner-authored copy free to use the Russian fallback.
+  const defaults = JSON.parse(read('tests/fixtures/public-ui.json'));
+  assert(defaults.length >= 250, 'Coverage includes page copy, forms, confirmations and metadata');
+  for (const code of ['uz', 'kaa']) {
+    const context = {window:{}};
+    vm.runInNewContext(read(`assets/i18n/${code}.js`), context, {timeout:1000});
+    const pack = Object.values(context.window)[0];
+    const translate = value => {
+      const normalized = value.trim().replace(/\s+/g, ' ');
+      if (pack.strings[normalized] !== undefined) return pack.strings[normalized];
+      for (const [pattern, build] of pack.patterns) {
+        const match = normalized.match(pattern);
+        if (match) return build(match, translate);
+      }
+      return value;
+    };
+    for (const source of defaults) {
+      const translated = translate(source);
+      assert(translated.trim(), `${code}: empty translation for ${source}`);
+      assert(!/[А-Яа-яЁё]/.test(translated), `${code}: untranslated default UI: ${source}`);
+    }
+  }
+});
+
 test('published Uzbek and Karakalpak packs contain valid Latin translations and dynamic patterns', () => {
   for (const [file, name] of [['uz', 'stanfordUz'], ['kaa', 'stanfordKaa']]) {
     const context = { window: {} };
