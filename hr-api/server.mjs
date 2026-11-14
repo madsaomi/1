@@ -104,7 +104,13 @@ function filename() {
 
 const server = http.createServer(async (request, response) => {
   const started = Date.now();
-  const url = new URL(request.url || '/', 'http://localhost');
+  let url;
+  try {
+    url = new URL(request.url || '/', 'http://localhost');
+  } catch {
+    send(response, 400, { ok: false, error: 'invalid_url' });
+    return;
+  }
   const cors = corsHeaders(request.headers.origin || '');
   response.setHeader('vary', 'Origin');
   for (const [key, value] of Object.entries(cors)) response.setHeader(key, value);

@@ -16,7 +16,7 @@ window.schoolContent = {
       "label": "выпускников"
     },
     {
-      "value": "3",
+      "value": "2",
       "label": "филиала"
     },
     {
@@ -274,24 +274,12 @@ window.schoolContent = {
         "googleEmbed": "https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d2943.71432776504!2d59.625085076114246!3d42.45509397118431!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zNDLCsDI3JzE4LjMiTiA1OcKwMzcnMzkuNiJF!5e0!3m2!1sen!2s!4v1793096816414!5m2!1sen!2s",
         "maps": [
           {
+            "provider": "google",
+            "url": "https://www.google.com/maps/search/?api=1&query=42.455094%2C59.62766"
+          },
+          {
             "provider": "yandex",
             "url": "https://yandex.uz/maps/-/CXbaBC64"
-          }
-        ]
-      },
-      {
-        "id": "youth-center",
-        "name": "Филиал «Жазлар ораый»",
-        "address": "Центр молодёжи",
-        "coordinates": [
-          59.604319,
-          42.4576377
-        ],
-        "googleEmbed": "https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d735.9002264880083!2d59.6037444!3d42.4575069!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x41dd9bfa1b8a33fd%3A0x5ee2e3a48c877e81!2sJaslar%20oray%C4%B1!5e0!3m2!1sen!2s!4v1793096759095!5m2!1sen!2s",
-        "maps": [
-          {
-            "provider": "google",
-            "url": "https://maps.app.goo.gl/gpwS4FxMVecFB4T4A"
           }
         ]
       }
@@ -334,8 +322,8 @@ window.schoolContent = {
     "why.text3": "Учебник и печатные материалы входят в стоимость обучения.",
     "why.title4": "Практика вне уроков",
     "why.text4": "Speaking Club, Movie Club и пробные экзамены.",
-    "why.title5": "Три филиала",
-    "why.text5": "На Сараева, на Абдирова и в «Жазлар ораый».",
+    "why.title5": "Два филиала",
+    "why.text5": "На Сараева и на Абдирова.",
     "courses.title1": "Курсы и цены",
     "courses.text1": "Стоимость в месяц, скидка и программа — в каждой карточке.",
     "courses.text2": "Скидка действует, если из одной семьи занимаются 2 ученика или один ученик записан на 2 курса. Условия и итоговую стоимость подтвердите перед оплатой.",
@@ -421,7 +409,7 @@ window.schoolContent = {
     "modal.text2": "Запись согласовывается напрямую с центром. Эта страница не собирает имя и телефон.",
     "meta.description": "Курсы Stanford: английский и немецкий, IELTS и SAT, занятия для детей и математика. Программы, цены и адреса филиалов.",
     "meta.og_title": "Stanford — курсы английского, IELTS и SAT",
-    "meta.og_description": "Языки, IELTS, SAT и математика. Программы, цены и три филиала Stanford.",
+    "meta.og_description": "Языки, IELTS, SAT и математика. Программы, цены и два филиала Stanford.",
     "results.title1": "Результаты студентов — Stanford",
     "results.meta1": "Баллы и отзывы выпускников Stanford Language Center: IELTS, SAT и другие программы.",
     "results.meta2": "Результаты студентов — Stanford",

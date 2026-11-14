@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readContent, validateContent, generate, generateResults, generateCareer, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
+import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
 
 const publishedData = readContent();
 const sourceHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -61,7 +61,7 @@ test('every root COPY input and every asset file stays in the default-deny Docke
   const assets = walkFiles(new URL('../assets/', import.meta.url), 'assets/');
   assert(assets.length, 'Assets must be shipped inside the image');
   for (const file of assets) assert(dockerContextKeeps(file, rules), `Docker context excludes asset: ${file}`);
-  for (const required of ['assets/i18n/uz.js', 'assets/stanford-icon.svg', 'assets/favicon.svg', 'assets/errors/404.html']) {
+  for (const required of ['assets/i18n/uz.js', 'assets/i18n/kaa.js', 'assets/stanford-icon.svg', 'assets/favicon.svg', 'assets/errors/404.html']) {
     assert(assets.includes(required), `Missing Docker context asset: ${required}`);
   }
   assert(assets.some(file => /^assets\/fonts\/[\w.-]+\.woff2$/.test(file)), 'Local Inter WOFF2 fonts must be in the context');
@@ -664,7 +664,7 @@ function descendantTags(node, tag) {
   ]);
 }
 
-test('catalog exposes each program condition without a disclosure and labels its full details', () => {
+test('catalog includes all programme details in static HTML and labels its flip action', () => {
   for (const course of data.courses) {
     const output = renderCourses([course]);
     assert(!/<details\b/.test(output));
@@ -674,12 +674,14 @@ test('catalog exposes each program condition without a disclosure and labels its
     assert.deepEqual(items.map(item => item.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/g, '').replace(/<[^>]+>/g, '')), Array.from(course.skills, escapeHTML));
     for (const item of items) assert.match(item, /<svg\b[^>]*aria-hidden="true"[^>]*focusable="false"/);
     assert.equal((conditions[1].match(/<li>/g) || []).length, course.skills.length);
-    assert(output.includes('>Записаться<'));
-    assert.match(output, new RegExp(`<a\\b[^>]*href="#prices"[^>]*data-open-course="${course.id}"`));
+    assert(output.includes('>Подробнее<'));
+    assert.match(output, new RegExp(`<a\\b[^>]*href="#course-details-${course.id}"[^>]*data-flip-open`));
+    assert(output.includes(`id="course-details-${course.id}"`));
+    assert(!output.includes('data-open-course='));
   }
 });
 
-test('course dialog shows both eligible prices and clears the discount when switching to IELTS', () => {
+test('course dialog shows only the monthly price, ignoring legacy family prices', () => {
   const { context, nodes, element } = runtime();
   const course = data.courses.find(item => item.id === 'general-english');
   context.openModal(course.id, element());
@@ -690,14 +692,13 @@ test('course dialog shows both eligible prices and clears the discount when swit
   assert.equal(summary.children[4].href, `#course-${course.id}`);
   const [prices] = descendantTags(summary.children[2], 'dl');
   assert(prices, 'Expected semantic price list');
-  assert.equal(descendantTags(prices, 'dt').length, 2);
-  assert.equal(descendantTags(prices, 'dd').length, 2);
+  assert.equal(descendantTags(prices, 'dt').length, 1);
+  assert.equal(descendantTags(prices, 'dd').length, 1);
   const pricesText = nodeText(prices);
   assert(pricesText.includes(new Intl.NumberFormat('ru-RU').format(course.price)));
-  assert(pricesText.includes(new Intl.NumberFormat('ru-RU').format(course.specialPrice)));
-  assert.match(pricesText, /обычн/iu);
-  assert.match(pricesText, /семья\s*\/\s*два курса/iu);
-  assert.match(nodeText(summary.children[2]), /подтверд|уточн/iu);
+  assert(!pricesText.includes(new Intl.NumberFormat('ru-RU').format(course.specialPrice)));
+  assert.match(pricesText, /Стоимость обучения/u);
+  assert(!/семья|скидк/iu.test(nodeText(summary.children[2])));
   nodes['#contact-course'].value = 'ielts';
   nodes['#contact-course'].handlers.change();
   const ielts = data.courses.find(item => item.id === 'ielts');
@@ -821,10 +822,10 @@ test('reset reveals every course and restores focus to the all-programs filter',
   assert.equal(filters[0].focused, true);
 });
 
-test('each program has a static anchor and its own enrol action', () => {
+test('each program has a static anchor and its own programme details action', () => {
   for (const course of data.courses) {
     assert(html.includes(`id="course-${course.id}" tabindex="-1"`));
-    assert(html.includes(`href="#prices" data-open-course="${course.id}"`));
+    assert(html.includes(`href="#course-details-${course.id}" data-flip-open`));
   }
   assert(html.includes('<span id="prices" class="anchor-alias" aria-hidden="true"></span>'), 'Old #prices links land in the merged section');
 });
@@ -864,20 +865,21 @@ test('hash navigation reveals and scrolls to a course after a conflicting filter
   assert.equal(card.scrolled, true);
 });
 
-test('each course card shows the monthly price and the family price or its absence', () => {
+test('each course card shows only the monthly price even when legacy family data exists', () => {
   const format = value => new Intl.NumberFormat('ru-RU').format(value);
   for (const course of data.courses) {
     const card = renderCourses([course]);
     assert(card.includes(`<p class="course-price"><strong>${format(course.price)}</strong> сум / месяц</p>`));
-    if (course.specialPrice) assert(card.includes(`Семья · 2 курса <strong>${format(course.specialPrice)} сум</strong>`));
-    else assert(card.includes('Семейной цены нет') && !card.includes('Семья · 2 курса'));
+    assert(!card.includes('Семейной цены нет') && !card.includes('Семья · 2 курса'));
+    assert(!card.includes('course-special'));
   }
   const escaped = renderCourses([{ ...data.courses[0], subtitle: '<b>x</b>', skills: ['<i>y</i>'] }]);
   assert(!/<b>|<i>/.test(escaped));
 });
 
-test('discount conditions are visible without a popup, disclosure or JavaScript', () => {
-  assert(/<p class="discount-note" id="discounts"[^>]*>[^<]+<\/p>/.test(html));
+test('removed family discounts have no leftover notice or disclosure in the catalogue', () => {
+  assert(!html.includes('id="discounts"'));
+  assert(!html.includes('discount-note'));
   assert(!html.includes('discount-explainer'));
   assert(!html.includes('data-open-discounts'));
   assert(!html.includes('discount-tooltip'));
@@ -890,7 +892,7 @@ test('PLAN-053: no direction strip under the first screen; filters live in the c
 
 test('stats, teachers and results are generated from content and demo mode controls every sample marker', () => {
   const demo = { ...data.site, demoMode: true, demoLabels: true };
-  const live = { ...data.site, demoMode: false, demoLabels: false };
+  const live = { ...data.site, url: 'https://stanford.example/', demoMode: false, demoLabels: false };
   assert.match(renderDemoBanner(demo), /class="demo-banner"/);
   assert.equal(renderDemoBanner(live), '');
   assert.match(renderStats(data.stats, demo), /class="demo-tag">Пример<\/span><dl>/);
@@ -899,7 +901,8 @@ test('stats, teachers and results are generated from content and demo mode contr
   assert.equal((renderStats(data.stats, live).match(/<dd>/g) || []).length, data.stats.length);
   const teachers = renderTeachers(data.teachers, live);
   assert.equal((teachers.match(/class="teacher-card"/g) || []).length, data.teachers.length);
-  assert(teachers.includes(`>${initials(data.teachers[0].name)}</div>`));
+  assert(teachers.includes('class="teacher-brand" src="assets/stanford-icon.svg"'));
+  assert(!teachers.includes(`>${initials(data.teachers[0].name)}</div>`));
   assert.equal(initials('Айгуль Бекмуратова'), 'АБ');
   const withPhoto = renderTeachers([{ ...data.teachers[0], photo: 'assets/stanford-logo.webp' }], live);
   assert(withPhoto.includes('<img class="teacher-photo" src="assets/stanford-logo.webp"') && !withPhoto.includes('teacher-initials'));
@@ -920,6 +923,44 @@ test('stats, teachers and results are generated from content and demo mode contr
   assert(liveHtml.includes('href="#teachers"') && liveHtml.includes('id="teachers"'));
 });
 
+test('featured teachers and results: index shows only admin-configured tops, results.html keeps everyone', () => {
+  const live = { ...data.site, url: 'https://stanford.example/', demoMode: false, demoLabels: false };
+  // Three featured teachers (1st, 2nd and 4th) among four: featuredOnly keeps them in order.
+  const tops = renderTeachers(data.teachers, live, { featuredOnly: true });
+  const topNames = [...tops.matchAll(/<h3>([^<]+)<\/h3>/g)].map(match => match[1]);
+  assert.deepEqual(topNames, ['Азиз Каримов', 'Дилноза Юсупова', 'Рустем Жумабаев']);
+  assert(tops.includes('href="teachers.html"'), 'The home page links to the full teachers list');
+  // A single-card grid stretches across the row, so mixed lists never leave gaps.
+  assert(!tops.includes('Айгуль'));
+  // Full list (results.html): everyone stays, featured first.
+  const full = renderTeachers(data.teachers, live);
+  assert.equal((full.match(/class="teacher-card"/g) || []).length, data.teachers.length);
+  assert([...full.matchAll(/<h3>([^<]+)<\/h3>/g)].map(match => match[1]).indexOf('Рустем Жумабаев') < [...full.matchAll(/<h3>([^<]+)<\/h3>/g)].map(match => match[1]).indexOf('Айгуль Бекмуратова'));
+  // Fallback: with no featured teacher the section shows everyone instead of an empty grid.
+  const none = renderTeachers(data.teachers.map(teacher => ({ ...teacher, featured: undefined })), live, { featuredOnly: true });
+  assert.equal((none.match(/class="teacher-card"/g) || []).length, data.teachers.length);
+  assert(none.includes('href="teachers.html"'), 'The home section always offers the full teachers page');
+  // Results: featured first on the home page, all cards on results.html.
+  const resultTops = renderResults(data.results, live, { featuredOnly: true });
+  assert.equal((resultTops.match(/class="result-card"/g) || []).length, 2);
+  assert([...resultTops.matchAll(/class="result-name">([^<·]+)/g)].map(match => match[1].trim()).indexOf('Малика Т.') === 0);
+  const allResults = renderResults(data.results, live);
+  assert.equal((allResults.match(/class="result-card"/g) || []).length, data.results.length);
+  // The published pages follow the same rules.
+  const indexHtml = generate(html, { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
+  const teachersSection = indexHtml.slice(indexHtml.indexOf('<!-- TEACHERS_START -->'), indexHtml.indexOf('<!-- TEACHERS_END -->'));
+  assert.equal((teachersSection.match(/class="teacher-card"/g) || []).length, 3, 'index keeps only featured teachers');  const resultsSection = indexHtml.slice(indexHtml.indexOf('<!-- RESULTS_START -->'), indexHtml.indexOf('<!-- RESULTS_END -->'));
+  assert.equal((resultsSection.match(/class="result-card"/g) || []).length, 2, 'index keeps only featured results');
+  // The dedicated teachers page lists everyone (featured first) with its own canonical URL,
+  // while results.html stays about students only.
+  const teachersPage = generateTeachers(fs.readFileSync(new URL('../teachers.html', import.meta.url), 'utf8'), { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
+  assert.equal((teachersPage.match(/class="profile-card profile-card-teacher"/g) || []).length, data.teachers.length);
+  assert(teachersPage.includes('rel="canonical" href="https://stanford.example/teachers.html"'));
+  assert(!teachersPage.includes('result-card'), 'The teachers page does not mix in student results');
+  const resultsPage = generateResults(fs.readFileSync(new URL('../results.html', import.meta.url), 'utf8'), { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
+  assert(!resultsPage.includes('teacher-card'), 'The results page does not mix in teachers');
+});
+
 test('content validation guards stats, teachers, results, photos and student consent', () => {
   const valid = () => structuredClone(data);
   assert.doesNotThrow(() => validateContent(valid()));
@@ -929,6 +970,8 @@ test('content validation guards stats, teachers, results, photos and student con
     content => { content.teachers[0].name = ''; },
     content => { content.teachers[0].photo = 'https://example.org/p.jpg'; },
     content => { content.teachers[0].photo = 'assets/uploads/missing.webp'; },
+    content => { content.teachers[0].featured = 'yes'; },
+    content => { content.results[0].featured = 1; },
     content => { content.results[0].quote = ''; },
     content => { content.site.demoMode = 'yes'; },
     content => { content.teachers = {}; }
@@ -1005,7 +1048,8 @@ test('first-screen entrance runs only when motion is allowed, and there is no sc
   const css = fs.readFileSync(new URL('../style.css', import.meta.url), 'utf8');
   for (const match of css.matchAll(/([^{}]+)\{[^{}]*animation:\s*hero-in/g)) assert.match(match[1], /\[data-motion="on"\]/, 'Hero entrance needs the head-time motion flag');
   assert(!/scroll-progress|animation-timeline/.test(css), 'The owner removed the scroll progress bar');
-  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  // Component-specific reduced-motion blocks may follow the global motion safeguard.
+  const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
   assert.match(reduced, /transform: none !important/);
   assert.match(reduced, /animation: none !important/);
 });
@@ -1024,7 +1068,7 @@ test('the full results page ships every result and is generated from the same da
   const template = fs.readFileSync(new URL('../results.html', import.meta.url), 'utf8');
   const output = generateResults(template, data);
   assert.equal(generateResults(output, data), output);
-  assert.equal((output.match(/class="result-card"/g) || []).length, data.results.length);
+  assert.equal((output.match(/class="profile-card profile-card-result"/g) || []).length, data.results.length);
   assert(template.includes('href="index.html"') && template.includes('href="index.html#courses"'));
   assert.match(template, /<script src="results\.js\?v=\d+"><\/script>/);
   assert(!/<script>([\s\S]*?)<\/script>/.test(template), 'The results page keeps scripts external for CSP');
@@ -1091,7 +1135,7 @@ test('the admin can change auxiliary page copy and attributes without injecting 
 });
 
 test('publishing new data or translations gives only the changed file a new cache version', () => {
-  const template = '<script src="content.js?v=1"></script><script src="assets/i18n/uz.js?v=1"></script><script src="script.js?v=56"></script>';
+  const template = '<script src="content.js?v=1"></script><script src="assets/i18n/uz.js?v=1"></script><script src="script.js?v=56"></script><script src="assets/i18n/kaa.js?v=1"></script>';
   const versions = output => [...output.matchAll(/src="([^"]+)"/g)].map(match => match[1]);
   const first = versions(versionContentAssets(template, data, 'dictionary one'));
   const configured = structuredClone(data);
@@ -1104,6 +1148,10 @@ test('publishing new data or translations gives only the changed file a new cach
   assert.notEqual(first[1], changedTranslation[1]);
   assert.equal(first[2], changedContent[2]);
   assert.equal(first[2], changedTranslation[2]);
+  const changedKarakalpak = versions(versionContentAssets(template, data, 'dictionary one', 'new Karakalpak dictionary'));
+  assert.equal(first[0], changedKarakalpak[0]);
+  assert.equal(first[1], changedKarakalpak[1]);
+  assert.notEqual(first[3], changedKarakalpak[3]);
   assert.equal(versionContentAssets(versionContentAssets(template, data, 'dictionary one'), data, 'dictionary one'),
     versionContentAssets(template, data, 'dictionary one'));
 });
@@ -1155,11 +1203,12 @@ test('a staged build uses its own data and validates every page before replacing
   const temporaryRoot = path.resolve(os.tmpdir());
   const stage = fs.mkdtempSync(path.join(temporaryRoot, 'stanford-site-build-'));
   try {
-    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html']) {
+    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html']) {
       fs.copyFileSync(new URL(`../${file}`, import.meta.url), path.join(stage, file));
     }
     fs.mkdirSync(path.join(stage, 'assets', 'i18n'), { recursive: true });
     fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'uz.js'), 'window.stanfordUz = { strings: {}, patterns: [] };\n');
+    fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'kaa.js'), 'window.stanfordKaa = { strings: {}, patterns: [] };\n');
     const fixture = {
       site: { url: 'https://staged.example', demoMode: false },
       courses: [{ id: 'staged-course', name: 'Проверочный курс', category: 'languages', description: 'Описание курса',

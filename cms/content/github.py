@@ -18,9 +18,12 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-SOURCE_FILES = ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'assets/i18n/uz.js')
-OUTPUT_FILES = frozenset(('content.js', 'index.html', 'results.html', 'career.html', 'assets/i18n/uz.js'))
+SOURCE_FILES = ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html',
+                'assets/i18n/uz.js', 'assets/i18n/kaa.js')
+OUTPUT_FILES = frozenset(('content.js', 'index.html', 'results.html', 'career.html', 'teachers.html',
+                          'assets/i18n/uz.js', 'assets/i18n/kaa.js'))
 PHOTO_PATH = re.compile(r'assets/[a-z0-9/_-]+\.(?:jpe?g|webp|png)\Z')
+MANAGED_PHOTO = re.compile(r'assets/uploads/[0-9a-f]{64}\.jpg\Z')
 
 
 def allowed_photo(path):
@@ -112,21 +115,25 @@ class GitHubClient:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(content)
 
-    def publish(self, snapshot, files):
+    def publish(self, snapshot, files, delete_paths=()):
         changed = {}
         for path, content in files.items():
             if path not in OUTPUT_FILES and not (path.startswith('assets/uploads/') and allowed_photo(path)):
                 raise GitHubError('Публикация содержит файл вне разрешённого списка.')
             if snapshot['entries'].get(path, {}).get('sha') != blob_sha(content):
                 changed[path] = content
+        removals = set(delete_paths)
+        if any(not MANAGED_PHOTO.fullmatch(path) or path in files or path not in snapshot['entries'] for path in removals):
+            raise GitHubError('Удалять можно только старые управляемые фотографии вне текущей публикации.')
         if self.head() != snapshot['parent']:
             raise GitHubError('Ветка изменилась во время сборки. Повторите публикацию с актуальными исходниками.')
-        if not changed:
+        if not changed and not removals:
             return {'commit': snapshot['parent'], 'changed': False}
         entries = []
         for path, content in changed.items():
             blob = self.request('POST', '/git/blobs', {'encoding': 'base64', 'content': base64.b64encode(content).decode('ascii')})
             entries.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': blob['sha']})
+        entries.extend({'path': path, 'mode': '100644', 'type': 'blob', 'sha': None} for path in sorted(removals))
         tree = self.request('POST', '/git/trees', {'base_tree': snapshot['tree'], 'tree': entries})
         commit = self.request('POST', '/git/commits', {'message': 'Publish site content from Stanford admin',
                               'tree': tree['sha'], 'parents': [snapshot['parent']]})

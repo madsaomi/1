@@ -9,8 +9,8 @@ from django.forms.models import BaseInlineFormSet
 from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 
-from .models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Faq, Location,
-                     MapLink, PageText, Phone, SiteSettings, Stat, StudentResult, Teacher, Translation)
+from .models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Event, Faq, Location,
+                     MapLink, PageText, Phone, Practice, SiteSettings, Stat, StudentResult, Teacher, Translation)
 
 admin.site.unregister(User)
 admin.site.unregister(Group)
@@ -57,6 +57,50 @@ class StatAdmin(ModelAdmin):
     list_editable = ['order']
 
 
+class DraftTemplateAdmin(ModelAdmin):
+    """Reuse a saved record's structure without publishing a copied person, photo or consent."""
+    save_as = True
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        initial['is_published'] = False
+        return initial
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        form_class = super().get_form(request, obj, change=change, **kwargs)
+        if '_saveasnew' not in request.POST:
+            return form_class
+
+        class DraftCopyForm(form_class):
+            def clean(self):
+                cleaned = super().clean()
+                for name in ('is_published', 'featured', 'consent'):
+                    if name in self.fields:
+                        cleaned[name] = False
+                for name in ('photo', 'photo_path'):
+                    if name in self.fields:
+                        cleaned[name] = False if name == 'photo' else ''
+                return cleaned
+
+        return DraftCopyForm
+
+    def response_add(self, request, obj, post_url_continue=None):
+        if '_saveasnew' in request.POST:
+            self.message_user(request, 'Создан черновик по шаблону. Замените данные и фото; '
+                                      'для нового результата заново подтвердите согласие. '
+                                      'Затем включите показ и опубликуйте сайт.')
+        return super().response_add(request, obj, post_url_continue)
+
+
+@admin.register(Event)
+class EventAdmin(DraftTemplateAdmin):
+    list_display = ['title', 'starts_at', 'is_published', 'order']
+    list_editable = ['is_published', 'order']
+    list_filter = ['is_published']
+    search_fields = ['title', 'description']
+    fields = ['title', 'description', 'starts_at', 'url', 'is_published', 'order']
+
+
 class RequiredContentInlineFormSet(BaseInlineFormSet):
     """Validate what will remain after this save, including deletion of all existing rows."""
 
@@ -83,24 +127,20 @@ class CourseSkillInline(TabularInline):
 @admin.register(Course)
 class CourseAdmin(ModelAdmin):
     readonly_fields = ['slug', 'target']
-    list_display = ['__str__', 'category', 'price_display', 'special_display', 'is_published', 'order']
+    list_display = ['__str__', 'category', 'price_display', 'is_published', 'order']
     list_editable = ['is_published', 'order']
     list_filter = ['category', 'is_published']
     search_fields = ['name', 'subtitle', 'description']
     inlines = [CourseSkillInline]
     fieldsets = [
         (None, {'fields': ['name', 'subtitle', 'category', 'description']}),
-        ('Цены', {'fields': [('price', 'special_price')]}),
+        ('Цена', {'fields': ['price']}),
         ('Публикация', {'fields': ['is_published', 'order', 'slug', 'target'], 'classes': ['collapse']}),
     ]
 
     @admin.display(description='Цена', ordering='price')
     def price_display(self, obj):
         return f'{obj.price:,}'.replace(',', ' ') + ' сум'
-
-    @admin.display(description='Семейная')
-    def special_display(self, obj):
-        return f'{obj.special_price:,}'.replace(',', ' ') + ' сум' if obj.special_price else '—'
 
 
 class PhoneInline(TabularInline):
@@ -192,12 +232,12 @@ class LocationAdmin(ModelAdmin):
 
 
 @admin.register(Teacher)
-class TeacherAdmin(ModelAdmin):
-    list_display = ['photo_preview', 'name', 'role', 'qualification', 'experience', 'is_published', 'order']
+class TeacherAdmin(DraftTemplateAdmin):
+    list_display = ['photo_preview', 'name', 'role', 'qualification', 'experience', 'featured', 'is_published', 'order']
     list_display_links = ['photo_preview', 'name']
-    list_editable = ['is_published', 'order']
+    list_editable = ['featured', 'is_published', 'order']
     search_fields = ['name', 'role']
-    fields = ['name', 'role', 'qualification', 'experience', 'photo', 'photo_path', 'is_published', 'order']
+    fields = ['name', 'role', 'qualification', 'experience', 'photo', 'photo_path', 'featured', 'is_published', 'order']
 
     @admin.display(description='Фото')
     def photo_preview(self, obj):
@@ -205,15 +245,37 @@ class TeacherAdmin(ModelAdmin):
 
 
 @admin.register(StudentResult)
-class StudentResultAdmin(ModelAdmin):
-    list_display = ['score', 'exam', 'level', 'student', 'consent', 'is_published', 'order']
-    list_editable = ['is_published', 'order']
-    list_filter = ['exam', 'consent', 'is_published']
+class StudentResultAdmin(DraftTemplateAdmin):
+    list_display = ['score', 'exam', 'level', 'student', 'featured', 'consent', 'is_published', 'order']
+    list_editable = ['featured', 'is_published', 'order']
+    list_filter = ['exam', 'featured', 'consent', 'is_published']
     fieldsets = [
         ('Результат', {'fields': [('score', 'exam', 'level')]}),
         ('Отзыв', {'fields': ['quote', ('student', 'course')]}),
-        ('Публикация', {'fields': ['consent', 'is_published', 'order']}),
+        ('Публикация', {'fields': ['featured', 'consent', 'is_published', 'order']}),
     ]
+
+
+@admin.register(Practice)
+class PracticeAdmin(DraftTemplateAdmin):
+    readonly_fields = ['slug']
+    list_display = ['photo_preview', 'title', 'is_published', 'order']
+    list_display_links = ['photo_preview', 'title']
+    list_editable = ['is_published', 'order']
+    list_filter = ['is_published']
+    search_fields = ['title', 'description']
+    fieldsets = [
+        ('Карточка занятия', {'fields': ['title', 'description', 'label']}),
+        ('Фото', {'fields': ['photo', 'photo_alt'],
+                  'description': 'Загрузите реальный снимок Speaking Club, Movie Club или пробного экзамена. '
+                                 'Без фотографии останется фирменная иллюстрация.'}),
+        ('Публикация', {'fields': ['is_published', 'order']}),
+        ('Служебное', {'fields': ['slug', 'photo_path'], 'classes': ['collapse']}),
+    ]
+
+    @admin.display(description='Фото')
+    def photo_preview(self, obj):
+        return thumbnail(obj.photo)
 
 
 @admin.register(CashbackTier)
@@ -243,12 +305,12 @@ def shorten(value, limit=90):
 @admin.register(PageText)
 class PageTextAdmin(ModelAdmin):
     """Texts are tied to places in the page, so they are edited but never added or removed here."""
-    list_display = ['place_display', 'section', 'text_display', 'uz_display']
+    list_display = ['place_display', 'section', 'text_display', 'uz_display', 'kaa_display']
     list_display_links = ['place_display', 'text_display']
     list_filter = ['section']
-    search_fields = ['text', 'uz']
+    search_fields = ['text', 'uz', 'kaa']
     list_per_page = 200
-    fields = ['where', 'text', 'uz']
+    fields = ['where', 'text', 'uz', 'kaa']
     readonly_fields = ['where']
 
     def has_add_permission(self, request):
@@ -269,6 +331,10 @@ class PageTextAdmin(ModelAdmin):
     def uz_display(self, obj):
         return shorten(obj.uz, 60) or '—'
 
+    @admin.display(description='По-каракалпакски')
+    def kaa_display(self, obj):
+        return shorten(obj.kaa, 60) or '—'
+
     @admin.display(description='Где на сайте')
     def where(self, obj):
         return str(obj)
@@ -276,26 +342,31 @@ class PageTextAdmin(ModelAdmin):
 
 @admin.register(Faq)
 class FaqAdmin(ModelAdmin):
-    list_display = ['question', 'has_uz', 'is_published', 'order']
+    list_display = ['question', 'has_uz', 'has_kaa', 'is_published', 'order']
     list_editable = ['is_published', 'order']
     search_fields = ['question', 'answer']
     fieldsets = [
         (None, {'fields': ['question', 'answer']}),
         ('По-узбекски', {'fields': ['question_uz', 'answer_uz']}),
+        ('По-каракалпакски', {'fields': ['question_kaa', 'answer_kaa']}),
         ('Публикация', {'fields': ['is_published', 'order']}),
     ]
 
-    @admin.display(description='Есть перевод', boolean=True)
+    @admin.display(description='UZ', boolean=True)
     def has_uz(self, obj):
         return bool(obj.question_uz.strip() and obj.answer_uz.strip())
+
+    @admin.display(description='QQ', boolean=True)
+    def has_kaa(self, obj):
+        return bool(obj.question_kaa.strip() and obj.answer_kaa.strip())
 
 
 @admin.register(Translation)
 class TranslationAdmin(ModelAdmin):
-    list_display = ['source_display', 'uz_display']
-    search_fields = ['source', 'uz']
+    list_display = ['source_display', 'uz_display', 'kaa_display']
+    search_fields = ['source', 'uz', 'kaa']
     list_per_page = 100
-    fields = ['source', 'uz']
+    fields = ['source', 'uz', 'kaa']
 
     @admin.display(description='Текст на сайте', ordering='source')
     def source_display(self, obj):
@@ -304,3 +375,7 @@ class TranslationAdmin(ModelAdmin):
     @admin.display(description='По-узбекски')
     def uz_display(self, obj):
         return shorten(obj.uz)
+
+    @admin.display(description='По-каракалпакски')
+    def kaa_display(self, obj):
+        return shorten(obj.kaa)

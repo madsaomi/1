@@ -1,7 +1,28 @@
 {% extends "admin/index.html" %}
+{% load static %}
 {% comment %}Stock Django index plus the «Опубликовать» button (config.sites.StanfordAdminSite.publish_view).{% endcomment %}
 
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'content/dashboard.css' %}?v=1">
+{% endblock %}
+
 {% block content %}
+<div class="module" id="quick-edit">
+  <h2>Быстрое добавление и шаблоны</h2>
+  <p>Заполните поля реальными данными, сохраните запись, затем включите «Показывать на сайте».
+    Чтобы использовать существующую карточку как шаблон, откройте её и нажмите «Сохранить как новый объект».
+    Копия останется черновиком: фото, отметка «Топ» и согласие ученика не переносятся.</p>
+  <ul class="quick-edit-actions">
+    {% if perms.content.add_teacher %}<li><a href="{% url 'admin:content_teacher_add' %}">Добавить преподавателя</a><span>Имя → направление → квалификация → опыт → реальное фото.</span></li>{% endif %}
+    {% if perms.content.add_studentresult %}<li><a href="{% url 'admin:content_studentresult_add' %}">Добавить результат ученика</a><span>Ученик → экзамен и балл → отзыв → согласие на публикацию.</span></li>{% endif %}
+    {% if perms.content.add_practice %}<li><a href="{% url 'admin:content_practice_add' %}">Добавить занятие и фото</a><span>Название → краткое описание → фото → описание фотографии.</span></li>{% endif %}
+    {% if perms.content.add_event %}<li><a href="{% url 'admin:content_event_add' %}">Добавить событие с таймером</a><span>Название → дата и время Нукуса → условия → ссылка, если нужна.</span></li>{% endif %}
+    {% if perms.content.view_pagetext %}<li><a href="{% url 'admin:content_pagetext_changelist' %}">Изменить тексты страниц</a><span>Русский текст и переводы UZ / QQ редактируются рядом.</span></li>{% endif %}
+    {% if perms.content.view_translation %}<li><a href="{% url 'admin:content_translation_changelist' %}">Переводы карточек и кнопок</a><span>Вставьте точную русскую надпись и её переводы.</span></li>{% endif %}
+  </ul>
+  <p class="help">Сохранение обновляет черновик в админке. Изменения становятся видны на сайте после кнопки «Опубликовать на сайт».</p>
+</div>
 {% if can_publish %}
 <form method="post" action="{% url 'admin:publish' %}" class="module" id="publish-form">
   {% csrf_token %}

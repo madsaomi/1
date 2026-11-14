@@ -5,7 +5,7 @@
   "description": "Static Stanford Language Center landing page",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test tests/site.test.mjs tests/i18n.test.mjs tests/design-system.test.mjs tests/owner-workflow.test.mjs",
-    "check": "node --check script.js && node --check content.js && node --check theme-init.js && node --check assets/i18n/uz.js && node --check results.js && node --check career.js && node build.mjs --check && npm test && python tests/validate_html.py"
+    "test": "node --test tests/site.test.mjs tests/i18n.test.mjs tests/design-system.test.mjs tests/owner-workflow.test.mjs tests/countdown.test.mjs tests/events.test.mjs tests/course-flip.test.mjs tests/directory-view.test.mjs tests/maps-icons.test.mjs tests/practices.test.mjs",
+    "check": "node --check script.js && node --check content.js && node --check theme-init.js && node --check assets/i18n/uz.js && node --check assets/i18n/kaa.js && node --check assets/i18n/language.js && node --check assets/course-flip.js && node --check assets/directory-view.js && node --check results.js && node --check career.js && node build.mjs --check && npm test && python tests/validate_html.py"
   }
 }

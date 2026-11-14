@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 from django.utils.text import slugify
+from django.utils import timezone
 
 from .validators import PHOTO_VALIDATORS
 
@@ -44,11 +45,25 @@ def validate_https_site_url(value):
             or '@' in url.netloc):
         raise ValidationError('Только https:// без логина, параметров (?…) и якоря (#…). Путь после домена можно.')
 
+
+def validate_event_url(value):
+    """A public registration page may have query parameters, but must use HTTPS without credentials."""
+    if not value:
+        return
+    try:
+        url = urlsplit(value)
+        invalid = (url.scheme != 'https' or not url.hostname or url.username or url.password
+                   or any(char.isspace() or ord(char) < 32 for char in value))
+    except ValueError:
+        invalid = True
+    if invalid:
+        raise ValidationError('Укажите https:// ссылку без логина и пароля.')
+
 telegram_validator = RegexValidator(r'^https://t\.me/[a-zA-Z0-9_]{5,32}$', 'Прямая ссылка вида https://t.me/имя.')
 instagram_validator = RegexValidator(r'^https://www\.instagram\.com/[a-zA-Z0-9_.]{1,30}/?$', 'Ссылка вида https://www.instagram.com/имя/.')
 target_validator = RegexValidator(r'^#[a-z0-9-]+$', 'Якорь на странице, например #prices.')
 MAP_PATTERNS = {
-    'google': RegexValidator(r'^https://maps\.app\.goo\.gl/[a-zA-Z0-9_-]+/?$', 'Короткая ссылка Google Maps (maps.app.goo.gl).'),
+    'google': RegexValidator(r'^https://(?:maps\.app\.goo\.gl/[a-zA-Z0-9_-]+/?|www\.google\.com/maps/search/\?api=1&query=-?\d+(?:\.\d+)?(?:%2[Cc]|,)-?\d+(?:\.\d+)?)$', 'Ссылка Google Maps: maps.app.goo.gl или поиск по координатам на www.google.com/maps/search/.'),
     'yandex': RegexValidator(r'^https://yandex\.(?:uz|com|ru)/maps/(?:-/[a-zA-Z0-9_-]+|org/[a-zA-Z0-9_-]+/\d+)/?$', 'Ссылка Яндекс Карт (yandex.uz/maps/-/…).'),
 }
 google_embed_validator = RegexValidator(r'^https://www\.google\.com/maps/embed\?pb=[^&#\s]+$', 'Ссылка «Встроить карту» из Google Maps (https://www.google.com/maps/embed?pb=…).')
@@ -78,7 +93,7 @@ class Singleton(models.Model):
 
 
 class SiteSettings(Singleton):
-    demo_mode = models.BooleanField('Демо-режим', default=True,
+    demo_mode = models.BooleanField('Демо-режим', default=False,
                                     help_text='Включен: на сайте плашка «Демо-версия» и метки «Пример». Выключите, когда все данные реальные.')
     demo_labels = models.BooleanField('Плашки «Пример»', default=True,
                                       help_text='Показывать баннер демо-версии и метки «Пример» на блоках. Выключите, чтобы смотреть сайт без служебных подписей.')
@@ -110,6 +125,31 @@ class Stat(Ordered):
         return f'{self.value} — {self.label}'
 
 
+class Event(Ordered):
+    title = models.CharField('Название события', max_length=120)
+    description = models.TextField('Описание', max_length=400, blank=True)
+    starts_at = models.DateTimeField('Дата и время начала',
+                                     help_text='Время Нукуса (Asia/Tashkent, UTC+5). Счётчик остановится в момент начала.')
+    url = models.URLField('Ссылка для записи', max_length=500, blank=True, validators=[validate_event_url])
+    is_published = models.BooleanField('Показывать на сайте', default=True)
+
+    class Meta(Ordered.Meta):
+        verbose_name = 'Событие'
+        verbose_name_plural = 'События и обратный отсчёт'
+
+    def __str__(self):
+        return self.title
+
+    def clean(self):
+        errors = {}
+        if not (self.title or '').strip():
+            errors['title'] = 'Укажите название события.'
+        if self.starts_at is not None and timezone.is_naive(self.starts_at):
+            errors['starts_at'] = 'Дата должна содержать часовой пояс. В форме админки используется время Нукуса.'
+        if errors:
+            raise ValidationError(errors)
+
+
 class Course(Ordered):
     CATEGORIES = [('languages', 'Языки'), ('kids', 'Для детей'), ('subjects', 'Математика'), ('exam', 'IELTS и SAT')]
     slug = models.CharField('Код (в адресе)', max_length=60, unique=True, blank=True, validators=[slug_validator])
@@ -139,8 +179,6 @@ class Course(Ordered):
             errors['name'] = 'Укажите название курса.'
         if not (self.description or '').strip():
             errors['description'] = 'Укажите описание курса.'
-        if self.special_price is not None and self.price is not None and self.special_price >= self.price:
-            errors['special_price'] = 'Семейная цена должна быть ниже обычной.'
         if errors:
             raise ValidationError(errors)
 
@@ -311,9 +349,11 @@ class Teacher(Ordered):
     qualification = models.CharField('Квалификация', max_length=40, blank=True, help_text='Например: IELTS 8.5, CELTA')
     experience = models.CharField('Опыт', max_length=40, blank=True, help_text='Например: 6 лет опыта')
     photo = models.ImageField('Фото', upload_to='teachers/', blank=True, validators=PHOTO_VALIDATORS,
-                              help_text='Вертикальное 4:5, JPG/PNG/WebP до 5 МБ. Без фото — инициалы.')
+                              help_text='Вертикальное 4:5, JPG/PNG/WebP до 5 МБ. Фото сжимается автоматически. Без фото — логотип Stanford.')
     photo_path = models.CharField('Фото из файлов сайта', max_length=240, blank=True, validators=[photo_path_validator],
                                   help_text='Сохраняется при импорте. Загруженное фото имеет приоритет.')
+    featured = models.BooleanField('Топ', default=False,
+                                   help_text='Отмеченные показываются в секции «Преподаватели» на главной; полный список — на странице преподавателей.')
     is_published = models.BooleanField('Показывать на сайте', default=True)
 
     class Meta(Ordered.Meta):
@@ -322,6 +362,45 @@ class Teacher(Ordered):
 
     def __str__(self):
         return self.name
+
+
+class Practice(Ordered):
+    slug = models.CharField('Код', max_length=40, unique=True, blank=True, validators=[slug_validator])
+    title = models.CharField('Название занятия', max_length=120)
+    description = models.TextField('Описание', max_length=400)
+    label = models.CharField('Короткая подпись', max_length=40, blank=True,
+                             help_text='Например: Speaking, Movie или Exams. Можно оставить пустым.')
+    photo = models.ImageField('Реальное фото занятия', upload_to='practice/', blank=True, validators=PHOTO_VALIDATORS,
+                              help_text='JPG, PNG или WebP до 5 МБ. Обложка 16:10. Фото сжимается автоматически.')
+    photo_path = models.CharField('Фото из файлов сайта', max_length=240, blank=True, validators=[photo_path_validator],
+                                  help_text='Сохраняется при импорте. Загруженное фото имеет приоритет.')
+    photo_alt = models.CharField('Описание фотографии', max_length=160, blank=True,
+                                 help_text='Кратко опишите, что изображено. Например: участники обсуждают тему в группе.')
+    is_published = models.BooleanField('Показывать на сайте', default=False)
+
+    class Meta(Ordered.Meta):
+        verbose_name = 'Занятие вне уроков'
+        verbose_name_plural = 'Практика вне уроков и фото'
+
+    def __str__(self):
+        return self.title
+
+    def clean(self):
+        if not (self.title or '').strip() or not (self.description or '').strip():
+            raise ValidationError('Укажите название и описание занятия.')
+
+    def save(self, *args, **kwargs):
+        # The title can change later; existing anchors keep their original identifier.
+        if not self.slug:
+            limit = self._meta.get_field('slug').max_length
+            stem = slugify(self.title)[:limit].strip('-') or f'practice-{uuid4().hex[:10]}'
+            candidate, suffix = stem, 2
+            while type(self).objects.exclude(pk=self.pk).filter(slug=candidate).exists():
+                tail = f'-{suffix}'
+                candidate = stem[:limit - len(tail)].rstrip('-') + tail
+                suffix += 1
+            self.slug = candidate
+        super().save(*args, **kwargs)
 
 
 class StudentResult(Ordered):
@@ -333,6 +412,8 @@ class StudentResult(Ordered):
     course = models.CharField('Курс и срок', max_length=60, blank=True, help_text='Например: IELTS, 4 месяца')
     consent = models.BooleanField('Есть согласие студента', default=False,
                                   help_text='Без согласия реальный отзыв не публикуется (вне демо-режима).')
+    featured = models.BooleanField('Топ', default=False,
+                                   help_text='Отмеченные показываются в блоке «Результаты студентов» на главной; полный список — на странице результатов.')
     is_published = models.BooleanField('Показывать на сайте', default=True)
 
     class Meta(Ordered.Meta):
@@ -370,6 +451,8 @@ class PageText(models.Model):
     text = models.TextField('Текст', max_length=800)
     uz = models.TextField('По-узбекски', max_length=800, blank=True,
                           help_text='Показывается, когда посетитель выбирает UZ. Пусто — останется русский текст.')
+    kaa = models.TextField('По-каракалпакски', max_length=800, blank=True,
+                           help_text='Показывается, когда посетитель выбирает QQ. Пусто — останется русский текст.')
     order = models.PositiveIntegerField('Порядок на странице', default=0, db_index=True, editable=False)
 
     class Meta:
@@ -403,6 +486,8 @@ class Faq(Ordered):
     answer = models.TextField('Ответ', max_length=800)
     question_uz = models.CharField('Вопрос по-узбекски', max_length=160, blank=True)
     answer_uz = models.TextField('Ответ по-узбекски', max_length=800, blank=True)
+    question_kaa = models.CharField('Вопрос по-каракалпакски', max_length=160, blank=True)
+    answer_kaa = models.TextField('Ответ по-каракалпакски', max_length=800, blank=True)
     is_published = models.BooleanField('Показывать на сайте', default=True)
 
     class Meta(Ordered.Meta):
@@ -423,20 +508,21 @@ class Faq(Ordered):
 
 
 class Translation(models.Model):
-    """Uzbek for texts that have no «По-узбекски» field of their own: courses, cashback, teachers, results, buttons."""
+    """Translations for courses, cashback, teachers, results and other texts without dedicated fields."""
     source = models.CharField('Текст на сайте (по-русски)', max_length=800, unique=True,
                               help_text='Точно как на сайте: с теми же знаками и регистром.')
-    uz = models.CharField('По-узбекски', max_length=800)
+    uz = models.CharField('По-узбекски', max_length=800, blank=True)
+    kaa = models.CharField('По-каракалпакски', max_length=800, blank=True)
 
     class Meta:
         ordering = ['source']
         verbose_name = 'Перевод'
-        verbose_name_plural = 'Переводы на узбекский'
+        verbose_name_plural = 'Переводы на узбекский и каракалпакский'
 
     def __str__(self):
         return self.source
 
     def clean(self):
         self.source = ' '.join((self.source or '').split())
-        if not self.source or not (self.uz or '').strip():
-            raise ValidationError('Заполните оба поля.')
+        if not self.source or not any((value or '').strip() for value in (self.uz, self.kaa)):
+            raise ValidationError('Укажите русский текст и хотя бы один перевод.')

@@ -22,7 +22,7 @@
 	@static path /assets/*
 	header @static Cache-Control "public, max-age=86400, must-revalidate"
 
-	@mutable path / /index.html /results.html /career.html /content.js /script.js /results.js /career.js /theme-init.js /style.css /robots.txt
+	@mutable path / /index.html /results.html /teachers.html /career.html /content.js /script.js /results.js /career.js /theme-init.js /style.css /robots.txt
 	header @mutable Cache-Control no-cache
 
 	# HR remains a separate service. Point this at its private address in production.

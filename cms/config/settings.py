@@ -18,6 +18,8 @@ SITE_ROOT = BASE_DIR.parent  # the static site whose content.js the admin publis
 # Fail closed. DJANGO_LOCAL=1 enables local-preview conveniences (default key and path, SQLite, plain HTTP);
 # Django's technical error pages (DEBUG) need their own explicit DJANGO_TRACEBACKS=1 — they reveal URLs and code.
 LOCAL = os.environ.get('DJANGO_LOCAL') == '1'
+if LOCAL and os.environ.get('SITE_LOCAL_ROOT'):
+    SITE_ROOT = Path(os.environ['SITE_LOCAL_ROOT'])
 if LOCAL and (os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID')):
     raise ImproperlyConfigured('DJANGO_LOCAL=1 запрещен на Railway: локальный режим отключает HTTPS-защиту.')
 DEBUG = os.environ.get('DJANGO_TRACEBACKS') == '1'

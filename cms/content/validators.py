@@ -10,4 +10,15 @@ def photo_size_validator(upload):
         raise ValidationError(f'Фото больше {settings.MAX_UPLOAD_BYTES // (1024 * 1024)} МБ — уменьшите его перед загрузкой.')
 
 
-PHOTO_VALIDATORS = [photo_extension_validator, photo_size_validator]
+def photo_content_validator(upload):
+    """Surface decoding and pixel-limit errors in the admin form before model.save()."""
+    from .media import normalize_image
+    position = upload.tell()
+    try:
+        upload.seek(0)
+        normalize_image(upload.read(settings.MAX_UPLOAD_BYTES + 1))
+    finally:
+        upload.seek(position)
+
+
+PHOTO_VALIDATORS = [photo_extension_validator, photo_size_validator, photo_content_validator]

@@ -2,6 +2,7 @@
 import base64
 import shutil
 import tempfile
+import os
 from pathlib import Path
 from unittest import mock
 
@@ -9,10 +10,22 @@ from django.conf import settings
 from django.test import SimpleTestCase, override_settings
 
 from .github import GitHubClient, GitHubError, SOURCE_FILES, blob_sha
-from .publish import PublishError, atomic_write, publication_lock, publish_local
+from .publish import PublishError, atomic_write, cleanup_public_photos, publication_lock, publish_local
 
 
 class GitHubPublicationTests(SimpleTestCase):
+    def test_collection_removes_only_requested_managed_exports_in_the_same_commit(self):
+        client = self.github()
+        stale = 'assets/uploads/' + 'a' * 64 + '.jpg'
+        snapshot = {'parent': 'parent', 'tree': 'tree', 'entries': {stale: {'sha': 'old'}, 'index.html': {'sha': blob_sha(b'same')}}}
+        with mock.patch.object(client, 'head', return_value='parent'), mock.patch.object(client, 'request', side_effect=[{'sha':'new-tree'}, {'sha':'commit'}, {}]) as request:
+            result = client.publish(snapshot, {'index.html': b'same'}, delete_paths=[stale])
+        self.assertTrue(result['changed'])
+        self.assertEqual(request.call_args_list[0].args[2]['tree'], [{'path': stale, 'mode':'100644', 'type':'blob', 'sha':None}])
+        for path in ['assets/uploads/owner-photo.jpg', 'index.html', '../outside.jpg']:
+            with self.assertRaises(GitHubError):
+                client.publish(snapshot, {'index.html': b'same'}, delete_paths=[path])
+
     def github(self):
         return GitHubClient('owner/site', 'main', 'test-token')
 
@@ -88,6 +101,31 @@ class GitHubPublicationTests(SimpleTestCase):
 
 
 class LocalPublicationTests(SimpleTestCase):
+    def test_publication_files_can_be_read_by_the_separate_site_process(self):
+        with tempfile.TemporaryDirectory() as temporary, override_settings(SITE_ROOT=Path(temporary)):
+            publish_local({'index.html': b'public page'})
+            if os.name != 'nt':
+                self.assertEqual((Path(temporary) / 'index.html').stat().st_mode & 0o444, 0o444)
+
+    def test_photo_collection_keeps_current_previous_recent_and_unmanaged_files(self):
+        with tempfile.TemporaryDirectory() as temporary, override_settings(SITE_ROOT=Path(temporary)):
+            directory = Path(temporary) / 'assets' / 'uploads'
+            directory.mkdir(parents=True)
+            paths = [f'assets/uploads/{digit * 64}.jpg' for digit in 'abcde']
+            for name in paths:
+                file = Path(temporary) / name
+                file.write_bytes(b'photo')
+                os.utime(file, (0, 0))
+            recent = Path(temporary) / paths[3]
+            os.utime(recent, (200000, 200000))
+            unmanaged = directory / 'owner-photo.jpg'
+            unmanaged.write_bytes(b'owner file')
+            self.assertEqual(cleanup_public_photos(set(paths[:2]), now=200001), 2)
+            self.assertTrue((Path(temporary) / paths[0]).exists())
+            self.assertTrue((Path(temporary) / paths[1]).exists())
+            self.assertTrue(recent.exists())
+            self.assertTrue(unmanaged.exists())
+
     def test_failed_file_replacement_restores_from_prepared_disk_backups(self):
         import os
         real_replace = os.replace

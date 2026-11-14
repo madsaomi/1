@@ -64,10 +64,11 @@ class StanfordAdminSite(AdminSite):
         if result['demo']:
             messages.warning(request, 'Опубликован демо-режим. Перед финальным запуском замените примеры реальными данными, '
                                       'получите согласия учеников и выключите демо-режим в настройках сайта.')
-        missing = result['missing_uz']
-        if missing['page_texts'] or missing['faq']:
-            messages.warning(request, f"Без узбекского перевода: текстов страницы {missing['page_texts']}, "
-                                      f"вопросов {missing['faq']}. На узбекской версии они останутся по-русски.")
+        for language, label in (('uz', 'узбекского'), ('kaa', 'каракалпакского')):
+            missing = result.get(f'missing_{language}', {})
+            if missing.get('page_texts') or missing.get('faq'):
+                messages.warning(request, f"Без {label} перевода: текстов страницы {missing['page_texts']}, "
+                                          f"вопросов {missing['faq']}. Они останутся по-русски.")
         return redirect('admin:index')
 
     def has_permission(self, request):

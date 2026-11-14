@@ -162,7 +162,12 @@ test('design tokens keep the requested type scale and brand palette with mobile-
     assert.equal(pixels, size);
   }
   for (const width of [768, 1024, 1280]) assert(new RegExp(`@media\\s*\\(min-width:\\s*${width}px\\)`).test(css), `Missing mobile-first breakpoint ${width}`);
-  for (const match of css.matchAll(/#([\da-f]{8}|[\da-f]{6}|[\da-f]{4}|[\da-f]{3})(?![\w-])/gi)) {
+  // Only the map illustration may use these four scoped tokens from the owner's reference.
+  let paletteCss = css;
+  for (const [name, value] of Object.entries({red: 'ea4335', blue: '4285f4', green: '34a853', yellow: 'fbbc04'})) {
+    paletteCss = paletteCss.replace(`--map-${name}: #${value};`, '');
+  }
+  for (const match of paletteCss.matchAll(/#([\da-f]{8}|[\da-f]{6}|[\da-f]{4}|[\da-f]{3})(?![\w-])/gi)) {
     const hex = match[1].toLowerCase();
     const channels = hex.length <= 4 ? [...hex.slice(0, 3)].map(char => char + char) : [hex.slice(0, 2), hex.slice(2, 4), hex.slice(4, 6)];
     assert(channels.join('') === 'ffb703' || new Set(channels).size === 1, `Unexpected UI color #${hex}`);

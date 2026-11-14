@@ -9,7 +9,7 @@ test('owner edits, additions and removals pass the full public-site checks witho
   const base = path.resolve(os.tmpdir());
   const stage = fs.mkdtempSync(path.join(base, 'stanford-owner-workflow-'));
   try {
-    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html', 'content.js', 'script.js',
+    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html', 'content.js', 'script.js',
       'results.js', 'career.js', 'theme-init.js', 'style.css', 'robots.txt', 'Dockerfile', 'Caddyfile',
       'railway.json', '.dockerignore', 'package.json']) {
       fs.copyFileSync(new URL('../' + file, import.meta.url), path.join(stage, file));

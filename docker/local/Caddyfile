@@ -1,0 +1,5 @@
+import /etc/caddy/site.Caddyfile
+
+:8000 {
+    reverse_proxy cms:8000
+}
