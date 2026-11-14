@@ -273,8 +273,6 @@ html[data-theme="dark"] .course-price strong { color: var(--brand); }
 .course-details li > .icon { margin-top: 1px; color: var(--brand); filter: drop-shadow(0 2px 4px var(--brand-a25)); }
 .course-card .course-enroll-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; margin: auto 8px 6px; border: 0; border-radius: 999px; background: var(--dark-panel); color: var(--on-dark); font-size: var(--text-16); font-weight: 700; text-decoration: none; box-shadow: 0 6px 20px var(--shadow-soft); transition: all var(--duration) var(--ease); }
 .course-card .course-enroll-btn:hover { background: var(--brand); color: var(--on-brand); box-shadow: 0 8px 24px var(--brand-a30); transform: translateY(-2px); }
-html[data-theme="dark"] .course-card .course-enroll-btn { background: var(--brand); color: var(--on-brand); }
-html[data-theme="dark"] .course-card .course-enroll-btn:hover { background: var(--brand-hover); }
 .course-card:target { animation: course-arrival 2s var(--ease); }
 @keyframes course-arrival { 0%, 30% { background: var(--tint); border-color: var(--brand); } 100% { background: var(--surface); border-color: var(--border); } }
 
