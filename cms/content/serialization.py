@@ -11,23 +11,25 @@ import re
 import hashlib
 from pathlib import Path
 from html.parser import HTMLParser
+from types import SimpleNamespace
 
 from django.conf import settings
 from django.core.exceptions import SuspiciousFileOperation, ValidationError
 from django.core.management.base import CommandError
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
-from .media import normalize_image
+from .media import normalize_image, safe_media_path
+from .github import MAX_ASSET_BYTES, allowed_media, allowed_photo
 
 from .models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Event, Faq, Location,
-                     MapLink, PageText, Phone, Practice, SiteSettings, Stat, StudentResult, Teacher, Translation,
+                     MapLink, MediaItem, PageText, Phone, Practice, SiteSettings, Stat, StudentResult, Teacher, Translation,
                      photo_path_validator, validate_https_site_url)
 
 PREFIX = 'window.schoolContent = '
 BANNER = '// Данные сайта. Публикуются из админки (PLAN-044); при ручной правке затем запустить node build.mjs.\n'
 
 # Everything import_content replaces; order is also the deletion order for children before parents.
-CONTENT_MODELS = (CashbackTier, CashbackRule, CourseSkill, Course, Stat, Teacher, StudentResult, Event, Practice,
+CONTENT_MODELS = (MediaItem, CashbackTier, CashbackRule, CourseSkill, Course, Stat, Teacher, StudentResult, Event, Practice,
                   MapLink, Location, Phone, AdmissionsTelegram, Contacts, SiteSettings, Faq, PageText)
 
 
@@ -164,6 +166,8 @@ def _courses_data():
             'skills': list(course.skills.values_list('text', flat=True)),
             'price': course.price,
         })
+        if course.special_price is not None:
+            item['specialPrice'] = course.special_price
         item.update({'target': course.target, 'id': course.slug})
         courses.append(item)
     return courses
@@ -190,11 +194,79 @@ def _photo_data(obj, files=None):
     return path
 
 
+def validate_gallery(items):
+    """Validate the portable mixed-media shape without opening files or fetching URLs."""
+    if not isinstance(items, list) or len(items) > 8:
+        raise CommandError('В галерее допускается до 8 фото и видео.')
+    videos = 0
+    for item in items:
+        if not isinstance(item, dict) or set(item) - {'type', 'src', 'poster', 'alt'}:
+            raise CommandError('Некорректная запись галереи.')
+        kind, source = item.get('type'), item.get('src')
+        if not isinstance(kind, str) or kind not in {'image', 'video'} or not allowed_media(source):
+            raise CommandError('Галерея поддерживает только локальные фото и MP4.')
+        if (kind == 'video') != source.endswith('.mp4'):
+            raise CommandError('Тип медиа не соответствует файлу галереи.')
+        if 'alt' in item and (not isinstance(item['alt'], str) or len(item['alt']) > 160):
+            raise CommandError('Описание фото или видео должно быть текстом до 160 символов.')
+        if 'poster' in item and (kind != 'video' or not allowed_photo(item['poster'])):
+            raise CommandError('Обложка видео должна быть локальным изображением.')
+        videos += kind == 'video'
+    if videos > 2:
+        raise CommandError('В одной галерее допускается до 2 видео.')
+
+
+def _video_data(upload, files=None):
+    """Stored videos were normalized before save; publish only bounded MP4 bytes from private storage."""
+    path = safe_media_path(upload.name, upload.storage)
+    try:
+        if path is None or path.suffix != '.mp4' or not path.is_file():
+            raise ValueError('Unsafe stored video.')
+        with upload.open('rb') as source:
+            encoded = source.read(MAX_ASSET_BYTES + 1)
+        if not encoded or len(encoded) > MAX_ASSET_BYTES or encoded[4:8] != b'ftyp':
+            raise ValueError('Invalid stored video.')
+    except (OSError, ValueError, SuspiciousFileOperation) as error:
+        raise CommandError('Не удалось подготовить видео: загрузите файл в админке заново.') from error
+    exported = f'assets/uploads/{hashlib.sha256(encoded).hexdigest()}.mp4'
+    if files is not None:
+        files[exported] = encoded
+    return exported
+
+
+def _gallery_data(parent, files=None):
+    items = []
+    rows = list(parent.media_items.filter(is_published=True)[:9])
+    if len(rows) > 8:
+        raise CommandError('В галерее допускается до 8 фото и видео.')
+    for media in rows:
+        if media.media_type == 'video':
+            item = {'type': 'video', 'src': _video_data(media.video, files) if media.video else media.source_path}
+            poster = _photo_data(SimpleNamespace(photo=media.poster, photo_path=media.poster_path), files)
+            if poster:
+                item['poster'] = poster
+        else:
+            item = {'type': 'image',
+                    'src': _photo_data(SimpleNamespace(photo=media.photo, photo_path=media.source_path), files)}
+        if media.alt:
+            item['alt'] = media.alt
+        items.append(item)
+    validate_gallery(items)
+    return items
+
+
 def collect_photo_files():
-    """Return {asset path: sanitized JPEG bytes} for photos needed by published content."""
+    """Compatibility API: return bounded image/video bytes used by published content."""
     files = {}
     for obj in [*Teacher.objects.filter(is_published=True), *Practice.objects.filter(is_published=True), *Location.objects.all()]:
         _photo_data(obj, files)
+        if hasattr(obj, 'media_items'):
+            _gallery_data(obj, files)
+    for result in StudentResult.objects.filter(is_published=True, consent=True):
+        _gallery_data(result, files)
+    site = SiteSettings.objects.filter(pk=1).first()
+    if site:
+        _gallery_data(site, files)
     return files
 
 
@@ -211,11 +283,14 @@ def _teachers_data(photo_files=None):
         photo = _photo_data(teacher, photo_files)
         if photo:
             item['photo'] = photo
+        gallery = _gallery_data(teacher, photo_files)
+        if gallery:
+            item['media'] = gallery
         teachers.append(item)
     return teachers
 
 
-def _results_data():
+def _results_data(photo_files=None):
     results = []
     for result in StudentResult.objects.filter(is_published=True):
         item = {'score': result.score, 'exam': result.exam}
@@ -228,6 +303,11 @@ def _results_data():
             item['consent'] = True
         if result.featured:
             item['featured'] = True
+        # Consent gates real files even while textual demo results are previewed.
+        if result.consent:
+            gallery = _gallery_data(result, photo_files)
+            if gallery:
+                item['media'] = gallery
         results.append(item)
     return results
 
@@ -243,6 +323,9 @@ def _practices_data(photo_files=None):
             item['photo'] = photo
         if practice.photo_alt:
             item['photoAlt'] = practice.photo_alt
+        gallery = _gallery_data(practice, photo_files)
+        if gallery:
+            item['media'] = gallery
         practices.append(item)
     return practices
 
@@ -282,12 +365,15 @@ def build_content(photo_files=None):
                  'demoLabels': settings.demo_labels},
         'stats': [{'value': stat.value, 'label': stat.label} for stat in Stat.objects.all()],
     }
+    hero_media = _gallery_data(settings, photo_files)
+    if hero_media:
+        data['site']['heroMedia'] = hero_media
     cashback = _cashback_data()
     if cashback:
         data['cashback'] = cashback
     data['courses'] = _courses_data()
     data['teachers'] = _teachers_data(photo_files)
-    data['results'] = _results_data()
+    data['results'] = _results_data(photo_files)
     data['practices'] = _practices_data(photo_files)
     events = []
     for event in Event.objects.filter(is_published=True):
@@ -312,6 +398,15 @@ def build_content(photo_files=None):
 def validate_content(data):
     """Catch the publication rules that model validation cannot see (e.g. contacts created empty)."""
     problems = []
+    try:
+        validate_gallery((data.get('site') or {}).get('heroMedia', []))
+        for group in ('teachers', 'results', 'practices'):
+            for owner in data.get(group) or []:
+                validate_gallery(owner.get('media', []))
+                if group == 'results' and owner.get('media') and owner.get('consent') is not True:
+                    raise CommandError('Для публикации фото и видео ученика подтвердите согласие.')
+    except CommandError as error:
+        problems.append(str(error))
     site_url = (data.get('site') or {}).get('url') or ''
     try:
         validate_https_site_url(site_url)

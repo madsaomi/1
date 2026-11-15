@@ -61,11 +61,13 @@ const element = (tagName, values = {}, childNodes = []) => {
 };
 const text = data => ({ nodeType: 3, data });
 
-function languageHarness(name, { saved = 'ru', blockedStorage = false, observe = true, nodes = [], packs = {} } = {}) {
+function languageHarness(name, { saved = 'ru', blockedStorage = false, observe = true, nodes = [], packs = {}, pageCopy = '', pathname = '/index.html', hash = '' } = {}) {
   const known = text('Кнопка');
   const unknown = text('Новый текст владельца без перевода');
   const field = element('INPUT', { placeholder: 'Имя' });
   const root = element('HTML', {}, [known, unknown, field, ...nodes]);
+  root.dataset = pageCopy ? { langPage: pageCopy } : {};
+  const visited = [];
   const select = element('SELECT', { 'aria-label': 'Язык сайта' });
   const handlers = {};
   select.addEventListener = (type, callback) => { handlers[type] = callback; };
@@ -82,6 +84,7 @@ function languageHarness(name, { saved = 'ru', blockedStorage = false, observe =
       stanfordKaa: packs.kaa || { strings: { 'Кнопка': 'Túyme', 'Имя': 'Atı', 'Новый текст': 'Jańa tekst', 'Язык сайта': 'Sayt tili' }, patterns: [] }
     },
     document: { documentElement: root, querySelector: () => select },
+    location: { pathname, hash, assign: address => visited.push(address) },
     Node: { TEXT_NODE: 3, ELEMENT_NODE: 1 },
     MutationObserver: observe ? class { constructor(callback) { notify = callback; } observe() {} takeRecords() {} } : undefined,
     localStorage: {
@@ -92,7 +95,7 @@ function languageHarness(name, { saved = 'ru', blockedStorage = false, observe =
   return { root, known, unknown, field, select,
     choose(value) { select.value = value; handlers.change(); },
     notify(records) { notify(records); },
-    stored: () => stored };
+    stored: () => stored, visited };
 }
 
 test('RU → UZ → QQ → RU always uses Russian originals and retains owner copy without translations', () => {
@@ -243,5 +246,26 @@ test('translated career labels and later owner edits never change the submitted 
     page.choose('kaa');
     assert.equal(fields.position.value, POSITIONS[0], 'Owner label changes cannot change the API enum');
     assert.doesNotThrow(() => validateApplication(payload()));
+  }
+});
+
+test('on the translated /uz/ and /kaa/ copies the switch opens the other language at the same page and section', () => {
+  for (const name of implementations) {
+    const page = languageHarness(name, { pageCopy: 'uz', saved: 'kaa', pathname: '/uz/results.html', hash: '#top' });
+    assert.equal(page.root.lang, 'uz', 'A copy keeps its own language even when another one was saved');
+    assert.equal(page.select.value, 'uz');
+    page.choose('kaa');
+    page.choose('ru');
+    page.choose('uz');
+    assert.deepEqual(page.visited, ['/kaa/results.html#top', '/results.html#top']);
+    assert.deepEqual(page.stored(), ['stanford-lang', 'uz']);
+    const home = languageHarness(name, { pageCopy: 'kaa', pathname: '/kaa/' });
+    home.choose('ru');
+    home.choose('uz');
+    assert.deepEqual(home.visited, ['/', '/uz/']);
+    const russian = languageHarness(name, { pathname: '/teachers.html' });
+    russian.choose('uz');
+    assert.equal(russian.known.data, 'Tugma', 'The Russian page still translates in place');
+    assert.deepEqual(russian.visited, []);
   }
 });

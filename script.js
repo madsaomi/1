@@ -133,6 +133,7 @@ function updateCourseSummary() {
     prices.append(row);
   }
   addPrice('Стоимость обучения', course.price);
+  if (course.specialPrice) addPrice('Семья или 2 курса', course.specialPrice);
   price.append(prices);
   const skills = document.createElement('ul');
   skills.setAttribute('aria-label', 'В программе курса');
@@ -225,6 +226,27 @@ dialog.addEventListener('close', () => {
 filterCourses(defaultCategory, filterLabel(defaultCategory));
 revealCourseFromHash();
 
+// Branch entrance photo: a small thumbnail opens a larger view; without JS the link opens the image itself.
+(() => {
+  const photoDialog = document.querySelector('#photo-dialog');
+  const full = photoDialog?.querySelector('[data-photo-full]');
+  if (!photoDialog || !full || typeof photoDialog.showModal !== 'function') return;
+  let opener;
+  document.addEventListener('click', event => {
+    const link = event.target.closest('[data-photo-zoom]');
+    if (!link) return;
+    event.preventDefault();
+    const thumb = link.querySelector('img');
+    opener = link;
+    full.src = link.getAttribute('href');
+    full.alt = thumb?.alt || '';
+    photoDialog.showModal();
+  });
+  photoDialog.querySelector('[data-photo-close]')?.addEventListener('click', () => photoDialog.close());
+  photoDialog.addEventListener('click', event => { if (event.target === photoDialog) photoDialog.close(); });
+  photoDialog.addEventListener('close', () => { if (opener?.isConnected) opener.focus(); });
+})();
+
 // Cashback tables: without JS both exams are listed; here they become tabs.
 function setupCashbackTabs() {
   const tabs = [...document.querySelectorAll('.cashback-tab')];
@@ -262,6 +284,13 @@ setupCashbackTabs();
 // The three-language selector always translates from the original Russian HTML.
 function setupLanguage() {
   const packs = { uz: window.stanfordUz, kaa: window.stanfordKaa };
+  // /uz/ and /kaa/ hold copies translated at build time; there the switch opens the other copy instead.
+  const pageCopy = Object.hasOwn(packs, document.documentElement.dataset?.langPage) ? document.documentElement.dataset.langPage : '';
+  const addressFor = code => {
+    const path = location.pathname;
+    const folder = path.slice(0, path.lastIndexOf('/') + 1).replace(/(?:uz|kaa)\/$/, '');
+    return `${folder}${code === 'ru' ? '' : `${code}/`}${path.slice(path.lastIndexOf('/') + 1)}${location.hash}`;
+  };
   const select = document.querySelector('#lang-toggle');
   if (!select) return;
   const attributes = ['aria-label', 'alt', 'title', 'placeholder', 'content'];
@@ -332,12 +361,19 @@ function setupLanguage() {
     observer?.takeRecords();
   };
   select.addEventListener('change', () => {
+    if (pageCopy) {
+      const next = select.value === 'ru' || Object.hasOwn(packs, select.value) ? select.value : pageCopy;
+      try { localStorage.setItem('stanford-lang', next); } catch { /* Keep the choice for this visit only. */ }
+      if (next !== pageCopy) location.assign(addressFor(next));
+      return;
+    }
     setLanguage(select.value);
     try { localStorage.setItem('stanford-lang', lang); } catch { /* Keep the choice for this visit only. */ }
   });
   let saved;
   try { saved = localStorage.getItem('stanford-lang'); } catch { /* Settings are optional. */ }
-  setLanguage(saved || 'ru');
+  // A translated copy always shows its own language; text added later by scripts is still translated.
+  setLanguage(pageCopy || saved || 'ru');
 }
 setupLanguage();
 
@@ -439,3 +475,4 @@ function setupReveal() {
   }
 }
 setupReveal();
+

@@ -4,12 +4,16 @@
 // stays in Russian, so new content from the admin never breaks the page.
 window.stanfordUz = {
   strings: {
+    "Семья или 2 курса": "Oila yoki 2 kurs",
+    "Скидка действует, если из одной семьи занимаются 2 ученика или один ученик записан на 2 курса. Условия и итоговую стоимость подтвердите перед оплатой.": "Bir oiladan 2 öquvçi öqisa yoki bitta öquvçi 2 ta kursga yozilsa, çegirma amal qiladi. Şartlar va yakuniy narxni tölovdan oldin aniqlang.",
+    "Фото и видео": "Foto va video",
+    "Предыдущий слайд": "Oldingi slayd",
+    "Следующий слайд": "Keyingi slayd",
+    "Открыть видео": "Videoni ochish",
     "Информация о преподавателях пока не опубликована.": "Öqituvçilar haqida maʼlumot hali eʼlon qilinmagan.",
     "Результаты пока не опубликованы.": "Natijalar hali eʼlon qilinmagan.",
     "Язык сайта": "Sayt tili",
-    "Карточки": "Kartalar",
-    "Обычный вид": "Oddiy köriniş",
-    "Вид отображения": "Körsatiş turi",
+    "Показать ещё": "Yana körsatiş",
     "Все преподаватели": "Barcha öqituvçilar",
     "Разделы Stanford": "Stanford bölimlari",
     "Результаты учеников": "Öquvçilar natijalari",
@@ -296,6 +300,7 @@ window.stanfordUz = {
   // Texts with numbers, names or two translatable halves. Each entry: [regular expression, builder];
   // the builder gets the match and the translate function for the parts.
   patterns: [
+    [/^Фото и видео: (.+)$/, (m, t) => `Foto va video: ${t(m[1])}`],
     [/^Написать в Telegram: (.+)$/, m => `Telegramga yozish: ${m[1]}`],
     [/^\/ 400 · максимум (\d+) слов$/, m => `/ 400 · ko‘pi bilan ${m[1]} ta so‘z`],
     [/^Подробнее: (.+)$/, (m, t) => `Batafsil: ${t(m[1])}`],

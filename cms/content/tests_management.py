@@ -223,7 +223,7 @@ class FullPublicationIntegrationTests(TestCase):
         site = root / 'site'
         site.mkdir()
         for name in ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html',
-                     'script.js', 'results.js', 'career.js', 'theme-init.js', 'style.css', 'robots.txt'):
+                     'script.js', 'results.js', 'career.js', 'theme-init.js', 'style.css', 'robots.txt', 'sitemap.xml'):
             shutil.copyfile(settings.SITE_ROOT / name, site / name)
         shutil.copytree(settings.SITE_ROOT / 'assets', site / 'assets')
         return site
@@ -264,6 +264,31 @@ class FullPublicationIntegrationTests(TestCase):
             with Image.open(site / photo) as uploaded:
                 self.assertEqual(uploaded.format, 'JPEG')
                 self.assertEqual(uploaded.size, (640, 800))
+            # A photo narrower than 800 px needs no phone copy and keeps a plain src.
+            self.assertFalse((site / photo.replace('.jpg', '-800.webp')).exists())
+            self.assertNotIn(f'src="{photo}" srcset=', (site / 'index.html').read_text(encoding='utf-8'))
+
+    def test_real_publication_adds_a_lighter_webp_copy_for_phones(self):
+        from .media import small_variant_path
+        from .publish import publish_site
+        image = io.BytesIO()
+        Image.new('RGB', (1600, 1000), 'yellow').save(image, 'PNG')
+        teacher = Teacher.objects.first()
+        teacher.photo.save('wide-photo.png', ContentFile(image.getvalue()))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            site = self.copy_site(root)
+            with override_settings(SITE_ROOT=site, BASE_DIR=root / 'cms', LOCAL=True),                     mock.patch.dict(os.environ, {'SITE_PUBLISH_TARGET': 'local', 'SITE_NODE_BINARY': shutil.which('node')}):
+                publish_site()
+            data = read_content(site / 'content.js')
+            photo = next(item['photo'] for item in data['teachers'] if item['name'] == teacher.name)
+            small = small_variant_path(photo)
+            with Image.open(site / small) as copy:
+                self.assertEqual(copy.format, 'WEBP')
+                self.assertEqual(copy.size, (800, 500))
+                self.assertNotIn('exif', copy.info)
+            self.assertLess((site / small).stat().st_size, (site / photo).stat().st_size)
+            self.assertIn(f'srcset="{small} 800w, {photo} 1600w"', (site / 'index.html').read_text(encoding='utf-8'))
 
     def test_failed_real_build_keeps_every_source_page_script_and_photo_unchanged(self):
         from .publish import PublishError, publish_site

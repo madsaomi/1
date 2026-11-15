@@ -9,8 +9,10 @@
 	header X-Content-Type-Options nosniff
 	header Referrer-Policy strict-origin-when-cross-origin
 	header X-Frame-Options DENY
-	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src https://yandex.ru https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self'; frame-src https://yandex.ru https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 	header Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	# Railway serves the site over HTTPS only; browsers remember that for a year (no preload, no subdomains).
+	header Strict-Transport-Security "max-age=31536000"
 }
 
 :{$PORT:8080} {
@@ -19,10 +21,20 @@
 
 	import security_headers
 
-	@static path /assets/*
+	# Files linked with ?v=… change their address on every edit, so browsers may keep them for a year.
+	@versioned query v=*
+	header @versioned Cache-Control "public, max-age=31536000, immutable"
+
+	@static {
+		path /assets/*
+		not query v=*
+	}
 	header @static Cache-Control "public, max-age=86400, must-revalidate"
 
-	@mutable path / /index.html /results.html /teachers.html /career.html /content.js /script.js /results.js /career.js /theme-init.js /style.css /robots.txt
+	@mutable {
+		path / /index.html /results.html /teachers.html /career.html /content.js /script.js /results.js /career.js /theme-init.js /style.css /robots.txt /sitemap.xml /uz /uz/* /kaa /kaa/*
+		not query v=*
+	}
 	header @mutable Cache-Control no-cache
 
 	# HR remains a separate service. Point this at its private address in production.

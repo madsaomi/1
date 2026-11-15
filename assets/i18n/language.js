@@ -2,6 +2,13 @@
 (() => {
 function setupLanguage() {
   const packs = { uz: window.stanfordUz, kaa: window.stanfordKaa };
+  // /uz/ and /kaa/ hold copies translated at build time; there the switch opens the other copy instead.
+  const pageCopy = Object.hasOwn(packs, document.documentElement.dataset?.langPage) ? document.documentElement.dataset.langPage : '';
+  const addressFor = code => {
+    const path = location.pathname;
+    const folder = path.slice(0, path.lastIndexOf('/') + 1).replace(/(?:uz|kaa)\/$/, '');
+    return `${folder}${code === 'ru' ? '' : `${code}/`}${path.slice(path.lastIndexOf('/') + 1)}${location.hash}`;
+  };
   const select = document.querySelector('#lang-toggle');
   if (!select) return;
   const attributes = ['aria-label', 'alt', 'title', 'placeholder', 'content'];
@@ -72,12 +79,19 @@ function setupLanguage() {
     observer?.takeRecords();
   };
   select.addEventListener('change', () => {
+    if (pageCopy) {
+      const next = select.value === 'ru' || Object.hasOwn(packs, select.value) ? select.value : pageCopy;
+      try { localStorage.setItem('stanford-lang', next); } catch { /* Keep the choice for this visit only. */ }
+      if (next !== pageCopy) location.assign(addressFor(next));
+      return;
+    }
     setLanguage(select.value);
     try { localStorage.setItem('stanford-lang', lang); } catch { /* Keep the choice for this visit only. */ }
   });
   let saved;
   try { saved = localStorage.getItem('stanford-lang'); } catch { /* Settings are optional. */ }
-  setLanguage(saved || 'ru');
+  // A translated copy always shows its own language; text added later by scripts is still translated.
+  setLanguage(pageCopy || saved || 'ru');
 }
 setupLanguage();
 })();

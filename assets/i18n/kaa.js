@@ -2,6 +2,12 @@
 // Owner translations published by the CMS may override these defaults.
 window.stanfordKaa = {
   strings: {
+    "Семья или 2 курса": "Shańaraq yamasa 2 kurs",
+    "Скидка действует, если из одной семьи занимаются 2 ученика или один ученик записан на 2 курса. Условия и итоговую стоимость подтвердите перед оплатой.": "Bir shańaraqtan 2 oqıwshı oqısa yamasa bir oqıwshı 2 kursqa jazılsa, shegirme ámel etedi. Shártlerdi hám aqırǵı bahanı tólewden aldın anıqlań.",
+    "Фото и видео": "Foto hám video",
+    "Предыдущий слайд": "Aldınǵı slayd",
+    "Следующий слайд": "Keyingi slayd",
+    "Открыть видео": "Videonı ashıw",
     "Информация о преподавателях пока не опубликована.": "Oqıtıwshılar haqqında maǵlıwmat ele járiyalanbaǵan.",
     "Результаты пока не опубликованы.": "Nátiyjeler ele járiyalanbaǵan.",
     "12 занятий в месяц · 3 раза в неделю": "Ayına 12 sabaq · háptesine 3 márte",
@@ -216,9 +222,7 @@ window.stanfordKaa = {
     "Формат и частота пробных тестов зависят от программы. Точные даты Speaking Club, Movie Club и mock-тестов уточняйте у администратора.": "Sınaw testleriniń tártibi hám jiyiligi baǵdarlamaǵa baylanıslı. Speaking Club, Movie Club hám mock-testlerdiń anıq sánelerin administratordan sorań.",
     "На главную": "Bas betke",
     "Вернуться на главную": "Bas betke qaytıw",
-    "Карточки": "Kartochkalar",
-    "Обычный вид": "Ádettegi kórinis",
-    "Вид отображения": "Kórsetiw túri",
+    "Показать ещё": "Jáne kórsetiw",
     "Разделы Stanford": "Stanford bólimleri",
     "Подробнее": "Tolıǵıraq",
     "Назад": "Artqa",
@@ -313,6 +317,7 @@ window.stanfordKaa = {
     "Готово": "Tayar"
   },
   patterns: [
+    [/^Фото и видео: (.+)$/, (m, t) => `Foto hám video: ${t(m[1])}`],
     [/^(.+)\. Программ: (\d+)\.$/, (m, t) => `${t(m[1])}. Baǵdarlamalar: ${m[2]}.`],
     [/^до ([\d\s]+) сум$/, m => `${m[1]} sumǵa shekem`],
     [/^([\d\s]+) сум$/, m => `${m[1]} sum`],

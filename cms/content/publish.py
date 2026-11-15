@@ -12,10 +12,11 @@ from django.conf import settings
 from django.core.management.base import CommandError
 from django.db import connection, transaction
 
-from .github import GitHubClient, GitHubError, MANAGED_PHOTO, OUTPUT_FILES, SOURCE_FILES, allowed_photo
+from .github import (GitHubClient, GitHubError, MANAGED_MEDIA, MANAGED_PHOTO, MAX_RELEASE_BYTES,
+                     OUTPUT_FILES, SOURCE_FILES, allowed_media)
 from .serialization import (TRANSLATION_LANGUAGES, build_content, build_translation_strings, missing_translations,
                             read_content, validate_content, write_content, write_translation_strings)
-from .media import audit_media
+from .media import audit_media, small_variant_path, small_webp
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +75,62 @@ def publication_lock():
                 fcntl.flock(handle, fcntl.LOCK_UN)
 
 
+def media_paths(data):
+    """References from the explicit media schema, including video posters and legacy photos."""
+    owners = [*data.get('teachers', []), *data.get('results', []), *data.get('practices', []),
+              *data.get('contacts', {}).get('locations', [])]
+    paths = {item['photo'] for item in owners if item.get('photo')}
+    galleries = [(data.get('site') or {}).get('heroMedia', [])]
+    galleries.extend(item.get('media', []) for item in owners)
+    for gallery in galleries:
+        for item in gallery:
+            if item.get('src'):
+                paths.add(item['src'])
+            if item.get('poster'):
+                paths.add(item['poster'])
+    return paths
+
+
 def photo_paths(data):
-    return {item['photo'] for item in [*data.get('teachers', []), *data.get('practices', []), *data.get('contacts', {}).get('locations', [])]
-            if item.get('photo')}
+    """Compatibility name retained for existing integrations; now includes mixed galleries."""
+    return media_paths(data)
+
+
+class PublicationAssets(dict):
+    """Bound the in-memory release while uploads are collected, rather than after allocation."""
+    total_bytes = 0
+
+    def __setitem__(self, path, content):
+        total = self.total_bytes - len(self.get(path, b'')) + len(content)
+        if total > MAX_RELEASE_BYTES:
+            raise PublishError('Суммарный размер фото и видео превышает 128 МБ. Уменьшите галереи перед публикацией.')
+        super().__setitem__(path, content)
+        self.total_bytes = total
+
+
+def validate_release_media_size(stage, data):
+    """Count existing imported assets together with new uploads, without loading them into memory."""
+    if sum((stage / name).stat().st_size for name in media_paths(data)) > MAX_RELEASE_BYTES:
+        raise PublishError('Суммарный размер фото и видео превышает 128 МБ. Уменьшите галереи перед публикацией.')
+
+
+def with_small_variants(paths):
+    """Published photos plus their derived phone copies, so cleanup never removes a copy still in use."""
+    return set(paths) | {small_variant_path(path) for path in paths if MANAGED_PHOTO.fullmatch(path)}
+
+
+def write_small_variants(stage, data):
+    """Create the phone copy of each managed photo inside the release; build.mjs links what exists."""
+    variants = {}
+    for path in sorted(media_paths(data)):
+        if not MANAGED_PHOTO.fullmatch(path) or not (stage / path).is_file():
+            continue
+        content = small_webp((stage / path).read_bytes())
+        if content:
+            variant = small_variant_path(path)
+            (stage / variant).write_bytes(content)
+            variants[variant] = content
+    return variants
 
 
 def cleanup_public_photos(keep, *, now=None):
@@ -89,7 +143,7 @@ def cleanup_public_photos(keep, *, now=None):
     removed = 0
     for path in directory.iterdir():
         relative = path.relative_to(root).as_posix()
-        if (not MANAGED_PHOTO.fullmatch(relative) or relative in keep or path.is_symlink()
+        if (not MANAGED_MEDIA.fullmatch(relative) or relative in keep or path.is_symlink()
                 or not path.is_file() or not path.resolve().is_relative_to(root) or path.stat().st_mtime > cutoff):
             continue
         path.unlink(missing_ok=True)
@@ -177,14 +231,14 @@ def publish_site():
                 if outermost and connection.vendor == 'postgresql':
                     with connection.cursor() as cursor:
                         cursor.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')
-                photos = {}
+                photos = PublicationAssets()
                 data = build_content(photo_files=photos)
                 validate_content(data)
                 translations = {language: build_translation_strings(language) for language in TRANSLATION_LANGUAGES}
                 missing = {language: missing_translations(language) for language in TRANSLATION_LANGUAGES}
-            paths = photo_paths(data) - photos.keys()
-            if any(not allowed_photo(path) for path in paths):
-                raise PublishError('Небезопасный путь фотографии.')
+            paths = media_paths(data) - photos.keys()
+            if any(not allowed_media(path) for path in paths):
+                raise PublishError('Небезопасный путь фото или видео.')
             target = publish_target()
             with tempfile.TemporaryDirectory(prefix='stanford-release-') as temporary:
                 stage = Path(temporary)
@@ -193,7 +247,7 @@ def publish_site():
                 if not client:
                     copy_local_sources(stage, paths)
                 previous = read_content(stage / 'content.js')
-                retained_photos = photo_paths(previous) | photo_paths(data)
+                retained_photos = with_small_variants(media_paths(previous) | media_paths(data))
                 for path, content in photos.items():
                     destination = stage / path
                     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -201,6 +255,8 @@ def publish_site():
                 write_content(data, stage / 'content.js')
                 for language, strings in translations.items():
                     write_translation_strings(stage / f'assets/i18n/{language}.js', strings)
+                validate_release_media_size(stage, data)
+                variants = write_small_variants(stage, data)
                 result = subprocess.run([node, 'build.mjs'], cwd=stage, capture_output=True, text=True,
                                         encoding='utf-8', errors='replace', timeout=120,
                                         env={**{key: value for key, value in os.environ.items()
@@ -212,8 +268,9 @@ def publish_site():
                     raise PublishError(f'Сайт не принял данные: {reason[:300]}')
                 files = {path: (stage / path).read_bytes() for path in sorted(OUTPUT_FILES)}
                 files.update(photos)
+                files.update(variants)
                 if client:
-                    obsolete = {path for path in snapshot['entries'] if MANAGED_PHOTO.fullmatch(path) and path not in retained_photos}
+                    obsolete = {path for path in snapshot['entries'] if MANAGED_MEDIA.fullmatch(path) and path not in retained_photos}
                     release = client.publish(snapshot, files, delete_paths=obsolete)
                 else:
                     release = publish_local(files)

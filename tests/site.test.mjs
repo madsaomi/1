@@ -446,7 +446,16 @@ test('metadata is emitted only for a configured real HTTPS URL', () => {
   if (!data.site.url) assert(!html.includes('rel="canonical"'));
   const configured = structuredClone(data);
   configured.site.url = 'https://example.org/';
-  assert(generate(html, configured).includes('content="https://example.org/assets/stanford-logo.png"'));
+  const output = generate(html, configured);
+  assert(output.includes('<meta property="og:image" content="https://example.org/assets/og-image.png">'));
+  assert(output.includes('<meta property="og:image:width" content="1200">'));
+  // Search engines get a data card built only from the verified contacts; it can never close its own block.
+  const card = JSON.parse(output.match(/<script type="application\/ld\+json">([^<]*)<\/script>/)[1]);
+  assert.equal(card['@type'], 'EducationalOrganization');
+  assert.deepEqual(card.telephone, data.contacts.phones);
+  assert.equal(card.location.length, data.contacts.locations.length);
+  configured.contacts.locations[0].address = '</script><script>alert(1)</script>';
+  assert(!generate(html, configured).includes('</script><script>alert(1)'));
   configured.site.url = 'javascript:alert(1)';
   assert.throws(() => generate(html, configured), /HTTPS/);
 });
@@ -681,7 +690,7 @@ test('catalog includes all programme details in static HTML and labels its flip 
   }
 });
 
-test('course dialog shows only the monthly price, ignoring legacy family prices', () => {
+test('course dialog shows the monthly price and, when set, the family price', () => {
   const { context, nodes, element } = runtime();
   const course = data.courses.find(item => item.id === 'general-english');
   context.openModal(course.id, element());
@@ -692,13 +701,13 @@ test('course dialog shows only the monthly price, ignoring legacy family prices'
   assert.equal(summary.children[4].href, `#course-${course.id}`);
   const [prices] = descendantTags(summary.children[2], 'dl');
   assert(prices, 'Expected semantic price list');
-  assert.equal(descendantTags(prices, 'dt').length, 1);
-  assert.equal(descendantTags(prices, 'dd').length, 1);
+  assert.equal(descendantTags(prices, 'dt').length, 2);
+  assert.equal(descendantTags(prices, 'dd').length, 2);
   const pricesText = nodeText(prices);
   assert(pricesText.includes(new Intl.NumberFormat('ru-RU').format(course.price)));
-  assert(!pricesText.includes(new Intl.NumberFormat('ru-RU').format(course.specialPrice)));
+  assert(pricesText.includes(new Intl.NumberFormat('ru-RU').format(course.specialPrice)));
   assert.match(pricesText, /Стоимость обучения/u);
-  assert(!/семья|скидк/iu.test(nodeText(summary.children[2])));
+  assert.match(pricesText, /Семья или 2 курса/u);
   nodes['#contact-course'].value = 'ielts';
   nodes['#contact-course'].handlers.change();
   const ielts = data.courses.find(item => item.id === 'ielts');
@@ -706,8 +715,8 @@ test('course dialog shows only the monthly price, ignoring legacy family prices'
   assert.equal(descendantTags(ieltsPrices, 'dt').length, 1);
   assert.equal(descendantTags(ieltsPrices, 'dd').length, 1);
   assert(nodeText(ieltsPrices).includes(new Intl.NumberFormat('ru-RU').format(ielts.price)));
-  assert(!nodeText(summary.children[2]).includes(new Intl.NumberFormat('ru-RU').format(course.specialPrice)));
-  assert(!/семья\s*\/\s*два курса/iu.test(nodeText(summary.children[2])));
+  assert(!ielts.specialPrice, 'IELTS has no family price in the data');
+  assert(!/Семья или 2 курса/u.test(nodeText(summary.children[2])), 'A course without a family price shows none');
 });
 
 test('dialog opens and switches courses at the top of its own scroll area, restoring page state on close', () => {
@@ -865,21 +874,21 @@ test('hash navigation reveals and scrolls to a course after a conflicting filter
   assert.equal(card.scrolled, true);
 });
 
-test('each course card shows only the monthly price even when legacy family data exists', () => {
+test('each course card shows the monthly price and the family price only where it exists', () => {
   const format = value => new Intl.NumberFormat('ru-RU').format(value);
   for (const course of data.courses) {
     const card = renderCourses([course]);
     assert(card.includes(`<p class="course-price"><strong>${format(course.price)}</strong> сум / месяц</p>`));
-    assert(!card.includes('Семейной цены нет') && !card.includes('Семья · 2 курса'));
-    assert(!card.includes('course-special'));
+    if (course.specialPrice) assert(card.includes(`<p class="course-special"><span>Семья или 2 курса</span><strong>${format(course.specialPrice)} сум</strong></p>`));
+    else assert(!card.includes('course-special'), `${course.id} has no family price`);
   }
+  assert(data.courses.some(course => course.specialPrice) && data.courses.some(course => !course.specialPrice));
   const escaped = renderCourses([{ ...data.courses[0], subtitle: '<b>x</b>', skills: ['<i>y</i>'] }]);
   assert(!/<b>|<i>/.test(escaped));
 });
 
-test('removed family discounts have no leftover notice or disclosure in the catalogue', () => {
-  assert(!html.includes('id="discounts"'));
-  assert(!html.includes('discount-note'));
+test('family discount conditions are a visible note without popups or disclosures', () => {
+  assert.match(html, /<p class="discount-note" id="discounts" data-text="courses.discount">Скидка действует[^<]+<\/p>/);
   assert(!html.includes('discount-explainer'));
   assert(!html.includes('data-open-discounts'));
   assert(!html.includes('discount-tooltip'));
@@ -901,7 +910,7 @@ test('stats, teachers and results are generated from content and demo mode contr
   assert.equal((renderStats(data.stats, live).match(/<dd>/g) || []).length, data.stats.length);
   const teachers = renderTeachers(data.teachers, live);
   assert.equal((teachers.match(/class="teacher-card"/g) || []).length, data.teachers.length);
-  assert(teachers.includes('class="teacher-brand" src="assets/stanford-icon.svg"'));
+  assert(teachers.includes('<div class="brand-cover" aria-hidden="true"><img src="assets/stanford-icon.svg"'), 'A teacher without a photo gets the logo panel');
   assert(!teachers.includes(`>${initials(data.teachers[0].name)}</div>`));
   assert.equal(initials('Айгуль Бекмуратова'), 'АБ');
   const withPhoto = renderTeachers([{ ...data.teachers[0], photo: 'assets/stanford-logo.webp' }], live);
@@ -1097,7 +1106,7 @@ test('all public pages share indexing settings and use their own canonical URL a
     assert.match(output, /<meta name="robots" content="noindex, nofollow">/);
     assert(output.includes(`rel="canonical" href="https://school.example/centre${suffix}"`), file);
     assert(output.includes(`property="og:url" content="https://school.example/centre${suffix}"`), file);
-    assert(output.includes('property="og:image" content="https://school.example/centre/assets/stanford-logo.png"'), file);
+    assert(output.includes('property="og:image" content="https://school.example/centre/assets/og-image.png"'), file);
     configured.site.demoMode = false;
     configured.results[0].consent = false;
     assert.throws(() => build(template, configured), /consent/, `${file} must reject unconsented results`);

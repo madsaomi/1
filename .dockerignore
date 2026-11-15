@@ -12,8 +12,13 @@
 !theme-init.js
 !style.css
 !robots.txt
+!sitemap.xml
 !assets/
 !assets/**
+!uz/
+!uz/**
+!kaa/
+!kaa/**
 
 **/*.zip
 **/*.rar

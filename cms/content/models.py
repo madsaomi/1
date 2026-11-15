@@ -11,7 +11,7 @@ from django.db import models
 from django.utils.text import slugify
 from django.utils import timezone
 
-from .validators import PHOTO_VALIDATORS
+from .validators import PHOTO_VALIDATORS, VIDEO_VALIDATORS
 
 slug_validator = RegexValidator(r'^[a-z0-9-]+$', 'Только строчные латинские буквы, цифры и дефис.')
 phone_validator = RegexValidator(r'^\+998\d{9}$', 'Формат +998 и 9 цифр, например +998913036001.')
@@ -428,6 +428,77 @@ class StudentResult(Ordered):
             settings = SiteSettings.objects.filter(pk=1).first()
             if settings is not None and not settings.demo_mode:
                 raise ValidationError({'consent': 'Для публикации реального результата нужно согласие студента.'})
+
+
+class MediaItem(Ordered):
+    """One ordered gallery slide, owned by exactly one editable section or person."""
+    site_settings = models.ForeignKey(SiteSettings, on_delete=models.CASCADE, related_name='media_items', null=True, blank=True)
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='media_items', null=True, blank=True)
+    result = models.ForeignKey(StudentResult, on_delete=models.CASCADE, related_name='media_items', null=True, blank=True)
+    practice = models.ForeignKey(Practice, on_delete=models.CASCADE, related_name='media_items', null=True, blank=True)
+    photo = models.ImageField('Фото', upload_to='gallery/photos/', blank=True, validators=PHOTO_VALIDATORS)
+    video = models.FileField('Видео', upload_to='gallery/videos/', blank=True, validators=VIDEO_VALIDATORS,
+                             help_text='MP4, MOV или WebM до 30 МБ и 90 секунд. Сжимается до MP4, максимум 8 МБ.')
+    poster = models.ImageField('Обложка видео', upload_to='gallery/posters/', blank=True, editable=False)
+    alt = models.CharField('Описание фото или видео', max_length=160, blank=True)
+    is_published = models.BooleanField('Показывать слайд', default=True)
+    source_path = models.CharField('Файл из публикации', max_length=240, blank=True,
+                                  validators=[RegexValidator(r'^assets/(?:[a-z0-9_-]+/)*[a-z0-9_-]+\.(?:jpg|jpeg|png|webp|mp4)$',
+                                                             'Допустим только локальный путь assets/… к фото или MP4.')])
+    poster_path = models.CharField('Обложка из публикации', max_length=240, blank=True, validators=[photo_path_validator])
+
+    class Meta(Ordered.Meta):
+        verbose_name = 'Фото или видео'
+        verbose_name_plural = 'Фото и видео — порядок слайдов'
+        constraints = [
+            models.CheckConstraint(condition=(
+                models.Q(site_settings__isnull=False, teacher__isnull=True, result__isnull=True, practice__isnull=True)
+                | models.Q(site_settings__isnull=True, teacher__isnull=False, result__isnull=True, practice__isnull=True)
+                | models.Q(site_settings__isnull=True, teacher__isnull=True, result__isnull=False, practice__isnull=True)
+                | models.Q(site_settings__isnull=True, teacher__isnull=True, result__isnull=True, practice__isnull=False)),
+                name='content_media_exactly_one_parent'),
+            models.CheckConstraint(condition=(
+                (models.Q(photo='') & models.Q(video='') & ~models.Q(source_path=''))
+                | (~models.Q(photo='') & models.Q(video='', source_path=''))
+                | (models.Q(photo='', source_path='') & ~models.Q(video=''))),
+                name='content_media_exactly_one_source'),
+        ]
+
+    @property
+    def media_type(self):
+        return 'video' if self.video or self.source_path.endswith('.mp4') else 'image'
+
+    def __str__(self):
+        return self.alt or ('Видео' if self.media_type == 'video' else 'Фото')
+
+    def clean(self):
+        parents = [name for name in ('site_settings', 'teacher', 'result', 'practice')
+                   if getattr(self, name + '_id') is not None or self._state.fields_cache.get(name) is not None]
+        if len(parents) != 1:
+            raise ValidationError('Слайд должен принадлежать ровно одному разделу, преподавателю или ученику.')
+        if sum(bool(value) for value in (self.photo, self.video, self.source_path)) != 1:
+            raise ValidationError('Для одного слайда выберите только фото или только видео.')
+        if self.poster_path and (not self.source_path or self.media_type != 'video'):
+            raise ValidationError({'poster_path': 'Обложка из публикации нужна только для импортированного видео.'})
+        if not getattr(self, '_validate_inline_gallery', False):
+            parent_id = getattr(self, parents[0] + '_id')
+            if parent_id is not None:
+                siblings = type(self).objects.filter(**{parents[0] + '_id': parent_id}).exclude(pk=self.pk)
+                if siblings.count() >= 8:
+                    raise ValidationError('В галерее может быть не более 8 фото и видео.')
+                if self.media_type == 'video' and sum(item.media_type == 'video' for item in siblings) >= 2:
+                    raise ValidationError('В одной галерее может быть не более 2 видео.')
+
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        with transaction.atomic(using=kwargs.get('using')):
+            for name in ('site_settings', 'teacher', 'result', 'practice'):
+                parent_id = getattr(self, name + '_id')
+                if parent_id is not None:
+                    model = self._meta.get_field(name).remote_field.model
+                    list(model.objects.select_for_update().filter(pk=parent_id).values_list('pk', flat=True))
+            self.clean()
+            super().save(*args, **kwargs)
 
 
 text_key_validator = RegexValidator(r'^[a-z0-9._-]+$', 'Только строчные латинские буквы, цифры, точка и дефис.')

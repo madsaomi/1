@@ -21,13 +21,25 @@ class NoRedirect(HTTPRedirectHandler):
 SOURCE_FILES = ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html',
                 'assets/i18n/uz.js', 'assets/i18n/kaa.js')
 OUTPUT_FILES = frozenset(('content.js', 'index.html', 'results.html', 'career.html', 'teachers.html',
-                          'assets/i18n/uz.js', 'assets/i18n/kaa.js'))
+                          'assets/i18n/uz.js', 'assets/i18n/kaa.js', 'robots.txt', 'sitemap.xml',
+                          *(f'{lang}/{page}' for lang in ('uz', 'kaa')
+                            for page in ('index.html', 'results.html', 'career.html', 'teachers.html'))))
 PHOTO_PATH = re.compile(r'assets/[a-z0-9/_-]+\.(?:jpe?g|webp|png)\Z')
 MANAGED_PHOTO = re.compile(r'assets/uploads/[0-9a-f]{64}\.jpg\Z')
+MEDIA_PATH = re.compile(r'assets/[a-z0-9/_-]+\.(?:jpe?g|webp|png|mp4)\Z')
+MANAGED_MEDIA = re.compile(r'assets/uploads/[0-9a-f]{64}(?:\.(?:jpg|mp4)|-800\.webp)\Z')
+MAX_ASSET_BYTES = 8 * 1024 * 1024
+MAX_RELEASE_BYTES = 128 * 1024 * 1024
 
 
 def allowed_photo(path):
     return isinstance(path, str) and bool(PHOTO_PATH.fullmatch(path)) and '..' not in path.split('/')
+
+
+def allowed_media(path):
+    """A same-origin static image or normalized MP4, never a URL or traversal."""
+    return (isinstance(path, str) and len(path) <= 240 and bool(MEDIA_PATH.fullmatch(path))
+            and '..' not in path.split('/'))
 
 
 def blob_sha(content):
@@ -88,43 +100,49 @@ class GitHubClient:
         entries = {item['path']: item for item in tree['tree'] if item.get('type') == 'blob' and item.get('mode') == '100644'}
         paths = set(SOURCE_FILES)
         for path in photo_paths:
-            if not allowed_photo(path):
-                raise GitHubError('Небезопасный путь фотографии. Выберите фото в админке заново.')
+            if not allowed_media(path):
+                raise GitHubError('Небезопасный путь фото или видео. Выберите файл в админке заново.')
             paths.add(path)
+        if sum(entries.get(path, {}).get('size', 0) for path in paths) > MAX_RELEASE_BYTES:
+            raise GitHubError('Суммарный размер исходников и медиа превышает 128 МБ.')
         total = 0
         for path in sorted(paths):
             self.download(directory, entries, path)
             total += entries[path].get('size', 0)
-            if total > 24 * 1024 * 1024:
-                raise GitHubError('Исходники превышают допустимый размер.')
+            if total > MAX_RELEASE_BYTES:
+                raise GitHubError('Суммарный размер исходников и медиа превышает 128 МБ.')
         return {'parent': parent, 'tree': tree_sha, 'entries': entries}
 
     def download(self, directory, entries, path):
-        if path not in SOURCE_FILES and not allowed_photo(path):
+        if path not in SOURCE_FILES and not allowed_media(path):
             raise GitHubError('Недопустимый исходник сайта.')
         entry = entries.get(path)
-        if not entry or entry.get('size', 0) > 8 * 1024 * 1024:
+        if not entry or entry.get('size', 0) > MAX_ASSET_BYTES:
             raise GitHubError(f'В выбранной ветке отсутствует или слишком велик файл {path}.')
         blob = self.request('GET', f"/git/blobs/{entry['sha']}")
         if blob.get('encoding') != 'base64':
             raise GitHubError('Неподдерживаемый формат файла в GitHub.')
         content = base64.b64decode(blob['content'])
-        if len(content) > 8 * 1024 * 1024 or blob_sha(content) != entry['sha']:
+        if len(content) > MAX_ASSET_BYTES or blob_sha(content) != entry['sha']:
             raise GitHubError('Размер или целостность исходника не прошли проверку.')
         destination = directory / path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(content)
 
     def publish(self, snapshot, files, delete_paths=()):
+        if sum(len(content) for content in files.values()) > MAX_RELEASE_BYTES:
+            raise GitHubError('Суммарный размер публикации превышает 128 МБ.')
         changed = {}
         for path, content in files.items():
-            if path not in OUTPUT_FILES and not (path.startswith('assets/uploads/') and allowed_photo(path)):
+            if path not in OUTPUT_FILES and not MANAGED_MEDIA.fullmatch(path):
                 raise GitHubError('Публикация содержит файл вне разрешённого списка.')
+            if len(content) > MAX_ASSET_BYTES:
+                raise GitHubError('Файл публикации превышает 8 МБ.')
             if snapshot['entries'].get(path, {}).get('sha') != blob_sha(content):
                 changed[path] = content
         removals = set(delete_paths)
-        if any(not MANAGED_PHOTO.fullmatch(path) or path in files or path not in snapshot['entries'] for path in removals):
-            raise GitHubError('Удалять можно только старые управляемые фотографии вне текущей публикации.')
+        if any(not MANAGED_MEDIA.fullmatch(path) or path in files or path not in snapshot['entries'] for path in removals):
+            raise GitHubError('Удалять можно только старые управляемые фото и видео вне текущей публикации.')
         if self.head() != snapshot['parent']:
             raise GitHubError('Ветка изменилась во время сборки. Повторите публикацию с актуальными исходниками.')
         if not changed and not removals:

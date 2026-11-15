@@ -27,8 +27,8 @@ class Page(HTMLParser):
             self.anchors.append(values['href'][1:])
         if tag == 'label' and 'for' in values:
             self.labels.append(values['for'])
-        if tag in {'script', 'img', 'source', 'link'}:
-            for key in ('src', 'srcset', 'href'):
+        if tag in {'script', 'img', 'source', 'link', 'video'}:
+            for key in ('src', 'srcset', 'href', 'poster'):
                 value = values.get(key, '').split('?')[0]
                 if value and not value.startswith(('http:', 'https:', '#', 'data:')):
                     self.files.append(value)

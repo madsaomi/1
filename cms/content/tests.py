@@ -283,8 +283,8 @@ class ImportContentTests(TestCase):
     def test_import_export_round_trip_keeps_the_content(self):
         original = read_content(self.content_path)
         original.setdefault('practices', [])
-        for course in original['courses']:
-            course.pop('specialPrice', None)
+        # The family price round-trips too (Course.special_price ↔ specialPrice).
+        self.assertTrue(any('specialPrice' in course for course in original['courses']))
         self.import_content(str(self.content_path))
         with content_path() as exported_path:
             call_command('export_content', '--output', str(exported_path), stdout=io.StringIO())
@@ -409,7 +409,8 @@ class AdminFormSaveTests(AdminTestCase):
         self.login()
         url = reverse('admin:content_sitesettings_change', args=[1])
         response = self.client.post(url, {'demo_mode': 'on', 'site_url': 'https://cms.example.org/cms',
-                                          'city': 'Нукус'})
+                                          'city': 'Нукус', 'media_items-TOTAL_FORMS': '0',
+                                          'media_items-INITIAL_FORMS': '0'})
         self.assertEqual(response.status_code, 302, response.context and response.context['adminform'].form.errors)
         saved = SiteSettings.load()
         self.assertEqual(saved.site_url, 'https://cms.example.org/cms')
@@ -418,7 +419,8 @@ class AdminFormSaveTests(AdminTestCase):
     def test_admin_rejects_an_http_site_url(self):
         self.login()
         response = self.client.post(reverse('admin:content_sitesettings_change', args=[1]),
-                                    {'demo_mode': 'on', 'site_url': 'http://cms.example.org', 'city': 'Нукус'})
+                                    {'demo_mode': 'on', 'site_url': 'http://cms.example.org', 'city': 'Нукус',
+                                     'media_items-TOTAL_FORMS': '0', 'media_items-INITIAL_FORMS': '0'})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Только https://')
         self.assertEqual(SiteSettings.load().site_url, 'https://1-production-8f16.up.railway.app')

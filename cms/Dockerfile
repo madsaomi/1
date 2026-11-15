@@ -15,7 +15,7 @@ WORKDIR /app
 # Only Node itself is needed; browser assets and sources are fetched from that pinned commit.
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libstdc++6 gosu \
+    && apt-get install -y --no-install-recommends libstdc++6 gosu ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./

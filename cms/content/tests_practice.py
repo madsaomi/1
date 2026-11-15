@@ -92,6 +92,7 @@ class PracticeAdminTests(AdminTestCase):
         response = self.client.post(reverse('admin:content_practice_add'), {
             'title': 'Speaking Club', 'description': 'Практика общения', 'label': 'Speaking',
             'photo_alt': '', 'photo_path': '', 'order': '0', 'is_published': 'on',
+            'media_items-TOTAL_FORMS': '0', 'media_items-INITIAL_FORMS': '0',
         })
         self.assertEqual(response.status_code, 302, response.context and response.context['adminform'].errors)
         practice = Practice.objects.get()

@@ -77,6 +77,7 @@ window.schoolContent = {
         "Книги, материалы и Supporter включены"
       ],
       "price": 590000,
+      "specialPrice": 500000,
       "target": "#prices",
       "id": "general-english"
     },
@@ -91,6 +92,7 @@ window.schoolContent = {
         "Supporter — второй преподаватель"
       ],
       "price": 540000,
+      "specialPrice": 450000,
       "target": "#prices",
       "id": "general-english-kaa"
     },
@@ -103,6 +105,7 @@ window.schoolContent = {
         "Supporter — второй преподаватель"
       ],
       "price": 690000,
+      "specialPrice": 585000,
       "target": "#prices",
       "id": "kids-english"
     },
@@ -115,6 +118,7 @@ window.schoolContent = {
         "Supporter — второй преподаватель"
       ],
       "price": 540000,
+      "specialPrice": 450000,
       "target": "#prices",
       "id": "math"
     },
@@ -393,7 +397,8 @@ window.schoolContent = {
     "career.text27": "Контакты",
     "career.text28": "Наверх",
     "teachers.empty": "Информация о преподавателях пока не опубликована.",
-    "results.empty": "Результаты пока не опубликованы."
+    "results.empty": "Результаты пока не опубликованы.",
+    "courses.discount": "Скидка действует, если из одной семьи занимаются 2 ученика или один ученик записан на 2 курса. Условия и итоговую стоимость подтвердите перед оплатой."
   },
   "practices": [
     {

@@ -12,6 +12,8 @@ export function svgIcon(name) {
   const paths = {
     external: 'M15 3h6v6 M10 14 21 3 M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5',
     'arrow-right': 'M5 12h14 M12 5l7 7-7 7',
+    'arrow-left': 'M19 12H5 M12 5l-7 7 7 7',
+    close: 'M6 6l12 12 M18 6 6 18',
     check: 'm5 12 4 4L19 6',
     plus: 'M12 5v14 M5 12h14',
     camera: 'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3Z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
@@ -34,6 +36,28 @@ const photoPattern = /^assets\/[a-z0-9/_-]+\.(?:jpe?g|webp|png)$/;
 function validatePhoto(photo, message) {
   if (photo !== undefined && (typeof photo !== 'string' || !photoPattern.test(photo) || !fs.existsSync(new URL(photo, import.meta.url)))) throw new Error(message);
 }
+const videoPattern = /^assets\/[a-z0-9/_-]+\.mp4$/;
+
+export function validateMediaGallery(items, label = 'Gallery') {
+  if (items === undefined) return;
+  if (!Array.isArray(items) || items.length > 8) throw new Error(`${label} needs an array with up to 8 media items`);
+  let videos = 0;
+  const localFile = (value, pattern) => typeof value === 'string' && pattern.test(value)
+    && fs.existsSync(new URL(value, import.meta.url)) && fs.lstatSync(new URL(value, import.meta.url)).isFile();
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)
+        || !Object.hasOwn(item, 'type') || !Object.hasOwn(item, 'src')
+        || !['image', 'video'].includes(item.type)) throw new Error(`${label} has an invalid media type`);
+    if (item.alt !== undefined && (typeof item.alt !== 'string' || item.alt.length > 160)) throw new Error(`${label} needs short media alternative text`);
+    if (item.type === 'image') {
+      if (!localFile(item.src, photoPattern) || item.poster !== undefined) throw new Error(`${label} needs an existing local image`);
+    } else {
+      videos += 1;
+      if (videos > 2 || !localFile(item.src, videoPattern)) throw new Error(`${label} allows up to 2 existing local MP4 videos`);
+      if (item.poster !== undefined && !localFile(item.poster, photoPattern)) throw new Error(`${label} needs an existing local image poster`);
+    }
+  }
+}
 const text = (value, max) => typeof value === 'string' && value.trim() !== '' && value.length <= max;
 const optionalText = (value, max) => value === undefined || text(value, max);
 const courseCategories = new Set(['languages', 'kids', 'subjects', 'exam']);
@@ -47,9 +71,11 @@ export function validateContent(data) {
     practiceIds.add(practice.id);
     if (!text(practice.title, 120) || !text(practice.description, 400) || !optionalText(practice.label, 40) || !optionalText(practice.photoAlt, 160)) throw new Error('Invalid practice text');
     validatePhoto(practice.photo, 'Use an existing local practice photo');
+    validateMediaGallery(practice.media, 'Practice gallery');
   }
   if (data.events !== undefined && (!Array.isArray(data.events) || data.events.length > 100)) throw new Error('Events must be an array with up to 100 items');
   for (const event of data.events ?? []) {
+    validateMediaGallery(event.media, 'Event gallery');
     if (!event || !text(event.title, 120) || !optionalText(event.description, 400)) throw new Error('Invalid event text');
     if (typeof event.startsAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(event.startsAt) || !Number.isFinite(Date.parse(event.startsAt))) throw new Error('Event date needs an explicit timezone');
     if (event.url !== undefined) {
@@ -69,6 +95,7 @@ export function validateContent(data) {
     if (!courseCategories.has(course.category)) throw new Error(`Invalid course category: ${course.id}`);
     if (!Array.isArray(course.skills) || !course.skills.length || course.skills.some(skill => !text(skill, 200))) throw new Error(`Invalid course skills: ${course.id}`);
     if (!Number.isFinite(course.price) || course.price <= 0) throw new Error(`Invalid price: ${course.id}`);
+    if (course.specialPrice != null && (!Number.isFinite(course.specialPrice) || course.specialPrice <= 0 || course.specialPrice >= course.price)) throw new Error(`Invalid family price: ${course.id}`);
     if (!/^#[a-z0-9-]+$/.test(course.target)) throw new Error(`Invalid course target: ${course.id}`);
   }
   if (!data.contacts || typeof data.contacts !== 'object' || Array.isArray(data.contacts)) throw new Error('Contacts must be an object');
@@ -106,6 +133,7 @@ export function validateContent(data) {
     }
   }
   if (data.site !== undefined && (!data.site || typeof data.site !== 'object' || Array.isArray(data.site))) throw new Error('Site settings must be an object');
+  validateMediaGallery(data.site?.heroMedia, 'Hero gallery');
   const demo = data.site?.demoMode;
   if (demo !== undefined && typeof demo !== 'boolean') throw new Error('demoMode must be true or false');
   if (data.site?.demoLabels !== undefined && typeof data.site.demoLabels !== 'boolean') throw new Error('demoLabels must be true or false');
@@ -116,10 +144,12 @@ export function validateContent(data) {
     if (!text(teacher.name, 60) || !text(teacher.role, 80) || !optionalText(teacher.qualification, 40) || !optionalText(teacher.experience, 40)) throw new Error('Teacher needs a name, role and short optional details');
     if (teacher.featured !== undefined && typeof teacher.featured !== 'boolean') throw new Error('Teacher featured must be true or false');
     validatePhoto(teacher.photo, 'Use an existing local teacher photo');
+    validateMediaGallery(teacher.media, 'Teacher gallery');
   }
   for (const result of results) {
     if (!text(result.score, 8) || !text(result.exam, 20) || !optionalText(result.level, 20) || !text(result.quote, 240) || !text(result.student, 40) || !optionalText(result.course, 60)) throw new Error('Result needs a score, exam, quote and student');
     if (result.featured !== undefined && typeof result.featured !== 'boolean') throw new Error('Result featured must be true or false');
+    validateMediaGallery(result.media, 'Student gallery');
     // Real student results are published only with the student's consent; demo samples are announced as examples instead.
     if (!demo && result.consent !== true) throw new Error('Publish a real student result only with consent');
   }
@@ -177,11 +207,152 @@ export function renderRobots(site) {
   return site?.demoMode ? '<meta name="robots" content="noindex, nofollow">' : '';
 }
 
-export function renderMetadata(site, page = '') {
+// Public pages listed for search engines; the career form is included, the 404 page is not.
+export const SITEMAP_PAGES = ['', 'results.html', 'teachers.html', 'career.html'];
+
+// robots.txt and sitemap.xml follow the site address from the admin, so a new domain needs only a republish.
+// In demo mode (or without an address) the sitemap stays empty: sample pages are not offered for indexing.
+export function renderRobotsTxt(site) {
+  const lines = ['User-agent: *', 'Allow: /'];
+  if (site?.url && !site.demoMode) lines.push('', `Sitemap: ${new URL('sitemap.xml', site.url.endsWith('/') ? site.url : `${site.url}/`).href}`);
+  return `${lines.join('\n')}\n`;
+}
+
+export function renderSitemap(site) {
+  const base = site?.url ? (site.url.endsWith('/') ? site.url : `${site.url}/`) : '';
+  const urls = base && !site.demoMode ? ['ru', ...LANGUAGES].flatMap(lang => SITEMAP_PAGES.map(page => `  <url><loc>${escapeHTML(pageAddress(site, page, lang))}</loc></url>`)).join('\n') : '';
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls ? `${urls}\n` : ''}</urlset>\n`;
+}
+
+// Address of one public page in one language: Russian at the root, translations in /uz/ and /kaa/.
+export function pageAddress(site, page = '', lang = 'ru') {
+  const base = site.url.endsWith('/') ? site.url : `${site.url}/`;
+  if (lang === 'ru') return page ? new URL(page, base).href : site.url;
+  return new URL(`${lang}/${page}`, base).href;
+}
+
+export function renderMetadata(site, page = '', lang = 'ru') {
   if (!site?.url) return '';
   const base = site.url.endsWith('/') ? site.url : `${site.url}/`;
-  const canonical = page ? new URL(page, base).href : site.url;
-  return `<link rel="canonical" href="${escapeHTML(canonical)}">\n<meta property="og:url" content="${escapeHTML(canonical)}">\n<meta property="og:image" content="${escapeHTML(new URL('assets/stanford-logo.png', base).href)}">`;
+  const canonical = pageAddress(site, page, lang);
+  // Search engines learn that the three language versions are the same page.
+  const alternates = [...['ru', ...LANGUAGES].map(code => [code, pageAddress(site, page, code)]), ['x-default', pageAddress(site, page)]]
+    .map(([code, href]) => `<link rel="alternate" hreflang="${code}" href="${escapeHTML(href)}">`).join('\n');
+  return `<link rel="canonical" href="${escapeHTML(canonical)}">\n<meta property="og:url" content="${escapeHTML(canonical)}">\n<meta property="og:image" content="${escapeHTML(new URL('assets/og-image.png', base).href)}">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n${alternates}`;
+}
+
+// ---------- Translated copies of the public pages (/uz/, /kaa/) ----------
+// The same dictionaries as the language switch, applied at build time so search engines see each language.
+// A string without a translation stays in Russian, exactly as in the browser.
+export const LANGUAGES = ['uz', 'kaa'];
+const PACK_NAMES = { uz: 'stanfordUz', kaa: 'stanfordKaa' };
+const TRANSLATED_ATTRIBUTES = new Set(['aria-label', 'alt', 'title', 'placeholder', 'content']);
+const URL_ATTRIBUTES = new Set(['src', 'href', 'poster']);
+const PAGE_LINK = /^(?:index|results|teachers|career)\.html(?:[?#].*)?$/;
+const CYRILLIC = /[А-Яа-яЁё]/;
+const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' };
+
+export function loadLanguagePack(lang, source = fs.readFileSync(new URL(`./assets/i18n/${lang}.js`, import.meta.url), 'utf8')) {
+  const sandbox = { window: {} };
+  vm.runInNewContext(source, sandbox, { timeout: 1000 });
+  const pack = sandbox.window[PACK_NAMES[lang]];
+  if (!pack?.strings) throw new Error(`Invalid language pack: ${lang}`);
+  return pack;
+}
+
+const decodeEntities = text => text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, name) => {
+  if (name[0] !== '#') return NAMED_ENTITIES[name.toLowerCase()] ?? entity;
+  return String.fromCodePoint(name[1].toLowerCase() === 'x' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10));
+});
+
+// Mirrors translate() of the language switch: whole trimmed text, then the dynamic patterns.
+export function makeTranslator(pack) {
+  const translate = value => {
+    const raw = value.trim();
+    if (!raw) return value;
+    let out = pack.strings[raw.replace(/\s+/g, ' ')];
+    if (out === undefined) {
+      for (const [pattern, build] of pack.patterns || []) {
+        const match = raw.match(pattern);
+        if (match) { out = build(match, translate); break; }
+      }
+    }
+    if (out === undefined) return value;
+    return value.match(/^\s*/)[0] + out + value.match(/\s*$/)[0];
+  };
+  return translate;
+}
+
+// Pages live one folder deeper: shared files get «../», links between pages stay inside the language.
+const localUrl = value => (!value || /^(?:[a-z][a-z0-9+.-]*:|\/|#|\.\.\/)/i.test(value) || PAGE_LINK.test(value)) ? value : `../${value}`;
+const localSrcset = value => value.split(',').map(candidate => {
+  const [url, ...descriptors] = candidate.trim().split(/\s+/);
+  return [localUrl(url), ...descriptors].join(' ');
+}).join(', ');
+
+function translateTag(tag, translate) {
+  return tag.replace(/(\s)([a-zA-Z:-]+)="([^"]*)"/g, (whole, space, name, value) => {
+    const key = name.toLowerCase();
+    if (URL_ATTRIBUTES.has(key)) return `${space}${name}="${localUrl(value)}"`;
+    if (key === 'srcset') return `${space}${name}="${localSrcset(value)}"`;
+    if (!TRANSLATED_ATTRIBUTES.has(key) || !CYRILLIC.test(value)) return whole;
+    const decoded = decodeEntities(value);
+    const next = translate(decoded);
+    return next === decoded ? whole : `${space}${name}="${escapeHTML(next)}"`;
+  });
+}
+
+export function translatePage(html, lang, pack = loadLanguagePack(lang)) {
+  const translate = makeTranslator(pack);
+  const parts = html.split(/(<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<[^>]*>)/i);
+  const out = parts.map((part, index) => {
+    if (index % 2 === 0) {
+      if (!CYRILLIC.test(part)) return part;
+      const decoded = decodeEntities(part);
+      const next = translate(decoded);
+      return next === decoded ? part : escapeText(next);
+    }
+    if (part.startsWith('<!--')) return part;
+    if (/^<script\b/i.test(part)) {
+      const open = part.indexOf('>') + 1;
+      return translateTag(part.slice(0, open), translate) + part.slice(open);
+    }
+    if (/^<style\b/i.test(part)) return part;
+    return translateTag(part, translate);
+  }).join('');
+  return out.replace(/<html lang="ru">/, `<html lang="${lang}" data-lang-page="${lang}">`);
+}
+
+// One translated copy: translated text, local paths, its own canonical address and language metadata.
+export function generateLanguagePage(html, data, lang, page, pack) {
+  const translated = translatePage(html, lang, pack);
+  return replaceBlock(translated, 'SEO', renderMetadata(data.site, page === 'index.html' ? '' : page, lang));
+}
+
+// Machine-readable card of the centre for search engines, built only from the published, verified contacts.
+// It is a data block (never executed), so the strict script-src policy is not involved.
+export function renderStructuredData(site, contacts) {
+  if (!site?.url || !contacts?.verified) return '';
+  const base = site.url.endsWith('/') ? site.url : `${site.url}/`;
+  const sameAs = [...(contacts.telegrams || []), contacts.instagram].filter(Boolean);
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'EducationalOrganization',
+    name: 'Stanford Language Center',
+    url: site.url,
+    logo: new URL('assets/stanford-logo.png', base).href,
+    image: new URL('assets/og-image.png', base).href,
+    ...(contacts.phones?.length ? { telephone: contacts.phones } : {}),
+    ...(sameAs.length ? { sameAs } : {}),
+    location: (contacts.locations || []).map(location => ({
+      '@type': 'Place',
+      name: location.name,
+      address: { '@type': 'PostalAddress', streetAddress: location.address, addressLocality: site.city || 'Нукус', addressCountry: 'UZ' },
+      ...(location.coordinates?.length === 2 ? { geo: { '@type': 'GeoCoordinates', latitude: location.coordinates[1], longitude: location.coordinates[0] } } : {})
+    }))
+  };
+  // «<» is escaped so that no text from the admin can close the block.
+  return `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`;
 }
 
 // A publication changes these URLs whenever the data or translations change, even if the old files are cached.
@@ -202,6 +373,35 @@ export function renderStats(stats = [], site) {
   return `<section class="wrap stats-strip" aria-label="Stanford в цифрах${showDemo(site) ? ' (пример)' : ''}">${showDemo(site) ? '<span class="demo-tag">Пример</span>' : ''}<dl>${items}</dl></section>`;
 }
 
+// One ordered, progressively enhanced gallery for the hero and every content card.
+// Files have already passed validateContent(); all user text still stays escaped.
+// Official logo on a brand panel: shown wherever a card has no photo or video yet.
+export const BRAND_COVER = '<div class="brand-cover" aria-hidden="true"><img src="assets/stanford-icon.svg" alt="" width="64" height="64"></div>';
+
+// The admin publishes a lighter phone copy next to each photo (assets/uploads/<hash>-800.webp).
+// It is linked only when the file exists, so imported or hand-placed photos keep a plain src.
+export const IMAGE_SIZES = { card: '(max-width: 767px) 100vw, 400px', wide: '(max-width: 1023px) 100vw, 640px', tile: '44px' };
+export function responsiveAttributes(src, sizes = IMAGE_SIZES.card) {
+  const match = /^assets\/uploads\/([0-9a-f]{64})\.jpg$/.exec(src || '');
+  if (!match) return '';
+  const small = `assets/uploads/${match[1]}-800.webp`;
+  if (!fs.existsSync(new URL(small, import.meta.url))) return '';
+  return ` srcset="${small} 800w, ${src} 1600w" sizes="${sizes}"`;
+}
+
+export function renderMediaGallery(items = [], label = 'Stanford', { eager = false } = {}) {
+  if (!items.length) return '';
+  const slides = items.map((item, index) => {
+    const source = escapeHTML(item.src);
+    const alt = escapeHTML(item.alt || label);
+    const medium = item.type === 'video'
+      ? `<video controls playsinline preload="none"${item.poster ? ` poster="${escapeHTML(item.poster)}"` : ''} aria-label="${alt}" width="1280" height="720" src="${source}"><a href="${source}">Открыть видео</a></video>`
+      : `<img src="${source}"${responsiveAttributes(item.src, eager ? IMAGE_SIZES.wide : IMAGE_SIZES.card)} alt="${alt}" width="1280" height="800" loading="${eager && index === 0 ? 'eager' : 'lazy'}" decoding="async">`;
+    return `<figure class="media-gallery-slide" data-gallery-slide>${medium}</figure>`;
+  }).join('');
+  return `<div class="media-gallery" data-media-gallery role="region" aria-label="Фото и видео: ${escapeHTML(label)}"><div class="media-gallery-track" data-gallery-track tabindex="0" aria-label="Фото и видео">${slides}</div><div class="media-gallery-controls" data-gallery-controls hidden><button type="button" data-gallery-prev aria-label="Предыдущий слайд">${svgIcon('arrow-left')}</button><span data-gallery-status role="status" aria-live="polite" aria-atomic="true">1 / ${items.length}</span><button type="button" data-gallery-next aria-label="Следующий слайд">${svgIcon('arrow-right')}</button></div></div>`;
+}
+
 export function renderPractices(practices = []) {
   if (!practices.length) return '';
   const artwork = { 'speaking-club': 'speaking', 'movie-club': 'movie', 'mock-exams': 'exams' };
@@ -210,7 +410,10 @@ export function renderPractices(practices = []) {
     const image = practice.photo || (fallback ? `assets/practice/${fallback}.svg` : 'assets/stanford-icon.svg');
     const kind = practice.photo ? ' practice-media--photo' : fallback ? '' : ' practice-media--brand';
     const alt = practice.photo ? practice.photoAlt || practice.title : '';
-    return `<article class="practice-card"><div class="practice-media${kind}"><img src="${escapeHTML(image)}" alt="${escapeHTML(alt)}" width="640" height="400" loading="lazy" decoding="async"></div><div class="practice-body">${practice.label ? `<span class="practice-kicker">${escapeHTML(practice.label)}</span>` : ''}<h3>${escapeHTML(practice.title)}</h3><p>${escapeHTML(practice.description)}</p></div></article>`;
+    const media = practice.media?.length
+      ? `<div class="practice-media practice-media--gallery">${renderMediaGallery(practice.media, practice.title)}</div>`
+      : `<div class="practice-media${kind}"><img src="${escapeHTML(image)}"${responsiveAttributes(practice.photo)} alt="${escapeHTML(alt)}" width="640" height="400" loading="lazy" decoding="async"></div>`;
+    return `<article class="practice-card">${media}<div class="practice-body">${practice.label ? `<span class="practice-kicker">${escapeHTML(practice.label)}</span>` : ''}<h3>${escapeHTML(practice.title)}</h3><p>${escapeHTML(practice.description)}</p></div></article>`;
   }).join('')}</div>`;
 }
 
@@ -220,6 +423,9 @@ function toggleEmptySection(html, id, visible) {
     return visible ? clean : clean.replace(/>$/, ' hidden>');
   });
 }
+
+// Home page limit for teachers and results; «Все преподаватели» / «Все результаты» open the full lists.
+export const HOME_LIMIT = 6;
 
 export function initials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
@@ -233,14 +439,14 @@ export function renderTeachers(teachers = [], site, { featuredOnly = false, head
   if (featuredOnly) {
     const featured = sorted.filter(teacher => teacher.featured === true);
     // Graceful fallback: with no featured teacher configured the section keeps showing everyone.
-    shown = featured.length ? featured : sorted;
+    shown = (featured.length ? featured : sorted).slice(0, HOME_LIMIT);
   }
   if (!teachers.length) return heading ? `${head}` : '';
   const cards = shown.map(teacher => {
     const name = escapeHTML(teacher.name);
-    const portrait = teacher.photo
-      ? `<img class="teacher-photo" src="${escapeHTML(teacher.photo)}" alt="Фото: ${name}" width="600" height="750" loading="lazy" decoding="async">`
-      : '<div class="teacher-initials" aria-hidden="true"><img class="teacher-brand" src="assets/stanford-icon.svg" alt="" width="48" height="48"></div>';
+    const portrait = teacher.media?.length ? renderMediaGallery(teacher.media, teacher.name) : teacher.photo
+      ? `<img class="teacher-photo" src="${escapeHTML(teacher.photo)}"${responsiveAttributes(teacher.photo)} alt="Фото: ${name}" width="600" height="750" loading="lazy" decoding="async">`
+      : BRAND_COVER;
     const chipIcons = {
       qualification: '<svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="9" r="5"/><path d="M8.5 13.5 7 21l5-2.8L17 21l-1.5-7.5"/></svg>',
       experience: '<svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
@@ -255,7 +461,7 @@ export function renderTeachers(teachers = [], site, { featuredOnly = false, head
 
 // One card per published student result; reused by the home section and the full results page.
 export function renderResultCards(results = []) {
-  return results.map(result => `<article class="result-card"><div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></article>`).join('');
+  return results.map(result => `<article class="result-card">${result.media?.length ? renderMediaGallery(result.media, result.student) : BRAND_COVER}<div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></article>`).join('');
 }
 
 export function renderResults(results = [], site, { featuredOnly = false } = {}) {
@@ -266,7 +472,7 @@ export function renderResults(results = [], site, { featuredOnly = false } = {})
   if (featuredOnly) {
     const featured = sorted.filter(result => result.featured === true);
     // Graceful fallback: with no featured result configured the section keeps showing everything.
-    shown = featured.length ? featured : sorted;
+    shown = (featured.length ? featured : sorted).slice(0, HOME_LIMIT);
   }
   return `<section data-reveal class="section wrap results-section" id="results" aria-labelledby="results-title">
 <div class="section-top"><h2 id="results-title">Результаты студентов${demoTag(site)}</h2></div>
@@ -289,12 +495,15 @@ export function renderLocations(contacts, { demo = false } = {}) {
     const links = location.maps.map(map => `<a class="map-icon-link" href="${escapeHTML(map.url)}" target="_blank" rel="noopener noreferrer" aria-label="${providers[map.provider]}: ${name}, ${address}">${map.provider === 'google' ? mapPin : yandexIcon}</a>`).join('');
     // Until the owner sends entrance photos, each branch shows a tagged placeholder.
     const photo = location.photo
-      ? `<img class="location-photo" src="${escapeHTML(location.photo)}" alt="Вход: ${name}" width="640" height="360" loading="lazy" decoding="async">`
+      ? `<a class="map-icon-link location-photo-link" href="${escapeHTML(location.photo)}" data-photo-zoom aria-label="Увеличить фото: ${name}" title="Фото входа"><img class="location-photo" src="${escapeHTML(location.photo)}"${responsiveAttributes(location.photo, IMAGE_SIZES.tile)} alt="Вход: ${name}" width="640" height="360" loading="lazy" decoding="async"></a>`
       : !demo ? '' : `<div class="location-photo location-photo-demo" role="img" aria-label="Пример: место для фото входа, ${name}">${svgIcon('camera')}<span>Фото входа</span><span class="demo-tag">Пример</span></div>`;
-    return `<article class="location-card"><h4>${name}</h4><p>${address}</p>${photo}${select}<div class="map-links">${links}</div></article>`;
+    // A real photo is a small tile next to the map buttons; the demo placeholder keeps its own slot.
+    const tile = location.photo ? photo : '';
+    return `<article class="location-card"><h4>${name}</h4><p>${address}</p>${tile ? '' : photo}${select}<div class="map-links">${tile}${links}</div></article>`;
   }).join('');
   const map = first ? `<div class="branch-map-panel"><div class="map-toolbar"><p id="map-status" class="map-status" tabindex="-1" aria-live="polite">${escapeHTML(`${first.name} — ${first.address}`)}</p></div><iframe id="branch-map" class="branch-map" src="${escapeHTML(first.googleEmbed)}" title="${escapeHTML(`Карта: ${first.name}`)}" width="1100" height="360" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : '';
-  return `<div class="contact-locations"><h3>Как добраться</h3><div class="location-map-layout"><div class="location-grid">${cards}</div>${map}</div></div>`;
+  const zoom = contacts.locations.some(location => location.photo) ? `<dialog class="photo-dialog" id="photo-dialog" aria-label="Фото входа"><button type="button" class="photo-dialog-close" data-photo-close aria-label="Закрыть окно">${svgIcon('close')}</button><img src="" alt="" width="1280" height="720" data-photo-full></dialog>` : '';
+  return `<div class="contact-locations"><h3>Как добраться</h3><div class="location-map-layout"><div class="location-grid">${cards}</div>${map}</div>${zoom}</div>`;
 }
 
 // Both faces are static HTML: the programme remains readable without JavaScript.
@@ -304,7 +513,7 @@ export function renderCourses(courses) {
     const name = escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '));
     return `<article class="course-card" id="course-${id}" tabindex="-1" data-category="${escapeHTML(course.category)}" data-course-id="${id}" data-course-flip>
 <div class="course-flip-inner">
-<div class="course-face course-front"><div class="course-front-brand" aria-hidden="true"><img src="assets/stanford-icon.svg" alt="" width="32" height="32"><span>Stanford</span></div><div class="course-head"><h3>${escapeHTML(course.name)}${course.subtitle ? `<span class="course-subtitle">${escapeHTML(course.subtitle)}</span>` : ''}</h3><p class="course-price"><strong>${money(course.price)}</strong> сум / месяц</p></div>
+<div class="course-face course-front"><div class="course-front-brand" aria-hidden="true"><img src="assets/stanford-icon.svg" alt="" width="32" height="32"><span>Stanford</span></div><div class="course-head"><h3>${escapeHTML(course.name)}${course.subtitle ? `<span class="course-subtitle">${escapeHTML(course.subtitle)}</span>` : ''}</h3><p class="course-price"><strong>${money(course.price)}</strong> сум / месяц</p>${course.specialPrice ? `<p class="course-special"><span>Семья или 2 курса</span><strong>${money(course.specialPrice)} сум</strong></p>` : ''}</div>
 <a class="course-enroll-btn course-flip-toggle" href="#course-details-${id}" data-flip-open aria-controls="course-details-${id}" aria-expanded="false" aria-label="Подробнее: ${name}">Подробнее${svgIcon('arrow-right')}</a></div>
 <div class="course-face course-back" id="course-details-${id}"><h4 class="course-back-title" tabindex="-1">${name}</h4><p class="course-description">${escapeHTML(course.description)}</p>
 <ul class="course-details" aria-label="В программе">${course.skills.map(skill => `<li>${svgIcon('check')}<span>${escapeHTML(skill)}</span></li>`).join('')}</ul>
@@ -423,11 +632,29 @@ function replaceBlock(html, name, body) {
 }
 
 // Optional: no published events means no empty section or invented countdown.
+// The home page lists the ten nearest events; the row scrolls sideways instead of growing down.
+export const EVENTS_LIMIT = 10;
+
 export function renderEvents(events = []) {
   if (!events.length) return '';
-  const formatter = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const zone = { timeZone: 'Asia/Tashkent' };
+  const formatter = new Intl.DateTimeFormat('ru-RU', { ...zone, day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const day = new Intl.DateTimeFormat('ru-RU', { ...zone, day: 'numeric' });
+  const clock = new Intl.DateTimeFormat('ru-RU', { ...zone, hour: '2-digit', minute: '2-digit' });
   const units = [['days', 'Дней'], ['hours', 'Часов'], ['minutes', 'Минут'], ['seconds', 'Секунд']];
-  return `<div class="events-section planned-events" id="events"><div class="section-top"><h3 id="events-title" data-text="events.heading">Запланированные события</h3></div><div class="events-grid">${events.map(event => `<article class="event-card"><h4>${escapeHTML(event.title)}</h4><time datetime="${escapeHTML(event.startsAt)}">${escapeHTML(formatter.format(new Date(event.startsAt)))} · Нукус</time>${event.description ? `<p>${escapeHTML(event.description)}</p>` : ''}<div class="event-countdown" data-countdown="${escapeHTML(event.startsAt)}" aria-label="До начала события">${units.map(([unit, label]) => `<div><span data-unit="${unit}">—</span><small>${label}</small></div>`).join('')}</div><p data-countdown-status></p>${event.url ? `<a class="text-link" href="${escapeHTML(event.url)}" target="_blank" rel="noopener noreferrer">Подробнее${svgIcon('external')}</a>` : ''}</article>`).join('')}</div></div>`;
+  // Compact card: date chip, title, link icon, countdown; an optional photo/video gallery sits above it.
+  const card = event => {
+    const date = new Date(event.startsAt);
+    const title = escapeHTML(event.title);
+    // Without a photo or video the official logo keeps every card the same shape; a gallery replaces it later.
+    const media = `<div class="event-media">${event.media?.length ? renderMediaGallery(event.media, event.title) : BRAND_COVER}</div>`;
+    const telegram = /^https:\/\/(t\.me|telegram\.me)\//.test(event.url || '');
+    const link = event.url ? `<a class="event-link${telegram ? ' event-link--telegram' : ''}" href="${escapeHTML(event.url)}" target="_blank" rel="noopener noreferrer" aria-label="${telegram ? 'Telegram' : 'Подробнее'}: ${title}" title="${telegram ? 'Telegram' : 'Подробнее'}">${svgIcon(telegram ? 'telegram' : 'external')}</a>` : '';
+    return `<article class="event-card${event.media?.length ? ' has-media' : ''}">${media}<div class="event-body"><div class="event-head"><span class="event-date" aria-hidden="true"><strong>${escapeHTML(day.format(date))}</strong><span>${escapeHTML(clock.format(date))}</span></span><div class="event-heading"><h4>${title}</h4><time datetime="${escapeHTML(event.startsAt)}">${escapeHTML(formatter.format(date))} · Нукус</time></div>${link}</div>${event.description ? `<p class="event-description">${escapeHTML(event.description)}</p>` : ''}<div class="event-countdown" data-countdown="${escapeHTML(event.startsAt)}" aria-label="До начала события">${units.map(([unit, label]) => `<div><span data-unit="${unit}">—</span><small>${label}</small></div>`).join('')}</div><p data-countdown-status></p></div></article>`;
+  };
+  const upcoming = [...events].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)).slice(0, EVENTS_LIMIT);
+  const nav = `<div class="carousel-nav" data-carousel-nav hidden><button type="button" class="carousel-arrow" data-carousel-prev aria-label="Предыдущий слайд">${svgIcon('arrow-left')}</button><div class="carousel-dots" data-carousel-dots></div><button type="button" class="carousel-arrow" data-carousel-next aria-label="Следующий слайд">${svgIcon('arrow-right')}</button></div>`;
+  return `<div class="events-section planned-events" id="events"><div class="section-top"><h3 id="events-title" data-text="events.heading">Запланированные события</h3></div><div class="carousel" data-carousel><div class="events-grid carousel-track" data-carousel-track tabindex="0" role="region" aria-labelledby="events-title">${upcoming.map(card).join('')}</div>${nav}</div></div>`;
 }
 
 export function generate(html, data) {
@@ -443,6 +670,7 @@ export function generate(html, data) {
   html = replaceBlock(html, 'TEACHERS', renderTeachers(data.teachers, data.site, { featuredOnly: true }));
   html = replaceBlock(html, 'RESULTS', renderResults(data.results, data.site, { featuredOnly: true }));
   html = replaceBlock(html, 'CASHBACK', renderCashback(data.cashback));
+  html = replaceBlock(html, 'HERO_MEDIA', renderMediaGallery(data.site?.heroMedia, 'Stanford', { eager: true }));
   html = replaceBlock(html, 'REWARD', renderHeroReward(data.cashback));
   html = replaceBlock(html, 'FAB', renderContactFab(data.contacts));
   html = replaceBlock(html, 'NAVCTA', renderNavCta(data.contacts));
@@ -457,7 +685,7 @@ export function generate(html, data) {
   });
   html = applyTexts(html, data.texts);
   html = replaceBlock(html, 'OPTIONS', data.courses.map(course => `<option value="${escapeHTML(course.id)}">${escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '))}</option>`).join(''));
-  html = replaceBlock(html, 'SEO', renderMetadata(data.site));
+  html = replaceBlock(html, 'SEO', [renderMetadata(data.site), renderStructuredData(data.site, data.contacts)].filter(Boolean).join('\n'));
   html = html.replace(/<!-- CONTACT_START:([a-z]+) -->[\s\S]*?<!-- CONTACT_END:\1 -->/g, (_, key) => `<!-- CONTACT_START:${key} -->\n${renderContacts(data.contacts, { compact: key === 'dialog' })}\n<!-- CONTACT_END:${key} -->`);
   html = replaceBlock(html, 'ASSET_VERSIONS', '<script src="content.js"></script><script src="assets/i18n/uz.js"></script><script src="assets/i18n/kaa.js"></script>');
   return versionContentAssets(html, data);
@@ -478,14 +706,14 @@ function bestByExam(results = []) {
 }
 const scoreLabels = results => [...new Set(results.map(result => `${result.exam} ${result.score}`))];
 
-// Profile cards of the full list: the same texts as the home cards plus an initials avatar and a highlight layer.
+// Profile cards of the full list: the same texts as the home cards plus a logo avatar and a highlight layer.
 export function renderResultProfiles(results = []) {
-  return results.map(result => `<article class="result-card" data-tilt><span class="result-shine" aria-hidden="true"></span><div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><div class="result-person"><span class="result-avatar" aria-hidden="true">${escapeHTML(initials(result.student))}</span><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></div></article>`).join('');
+  return results.map(result => `<article class="result-card" data-tilt><span class="result-shine" aria-hidden="true"></span>${renderMediaGallery(result.media, result.student)}<div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><div class="result-person"><span class="result-avatar" aria-hidden="true"><img src="assets/stanford-icon.svg" alt="" width="20" height="20"></span><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></div></article>`).join('');
 }
 
-function directoryCard({ id, name, subtitle = '', cover, details, type }) {
+function directoryCard({ id, name, subtitle = '', cover, details, type, media = false }) {
   const label = escapeHTML(name);
-  return `<article class="profile-card profile-card-${type}" data-course-flip><div class="course-flip-inner"><div class="course-face course-front"><div class="profile-cover">${cover}</div><div class="profile-identity"><h3>${label}</h3>${subtitle ? `<p>${escapeHTML(subtitle)}</p>` : ''}</div><a class="button profile-more" href="#${id}" data-flip-open aria-controls="${id}" aria-expanded="false" aria-label="Подробнее: ${label}">Подробнее${svgIcon('arrow-right')}</a></div><div class="course-face course-back" id="${id}"><h3 class="course-back-title" tabindex="-1">${label}</h3><div class="profile-details">${details}</div><button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${label}">Назад${svgIcon('arrow-right')}</button></div></div></article>`;
+  return `<article class="profile-card profile-card-${type}" data-course-flip><div class="course-flip-inner"><div class="course-face course-front"><div class="profile-cover${media ? ' profile-cover--gallery' : ''}">${cover}</div><div class="profile-identity"><h3>${label}</h3>${subtitle ? `<p>${escapeHTML(subtitle)}</p>` : ''}</div><a class="button profile-more" href="#${id}" data-flip-open aria-controls="${id}" aria-expanded="false" aria-label="Подробнее: ${label}">Подробнее${svgIcon('arrow-right')}</a></div><div class="course-face course-back" id="${id}"><h3 class="course-back-title" tabindex="-1">${label}</h3><div class="profile-details">${details}</div><button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${label}">Назад${svgIcon('arrow-right')}</button></div></div></article>`;
 }
 
 export function renderDirectoryTeachers(teachers = []) {
@@ -493,7 +721,8 @@ export function renderDirectoryTeachers(teachers = []) {
   const sorted = [...teachers].sort((a, b) => (b.featured === true) - (a.featured === true));
   return `<div class="team-grid">${sorted.map((teacher, index) => directoryCard({
     id: `teacher-details-${index + 1}`, name: teacher.name, subtitle: teacher.role, type: 'teacher',
-    cover: teacher.photo ? `<img class="profile-photo" src="${escapeHTML(teacher.photo)}" alt="Фото: ${escapeHTML(teacher.name)}" width="600" height="750" loading="lazy" decoding="async">` : '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>',
+    cover: teacher.media?.length ? renderMediaGallery(teacher.media, teacher.name) : teacher.photo ? `<img class="profile-photo" src="${escapeHTML(teacher.photo)}"${responsiveAttributes(teacher.photo)} alt="Фото: ${escapeHTML(teacher.name)}" width="600" height="750" loading="lazy" decoding="async">` : '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>',
+    media: Boolean(teacher.media?.length),
     details: `<p class="profile-back-role">${escapeHTML(teacher.role)}</p><dl class="profile-facts">${teacher.qualification ? `<div><dt>Квалификация</dt><dd>${escapeHTML(teacher.qualification)}</dd></div>` : ''}${teacher.experience ? `<div><dt>Опыт</dt><dd>${escapeHTML(teacher.experience)}</dd></div>` : ''}</dl>`
   })).join('')}</div>`;
 }
@@ -502,7 +731,8 @@ export function renderDirectoryResults(results = []) {
   if (!results.length) return '<p class="directory-empty" data-text="results.empty">Результаты пока не опубликованы.</p>';
   return results.map((result, index) => directoryCard({
     id: `student-details-${index + 1}`, name: result.student, subtitle: result.course, type: 'result',
-    cover: '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>',
+    cover: result.media?.length ? renderMediaGallery(result.media, result.student) : '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>',
+    media: Boolean(result.media?.length),
     details: `<div class="profile-result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}${result.level ? ` · ${escapeHTML(result.level)}` : ''}</span></div><blockquote>«${escapeHTML(result.quote)}»</blockquote>`
   })).join('');
 }
@@ -598,6 +828,19 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(proces
     { file: new URL('./career.html', import.meta.url), build: generateCareer, label: 'career.html' }
   ];
   let stale = false;
+  // Plain files generated from the same data: robots.txt and sitemap.xml.
+  const textFiles = [
+    { file: new URL('./robots.txt', import.meta.url), output: renderRobotsTxt(data.site), label: 'robots.txt' },
+    { file: new URL('./sitemap.xml', import.meta.url), output: renderSitemap(data.site), label: 'sitemap.xml' }
+  ];
+  for (const { file, output, label } of textFiles) {
+    const source = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+    if (process.argv.includes('--check')) {
+      if (output !== source) { console.error(`Generated ${label} is stale. Run node build.mjs`); stale = true; }
+    } else if (output !== source) {
+      fs.writeFileSync(file, output);
+    }
+  }
   const generated = pages.map(page => {
     const source = fs.readFileSync(page.file, 'utf8');
     return { ...page, source, output: page.build(source, data) };
@@ -607,6 +850,21 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(proces
       if (output !== source) { console.error(`Generated ${label} is stale. Run node build.mjs`); stale = true; }
     } else {
       fs.writeFileSync(file, output);
+    }
+  }
+  for (const lang of LANGUAGES) {
+    const pack = loadLanguagePack(lang);
+    const folder = new URL(`./${lang}/`, import.meta.url);
+    for (const { output, label } of generated) {
+      const file = new URL(label, folder);
+      const translated = generateLanguagePage(output, data, lang, label, pack);
+      const source = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+      if (process.argv.includes('--check')) {
+        if (translated !== source) { console.error(`Generated ${lang}/${label} is stale. Run node build.mjs`); stale = true; }
+      } else if (translated !== source) {
+        fs.mkdirSync(folder, { recursive: true });
+        fs.writeFileSync(file, translated);
+      }
     }
   }
   if (process.argv.includes('--check')) {

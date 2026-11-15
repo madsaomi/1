@@ -1,5 +1,7 @@
 """Publication tests use temporary checkouts and a fake GitHub API; no external writes."""
 import base64
+import io
+import unittest
 import shutil
 import tempfile
 import os
@@ -168,3 +170,30 @@ class LocalPublicationTests(SimpleTestCase):
                 with self.assertRaises(PublishError):
                     with publication_lock():
                         self.fail('Second publisher entered')
+
+
+class SmallPhotoCopyTests(unittest.TestCase):
+    """The phone copy is derived from a published photo and cleaned up together with it."""
+
+    def test_copy_is_made_only_for_wide_jpeg_photos(self):
+        from PIL import Image
+        from .media import small_webp
+        def jpeg(size):
+            output = io.BytesIO()
+            Image.new('RGB', size, 'yellow').save(output, 'JPEG')
+            return output.getvalue()
+        self.assertIsNone(small_webp(jpeg((800, 600))))
+        self.assertIsNone(small_webp(b'not an image'))
+        copy = small_webp(jpeg((1200, 1600)))
+        with Image.open(io.BytesIO(copy)) as image:
+            self.assertEqual((image.format, image.size), ('WEBP', (800, 1067)))
+        self.assertEqual(copy, small_webp(jpeg((1200, 1600))), 'Same photo, same bytes: no needless Git changes')
+
+    def test_copies_follow_their_photo_in_release_and_cleanup_lists(self):
+        from .github import MANAGED_MEDIA
+        from .publish import with_small_variants
+        photo = 'assets/uploads/' + 'a' * 64 + '.jpg'
+        self.assertTrue(MANAGED_MEDIA.fullmatch('assets/uploads/' + 'a' * 64 + '-800.webp'))
+        self.assertFalse(MANAGED_MEDIA.fullmatch('assets/uploads/' + 'a' * 64 + '-801.webp'))
+        self.assertEqual(with_small_variants({photo, 'assets/stanford-logo.png'}),
+                         {photo, 'assets/stanford-logo.png', 'assets/uploads/' + 'a' * 64 + '-800.webp'})

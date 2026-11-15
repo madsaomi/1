@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django import forms
-from django.contrib.admin import ModelAdmin, TabularInline
+from django.contrib.admin import ModelAdmin, TabularInline, StackedInline
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group, User
@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 
 from .models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Event, Faq, Location,
-                     MapLink, PageText, Phone, Practice, SiteSettings, Stat, StudentResult, Teacher, Translation)
+                     MapLink, MediaItem, PageText, Phone, Practice, SiteSettings, Stat, StudentResult, Teacher, Translation)
 
 admin.site.unregister(User)
 admin.site.unregister(Group)
@@ -46,8 +46,96 @@ def thumbnail(image, initials=''):
                        'background:#ffb703;color:#070707;font-weight:700">{}</span>', initials or '—')
 
 
+class MediaItemForm(forms.ModelForm):
+    class Meta:
+        model = MediaItem
+        fields = '__all__'
+        widgets = {'video': forms.ClearableFileInput(attrs={'accept': 'video/mp4,video/quicktime,video/webm'})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance._validate_inline_gallery = True
+        gallery_prefix = (self.prefix or '').rsplit('-', 1)[0]
+        self._too_many_new_videos = bool(gallery_prefix) and sum(
+            key.startswith(gallery_prefix + '-') and key.endswith('-video') for key in self.files) > 2
+
+    def clean(self):
+        cleaned = super().clean()
+        new_photo = self.files.get(self.add_prefix('photo'))
+        new_video = self.files.get(self.add_prefix('video'))
+        if self._too_many_new_videos and new_video:
+            # Reject the batch before ModelForm._post_clean invokes FFmpeg.
+            self.add_error('video', 'За один раз добавьте не более 2 видео в галерею.')
+        elif new_photo and new_video:
+            self.add_error('video', 'Один слайд содержит фото или видео. Для обоих файлов добавьте два слайда.')
+        elif new_photo:
+            cleaned['video'] = False
+        elif new_video:
+            cleaned['photo'] = False
+        if new_photo or new_video:
+            self.instance.source_path = self.instance.poster_path = ''
+        return cleaned
+
+
+class MediaGalleryFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(form.errors for form in self.forms):
+            return
+        slides = [form.instance for form in self.forms if form.cleaned_data and not form.cleaned_data.get('DELETE')]
+        if len(slides) > 8:
+            raise ValidationError('В галерее может быть не более 8 фото и видео.')
+        if sum(item.media_type == 'video' for item in slides) > 2:
+            raise ValidationError('В одной галерее может быть не более 2 видео.')
+
+
+class MediaItemInline(StackedInline):
+    model = MediaItem
+    form = MediaItemForm
+    formset = MediaGalleryFormSet
+    extra = 0
+    max_num = 8
+    fieldsets = [(None, {'fields': ['preview', 'photo', 'video', 'alt', ('order', 'is_published')],
+                         'description': 'Один слайд — одно фото или видео. Для нескольких файлов добавьте слайды. '
+                                        'Меньший номер порядка показывается раньше; видео можно поставить первым.'})]
+    readonly_fields = ['preview']
+    verbose_name_plural = 'Фото и видео — порядок слайдов (до 8, не более 2 видео)'
+
+    @admin.display(description='Предпросмотр')
+    def preview(self, obj):
+        if not obj.pk:
+            return 'Сохраните слайд для предпросмотра.'
+        public_root = (SiteSettings.objects.filter(pk=1).values_list('site_url', flat=True).first() or '').rstrip('/')
+        source = obj.video.url if obj.video else (obj.photo.url if obj.photo else public_root + '/' + obj.source_path if public_root and obj.source_path else '')
+        poster = obj.poster.url if obj.poster else public_root + '/' + obj.poster_path if public_root and obj.poster_path else ''
+        if obj.media_type == 'video' and source:
+            return format_html('<video controls playsinline preload="none" width="240" height="150" poster="{}">'
+                               '<source src="{}" type="video/mp4"></video>', poster, source)
+        if source:
+            return format_html('<img src="{}" width="160" alt="{}">', source, obj.alt)
+        return 'Файл из опубликованного сайта. Для замены загрузите фото или видео.'
+
+
+class HeroMediaInline(MediaItemInline):
+    fk_name = 'site_settings'
+    verbose_name_plural = 'Главный экран — фото и видео (первым показывается слайд с меньшим порядком)'
+
+
+class TeacherMediaInline(MediaItemInline):
+    fk_name = 'teacher'
+
+
+class ResultMediaInline(MediaItemInline):
+    fk_name = 'result'
+
+
+class PracticeMediaInline(MediaItemInline):
+    fk_name = 'practice'
+
+
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(SingletonAdmin):
+    inlines = [HeroMediaInline]
     fieldsets = [('Режим сайта', {'fields': ['demo_mode', 'demo_labels']}), ('Сайт', {'fields': ['site_url', 'city']})]
 
 
@@ -60,6 +148,13 @@ class StatAdmin(ModelAdmin):
 class DraftTemplateAdmin(ModelAdmin):
     """Reuse a saved record's structure without publishing a copied person, photo or consent."""
     save_as = True
+
+    def get_formsets_with_inlines(self, request, obj=None):
+        for formset, inline in super().get_formsets_with_inlines(request, obj):
+            # A copied person's gallery is deliberately empty, just like their old single photo.
+            if '_saveasnew' in request.POST and isinstance(inline, MediaItemInline):
+                continue
+            yield formset, inline
 
     def get_changeform_initial_data(self, request):
         initial = super().get_changeform_initial_data(request)
@@ -233,6 +328,7 @@ class LocationAdmin(ModelAdmin):
 
 @admin.register(Teacher)
 class TeacherAdmin(DraftTemplateAdmin):
+    inlines = [TeacherMediaInline]
     list_display = ['photo_preview', 'name', 'role', 'qualification', 'experience', 'featured', 'is_published', 'order']
     list_display_links = ['photo_preview', 'name']
     list_editable = ['featured', 'is_published', 'order']
@@ -246,6 +342,7 @@ class TeacherAdmin(DraftTemplateAdmin):
 
 @admin.register(StudentResult)
 class StudentResultAdmin(DraftTemplateAdmin):
+    inlines = [ResultMediaInline]
     list_display = ['score', 'exam', 'level', 'student', 'featured', 'consent', 'is_published', 'order']
     list_editable = ['featured', 'is_published', 'order']
     list_filter = ['exam', 'featured', 'consent', 'is_published']
@@ -258,6 +355,7 @@ class StudentResultAdmin(DraftTemplateAdmin):
 
 @admin.register(Practice)
 class PracticeAdmin(DraftTemplateAdmin):
+    inlines = [PracticeMediaInline]
     readonly_fields = ['slug']
     list_display = ['photo_preview', 'title', 'is_published', 'order']
     list_display_links = ['photo_preview', 'title']

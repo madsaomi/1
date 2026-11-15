@@ -15,7 +15,7 @@ from django.utils import timezone
 from pathlib import Path
 
 from content.models import (AdmissionsTelegram, CashbackRule, CashbackTier, Contacts, Course, CourseSkill, Event, Faq,
-                            Location, MapLink, PageText, Phone, Practice, SiteSettings, Stat, StudentResult, Teacher)
+                            Location, MapLink, MediaItem, PageText, Phone, Practice, SiteSettings, Stat, StudentResult, Teacher)
 from content.serialization import (CONTENT_MODELS, TRANSLATION_LANGUAGES, build_content, build_translation_strings,
                                    load_translation_strings, read_content, read_translation_strings,
                                    sync_page_texts, validate_content)
@@ -96,6 +96,8 @@ class Command(BaseCommand):
         return obj
 
     def _replace(self, data):
+        # Media imports retain approved public paths; dry-run never writes uploaded files.
+        validate_content(data)
         practices = data.get('practices', [])
         if not isinstance(practices, list) or len(practices) > 100:
             raise ValueError('Практика вне уроков должна быть списком до 100 занятий.')
@@ -104,8 +106,9 @@ class Command(BaseCommand):
             model.objects.all().delete()
 
         site = data.get('site') or {}
-        self._save(SiteSettings(demo_mode=site.get('demoMode', False), demo_labels=site.get('demoLabels', True),
-                                site_url=site.get('url') or '', city=site.get('city') or ''))
+        site_object = self._save(SiteSettings(demo_mode=site.get('demoMode', False), demo_labels=site.get('demoLabels', True),
+                                              site_url=site.get('url') or '', city=site.get('city') or ''))
+        self._gallery(site_object, site.get('heroMedia', []), 'site_settings')
 
         for order, stat in enumerate(data.get('stats') or []):
             self._save(Stat(order=order, value=stat['value'], label=stat['label']))
@@ -129,15 +132,17 @@ class Command(BaseCommand):
                 self._save(CourseSkill(course=course, order=skill_order, text=skill))
 
         for order, item in enumerate(data.get('teachers') or []):
-            self._save(Teacher(order=order, name=item['name'], role=item['role'],
-                               qualification=item.get('qualification') or '', experience=item.get('experience') or '',
-                               featured=bool(item.get('featured')), photo_path=item.get('photo') or ''))
+            teacher = self._save(Teacher(order=order, name=item['name'], role=item['role'],
+                                         qualification=item.get('qualification') or '', experience=item.get('experience') or '',
+                                         featured=bool(item.get('featured')), photo_path=item.get('photo') or ''))
+            self._gallery(teacher, item.get('media', []), 'teacher')
 
         for order, item in enumerate(data.get('results') or []):
-            self._save(StudentResult(order=order, score=item['score'], exam=item['exam'],
-                                     level=item.get('level') or '', quote=item['quote'], student=item['student'],
-                                     course=item.get('course') or '', featured=bool(item.get('featured')),
-                                     consent=item.get('consent', False)))
+            result = self._save(StudentResult(order=order, score=item['score'], exam=item['exam'],
+                                               level=item.get('level') or '', quote=item['quote'], student=item['student'],
+                                               course=item.get('course') or '', featured=bool(item.get('featured')),
+                                               consent=item.get('consent', False)))
+            self._gallery(result, item.get('media', []), 'result')
 
         for order, item in enumerate(data.get('events') or []):
             starts_at = parse_datetime(item['startsAt'])
@@ -147,9 +152,10 @@ class Command(BaseCommand):
                              starts_at=starts_at, url=item.get('url') or ''))
 
         for order, item in enumerate(practices):
-            self._save(Practice(order=order, slug=item['id'], title=item['title'], description=item['description'],
-                                label=item.get('label') or '', photo_path=item.get('photo') or '',
-                                photo_alt=item.get('photoAlt') or '', is_published=True))
+            practice = self._save(Practice(order=order, slug=item['id'], title=item['title'], description=item['description'],
+                                          label=item.get('label') or '', photo_path=item.get('photo') or '',
+                                          photo_alt=item.get('photoAlt') or '', is_published=True))
+            self._gallery(practice, item.get('media', []), 'practice')
 
         source = data.get('contacts') or {}
         contacts = Contacts(verified=source.get('verified', False), hr_telegram=source.get('hrTelegram') or '',
@@ -189,3 +195,9 @@ class Command(BaseCommand):
             'events': Event.objects.count(),
             'practices': Practice.objects.count(),
         }
+
+    def _gallery(self, owner, items, parent_field):
+        for order, item in enumerate(items):
+            self._save(MediaItem(**{parent_field: owner}, order=order, source_path=item['src'],
+                                 poster_path=item.get('poster') or '', alt=item.get('alt') or '',
+                                 is_published=True))

@@ -183,6 +183,8 @@ if not LOCAL:
     SECURE_HSTS_SECONDS = 365 * 24 * 60 * 60
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # the admin host has no subdomains of its own
 
-# Photos only: small, common formats (see content.validators); requests stay modest.
+# Photo/video validators have separate limits; large files spool to a temporary
+# upload instead of occupying request memory. The text-only form limit excludes files.
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
