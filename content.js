@@ -1,7 +1,7 @@
 // Данные сайта. Публикуются из админки (PLAN-044); при ручной правке затем запустить node build.mjs.
 window.schoolContent = {
   "site": {
-    "url": "https://1-production-8f16.up.railway.app",
+    "url": "https://stanford-lc.uz",
     "city": "Нукус",
     "demoMode": false,
     "demoLabels": false

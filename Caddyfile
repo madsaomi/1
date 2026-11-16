@@ -21,6 +21,13 @@
 
 	import security_headers
 
+	# Keep one public address while leaving Railway health checks reachable on every host.
+	@old_public_host {
+		host 1-production-8f16.up.railway.app www.stanford-lc.uz
+		not path /healthz
+	}
+	redir @old_public_host https://stanford-lc.uz{uri} 308
+
 	# Files linked with ?v=… change their address on every edit, so browsers may keep them for a year.
 	@versioned query v=*
 	header @versioned Cache-Control "public, max-age=31536000, immutable"
