@@ -310,7 +310,7 @@ window.schoolContent = {
     "header.link4": "Преподаватели",
     "header.link5": "Вопросы",
     "header.link6": "Контакты",
-    "hero.text1": "Языковой центр",
+    "hero.text1": "Учебный центр",
     "hero.title1": "Английский,",
     "hero.label1": "IELTS и SAT",
     "hero.text2": "Языки для взрослых и детей, подготовка к экзаменам и математика.",

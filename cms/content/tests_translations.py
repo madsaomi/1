@@ -112,3 +112,21 @@ class TranslationWorkflowTests(AdminTestCase):
                 self.assertEqual(exported['Кнопка'], f'Seed {code}')
             self.assertIn('assets/i18n/kaa.js', SOURCE_FILES)
             self.assertIn('assets/i18n/kaa.js', OUTPUT_FILES)
+
+
+class LearningCenterWordingMigrationTests(TestCase):
+    def test_old_wording_is_renamed_and_owner_edits_are_kept(self):
+        from django.apps import apps
+        from importlib import import_module
+        forward = import_module('content.migrations.0013_learning_center_wording').forward
+        hero = PageText.objects.create(key='hero.text1', text='Языковой центр', uz='Til markazi', kaa='')
+        own = Translation.objects.create(source='Языковой центр в Нукусе', uz='Mening matnim', kaa='Nókistegi til orayı')
+        forward(apps, None)
+        forward(apps, None)  # running twice changes nothing
+        hero.refresh_from_db()
+        own.refresh_from_db()
+        self.assertEqual((hero.text, hero.uz, hero.kaa), ('Учебный центр', 'Öquv markazi', 'Oqıw orayı'))
+        self.assertEqual((own.uz, own.kaa), ('Mening matnim', 'Nókistegi oqıw orayı'))
+        added = Translation.objects.get(source='Учебный центр в Нукусе')
+        self.assertEqual((added.uz, added.kaa), ('Nukusdagi öquv markazi', 'Nókistegi oqıw orayı'))
+        self.assertEqual(build_translation_strings('kaa')['Учебный центр'], 'Oqıw orayı')

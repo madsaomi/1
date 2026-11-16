@@ -200,6 +200,8 @@ html[data-motion="on"] :is(.hero .eyebrow, .cashback-pill)::before { animation: 
 .error-card h1 { margin-bottom: var(--space-1); font-size: var(--text-32); font-weight: 800; }
 .error-text { max-width: 40ch; margin-inline: auto; color: var(--muted); }
 .error-actions { justify-content: center; }
+.error-card { position: relative; }
+.error-lang { position: absolute; inset-block-start: var(--space-2); inset-inline-end: var(--space-2); }
 html[data-motion="on"] .error-mark { animation: brand-pop 900ms var(--spring) 150ms both; }
 html[data-motion="on"] .error-mark svg { animation: brand-talk 1200ms ease-in-out 1050ms 2; }
 html[data-motion="on"] .error-rings { animation: error-rings 1200ms var(--ease) both; }
@@ -325,7 +327,7 @@ html[data-theme="dark"] .stats-strip dt { color: var(--muted); }
 .cashback-score strong { font-size: var(--text-32); color: var(--accent-text); }
 .cashback-card-max .cashback-score strong { text-shadow: 0 0 16px var(--brand-a30); }
 .cashback-score span { font-size: var(--text-14); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-.cashback-amount { font-size: var(--text-20); font-weight: 700; color: var(--ink); margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cashback-amount { font-size: var(--text-20); font-weight: 700; color: var(--ink); margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: normal; }
 .cashback-amount-max { font-size: var(--text-20); color: var(--accent-text); }
 
 /* Exams */
@@ -662,7 +664,7 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .course-grid, .cashback-grid { margin-inline: 0; padding: 0; overflow: visible; scroll-snap-type: none; }
   .course-grid { flex-wrap: wrap; justify-content: center; }
   .course-card { flex: 0 1 360px; width: 100%; max-width: 380px; min-width: 290px; }
-  .cashback-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: var(--space-3); }
+  .cashback-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: var(--space-3); }
   .cashback-card { width: auto; }
   footer { padding-block: var(--space-4); }
   .wrap { width: min(calc(100% - var(--space-8)), var(--container)); }
@@ -1531,7 +1533,14 @@ html[data-theme] footer { padding-block: var(--space-3); background: var(--surfa
 .event-date strong { font-size: var(--text-24); font-weight: 800; }
 .event-date span { font-size: var(--text-14); font-weight: 600; }
 .event-heading { display: grid; gap: 4px; min-width: 0; }
-.planned-events .event-card .event-heading h4 { font-size: var(--text-16); line-height: 1.35; overflow-wrap: anywhere; }
+.planned-events .event-card .event-heading h4 { font-size: var(--text-16); line-height: 1.35; overflow-wrap: break-word; }
+/* Phones: date and Telegram on one row, the title below at full width instead of a narrow column. */
+@media (max-width: 599px) {
+  .event-head { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "date . link" "heading heading heading"; }
+  .event-date { grid-area: date; }
+  .event-heading { grid-area: heading; }
+  .event-link { grid-area: link; }
+}
 .event-heading time { color: var(--muted); font-size: var(--text-14); }
 .event-link { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 12px; color: var(--ink); transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease); }
 .event-link:hover { border-color: var(--brand); background: var(--surface-hover); text-decoration: none; }
@@ -1570,6 +1579,9 @@ html[data-theme] footer { padding-block: var(--space-3); background: var(--surfa
 /* Official logo on a brand panel wherever a card has no photo or video yet (teachers, results, events). */
 .brand-cover { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 10; border-radius: 16px; background: var(--brand); }
 .brand-cover img { width: 72px; height: 72px; filter: brightness(0); }
+/* The logo file is wider than tall: never crop or stretch it to a square box. */
+.event-media .brand-cover img { width: 72px; height: 72px; aspect-ratio: auto; }
+img[src$="stanford-icon.svg"] { object-fit: contain; }
 .event-media .brand-cover { border-radius: 0; }
 .event-media :is(.brand-cover, .media-gallery-track) { aspect-ratio: 16 / 9; }
 
@@ -1581,7 +1593,8 @@ html[data-theme] footer { padding-block: var(--space-3); background: var(--surfa
 .events-grid.carousel-track { display: flex; gap: var(--space-2); overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
 .events-grid.carousel-track::-webkit-scrollbar { display: none; }
 .events-grid.carousel-track:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
-.carousel-track > .event-card { flex: 0 0 min(85%, 340px); scroll-snap-align: start; }
+/* Phones: one whole event at a time, the next one only after a swipe or an arrow. */
+.carousel-track > .event-card { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }
 @media (min-width: 768px) { .carousel-track > .event-card { flex-basis: calc((100% - var(--space-2)) / 2); } }
 @media (min-width: 1024px) { .carousel-track > .event-card { flex-basis: calc((100% - 2 * var(--space-2)) / 3); } }
 .carousel-nav { display: flex; align-items: center; justify-content: center; gap: var(--space-1); margin-top: var(--space-2); }
