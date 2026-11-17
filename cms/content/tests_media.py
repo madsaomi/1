@@ -114,13 +114,19 @@ class StoredImageTests(TestCase):
         with Image.open(teacher.photo.path) as image:
             self.assertLessEqual(max(image.size), 1600)
 
-    def test_replacement_removes_the_previous_photo_only_after_commit(self):
+    def test_replacement_retains_previous_photo_for_24_hours_from_commit(self):
         teacher = self.teacher()
         old_path = Path(teacher.photo.path)
+        past = time.time() - 48 * 3600
+        os.utime(old_path, (past, past))
         with self.captureOnCommitCallbacks(execute=True):
             teacher.photo = SimpleUploadedFile('new.png', image_bytes('blue'))
             teacher.save()
             self.assertTrue(old_path.exists())
+        self.assertGreater(old_path.stat().st_mtime, past + 24 * 3600)
+        audit_media(apply=True, now=time.time() + 23 * 3600)
+        self.assertTrue(old_path.exists())
+        audit_media(apply=True, now=time.time() + 25 * 3600)
         self.assertFalse(old_path.exists())
         self.assertTrue(Path(teacher.photo.path).exists())
 
@@ -140,7 +146,7 @@ class StoredImageTests(TestCase):
         self.assertTrue(old_path.exists())
         self.assertTrue(all(path.stat().st_size <= PHOTO_MAX_BYTES for path in self.root.rglob('*.jpg')))
 
-    def test_shared_photo_survives_until_its_last_record_is_deleted(self):
+    def test_shared_photo_survives_last_reference_deletion_and_then_its_grace_period(self):
         first = self.teacher()
         path = Path(first.photo.path)
         second = Teacher.objects.create(name='Shared', role='English', photo=first.photo.name)
@@ -149,7 +155,37 @@ class StoredImageTests(TestCase):
         self.assertTrue(path.exists())
         with self.captureOnCommitCallbacks(execute=True):
             second.delete()
+        self.assertTrue(path.exists())
+        audit_media(apply=True, now=time.time() + 25 * 3600)
         self.assertFalse(path.exists())
+
+    def test_reusing_a_retired_photo_keeps_it_after_its_old_grace_expires(self):
+        teacher = self.teacher()
+        name, path = teacher.photo.name, Path(teacher.photo.path)
+        with self.captureOnCommitCallbacks(execute=True):
+            teacher.delete()
+        Teacher.objects.create(name='Reused photo', role='English', photo=name)
+        audit_media(apply=True, now=time.time() + 25 * 3600)
+        self.assertTrue(path.exists())
+
+    def test_reencoding_a_reused_orphan_preserves_the_old_bytes_for_an_earlier_backup(self):
+        source = io.BytesIO()
+        Image.effect_noise((240, 160), 100).convert('RGB').save(source, 'PNG')
+        teacher = Teacher.objects.create(name='Original photo', role='English',
+                                        photo=SimpleUploadedFile('original.png', source.getvalue()))
+        old_name, old_path = teacher.photo.name, Path(teacher.photo.path)
+        original = old_path.read_bytes()
+        self.assertNotEqual(normalize_image(original), original)
+        with self.captureOnCommitCallbacks(execute=True):
+            teacher.delete()
+        reused = Teacher.objects.create(name='Reused photo', role='English', photo=old_name)
+        self.assertNotEqual(reused.photo.name, old_name)
+        self.assertEqual(old_path.read_bytes(), original)
+        audit_media(apply=True)
+        self.assertTrue(old_path.exists())
+        audit_media(apply=True, now=time.time() + 25 * 3600)
+        self.assertFalse(old_path.exists())
+        self.assertTrue(Path(reused.photo.path).is_file())
 
     def test_bad_upload_does_not_create_a_file_or_a_record(self):
         with self.assertRaises(ValidationError):

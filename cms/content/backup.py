@@ -12,6 +12,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.management import call_command
+from django.db import connection, transaction
 
 # Logs and data Django rebuilds by itself are left out; users, 2FA devices and all content are kept.
 EXCLUDE = ['contenttypes', 'auth.permission', 'sessions', 'admin.logentry', 'axes']
@@ -21,7 +22,13 @@ SKIP_DIRS = {'tmp', '.tmp', 'cache'}
 def dump_database():
     """All data as gzip-compressed JSON with natural keys, readable by loaddata on any database."""
     out = io.StringIO()
-    call_command('dumpdata', exclude=EXCLUDE, natural_foreign=True, natural_primary=True, indent=None, stdout=out)
+    outermost = not connection.in_atomic_block
+    with transaction.atomic():
+        if outermost and connection.vendor == 'postgresql':
+            # dumpdata uses several SELECTs: every model must come from the same database snapshot.
+            with connection.cursor() as cursor:
+                cursor.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
+        call_command('dumpdata', exclude=EXCLUDE, natural_foreign=True, natural_primary=True, indent=None, stdout=out)
     return gzip.compress(out.getvalue().encode('utf-8'), mtime=0)
 
 
@@ -77,3 +84,14 @@ def restore_media(archive_path):
                     output.write(chunk)
             count += 1
     return count
+
+
+def verify_media_references():
+    """A successful restore must include every upload referenced by the restored database."""
+    from .media import referenced_media, safe_media_path
+
+    names = referenced_media()
+    missing = [name for name in names if (path := safe_media_path(name)) is None or not path.is_file()]
+    if missing:
+        raise ValueError(f'Не найдены файлы, указанные в базе: {len(missing)}. Восстановление медиа не завершено.')
+    return len(names)

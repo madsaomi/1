@@ -13,7 +13,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Check addresses and alert Telegram
         env:
@@ -26,9 +26,9 @@ jobs:
           for url in $URLS; do
             ok=""
             for attempt in 1 2 3; do
-              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo 000)
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url") || code=000
               if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then ok=1; break; fi
-              sleep 20
+              if [ "$attempt" -lt 3 ]; then sleep 20; fi
             done
             if [ -z "$ok" ]; then failed="$failed\n• $url — ответ $code"; fi
             echo "$url: ${ok:+ok}${ok:-FAILED ($code)}"

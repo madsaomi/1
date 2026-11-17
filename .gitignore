@@ -2,6 +2,7 @@
 node_modules/
 coverage/
 .cache/
+/.local-credentials/
 .publish-*/
 .vscode/
 .idea/

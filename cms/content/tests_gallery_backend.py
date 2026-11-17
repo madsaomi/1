@@ -78,6 +78,8 @@ class GalleryModelTests(TestCase):
         self.assertTrue(path.exists())
         with self.captureOnCommitCallbacks(execute=True):
             second.delete()
+        self.assertTrue(path.exists())
+        audit_media(apply=True, now=time.time() + 25 * 3600)
         self.assertFalse(path.exists())
 
     def test_inline_final_composition_enforces_max_videos(self):
@@ -289,7 +291,7 @@ class RealVideoTests(TestCase):
         self.assertFalse(list(self.root.rglob('*.mov')))
         self.assertEqual(referenced_media(), {item.video.name, item.poster.name})
 
-    def test_shared_video_and_poster_survive_until_last_reference_commits(self):
+    def test_shared_video_and_poster_survive_last_reference_and_retention_grace(self):
         first = MediaItem.objects.create(teacher=self.teacher, video=self.video())
         second = MediaItem.objects.create(teacher=self.teacher, video=first.video.name, poster=first.poster.name)
         paths = [Path(first.video.path), Path(first.poster.path)]
@@ -298,9 +300,11 @@ class RealVideoTests(TestCase):
         self.assertTrue(all(path.exists() for path in paths))
         with self.captureOnCommitCallbacks(execute=True):
             second.delete()
+        self.assertTrue(all(path.exists() for path in paths))
+        audit_media(apply=True, now=time.time() + 25 * 3600)
         self.assertFalse(any(path.exists() for path in paths))
 
-    def test_replacing_a_photo_with_video_and_back_deletes_only_after_commit(self):
+    def test_replacing_a_photo_with_video_and_back_retains_the_old_media_for_backups(self):
         item = MediaItem.objects.create(teacher=self.teacher, photo=picture())
         old_photo = Path(item.photo.path)
         form_class = modelform_factory(MediaItem, form=MediaItemForm,
@@ -311,7 +315,7 @@ class RealVideoTests(TestCase):
             item = form.save()
             self.assertTrue(old_photo.exists())
             self.assertFalse(item.photo)
-        self.assertFalse(old_photo.exists())
+        self.assertTrue(old_photo.exists())
         old_files = [Path(item.video.path), Path(item.poster.path)]
         with self.captureOnCommitCallbacks(execute=True):
             form = form_class({'order': '0', 'is_published': 'on'}, files={'photo': picture()}, instance=item)
@@ -319,6 +323,10 @@ class RealVideoTests(TestCase):
             item = form.save()
             self.assertTrue(all(path.exists() for path in old_files))
             self.assertFalse(item.video or item.poster)
+        self.assertTrue(all(path.exists() for path in old_files))
+        audit_media(apply=True, now=time.time() + 25 * 3600)
+        # Identical photo uploads reuse the previous hash, which now belongs to the row again.
+        self.assertTrue(old_photo.exists())
         self.assertFalse(any(path.exists() for path in old_files))
 
     def test_disguised_playlist_is_not_accepted_as_mp4(self):

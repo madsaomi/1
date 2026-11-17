@@ -52,9 +52,18 @@ jobs:
           curl -fsS http://localhost:8080/ -o /tmp/stanford-home.html
           grep -q Stanford /tmp/stanford-home.html
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/assets/i18n/uz.js)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/results.html)" = "200"
+          for prefix in '' /uz /kaa; do
+            for page in results teachers career privacy; do
+              test "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080${prefix}/${page}")" = "200"
+              curl -sS -D /tmp/stanford-redirect.txt -o /dev/null "http://localhost:8080${prefix}/${page}.html?source=smoke"
+              grep -qE '^HTTP/[^ ]+ 301([[:space:]]|$)' /tmp/stanford-redirect.txt
+              tr -d '\r' < /tmp/stanford-redirect.txt | grep -qiFx "Location: ${prefix}/${page}?source=smoke"
+            done
+            curl -sS -D /tmp/stanford-redirect.txt -o /dev/null "http://localhost:8080${prefix}/index.html?source=smoke"
+            grep -qE '^HTTP/[^ ]+ 301([[:space:]]|$)' /tmp/stanford-redirect.txt
+            tr -d '\r' < /tmp/stanford-redirect.txt | grep -qiFx "Location: ${prefix}/?source=smoke"
+          done
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/results.js)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/career.html)" = "200"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/no-such-page)" = "404"
           curl -fsSI http://localhost:8080/ -o /tmp/stanford-headers.txt
           grep -qi '^content-security-policy:' /tmp/stanford-headers.txt

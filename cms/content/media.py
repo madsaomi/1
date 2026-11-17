@@ -1,8 +1,8 @@
 """Bounded image storage and conservative garbage collection for CMS uploads.
 
 Original uploads are never persisted: ImageField pre-save writes a metadata-free,
-content-addressed JPEG. Database rollbacks may leave a new normalized file behind;
-the age-protected audit command collects those only after a later successful save.
+content-addressed JPEG. Replaced/deleted files stay for the orphan grace period so
+a database backup can still collect its referenced media after an administrator edit.
 """
 import hashlib
 import io
@@ -140,12 +140,39 @@ def safe_media_path(name, storage=None):
         return None
 
 
+def refresh_media_grace(name, storage):
+    """Start the collection grace period without following links or leaving MEDIA_ROOT."""
+    path = safe_media_path(name, storage)
+    if path is None or not path.is_file():
+        return False
+    os.utime(path, None)
+    return True
+
+
+def retire_unreferenced(name, storage, using='default'):
+    """Retain a newly orphaned file; audit_media removes it after the grace period."""
+    if not name or name in referenced_media(using):
+        return False
+    return refresh_media_grace(name, storage)
+
+
 def delete_unreferenced(name, storage, using='default'):
+    """Remove new originals, but retain a reused content-addressed upload for backups."""
     if not name or name in referenced_media(using):
         return False
     path = safe_media_path(name, storage)
     if path is None or not path.is_file():
         return False
+    limit = PHOTO_MAX_BYTES if path.suffix == '.jpg' else None
+    if path.suffix == '.mp4':
+        from .media_video import VIDEO_MAX_BYTES
+        limit = VIDEO_MAX_BYTES
+    if limit and len(path.stem) == 64 and all(letter in '0123456789abcdef' for letter in path.stem):
+        with path.open('rb') as source:
+            raw = source.read(limit + 1)
+        if len(raw) <= limit and hashlib.sha256(raw).hexdigest() == path.stem:
+            # A stored path may be an orphan from an earlier DB snapshot, not a new original.
+            return refresh_media_grace(name, storage)
     path.unlink(missing_ok=True)
     return True
 
@@ -159,6 +186,10 @@ def prepare_instance_images(sender, instance, using='default', raw=False, **kwar
                                     for field in fields if old and getattr(old, field.name)]
     for field in fields:
         upload = getattr(instance, field.name)
+        previous = getattr(old, field.name) if old else None
+        if previous and (not upload or not upload._committed or upload.name != previous.name):
+            # Protect it before the last DB reference disappears, then refresh again on commit.
+            refresh_media_grace(previous.name, field.storage)
         if not upload:
             continue
         incoming_stored_name = upload.name if upload._committed else ''
@@ -203,6 +234,8 @@ def prepare_gallery_video(sender, instance, using='default', raw=False, **kwargs
         return
     old = sender._default_manager.using(using).filter(pk=instance.pk).first() if instance.pk else None
     instance._old_content_videos = [(old.video.name, old.video.storage)] if old and old.video else []
+    if old and old.video and (not instance.video or not instance.video._committed or instance.video.name != old.video.name):
+        refresh_media_grace(old.video.name, old.video.storage)
     if not instance.video:
         instance.poster = ''
         return
@@ -236,13 +269,22 @@ def saved_instance_images(sender, instance, using='default', **kwargs):
     if sender._meta.app_label != 'content':
         return
     for name, storage in getattr(instance, '_old_content_images', ()):
-        transaction.on_commit(lambda name=name, storage=storage: delete_unreferenced(name, storage, using),
+        transaction.on_commit(lambda name=name, storage=storage: retire_unreferenced(name, storage, using),
                               using=using, robust=True)
     instance._old_content_images = ()
     for name, storage in getattr(instance, '_old_content_videos', ()):
-        transaction.on_commit(lambda name=name, storage=storage: delete_unreferenced(name, storage, using),
+        transaction.on_commit(lambda name=name, storage=storage: retire_unreferenced(name, storage, using),
                               using=using, robust=True)
     instance._old_content_videos = ()
+
+
+def protect_deleted_instance_images(sender, instance, **kwargs):
+    if sender._meta.app_label != 'content':
+        return
+    for field in file_fields(sender):
+        upload = getattr(instance, field.name)
+        if upload:
+            refresh_media_grace(upload.name, field.storage)
 
 
 def deleted_instance_images(sender, instance, using='default', **kwargs):
@@ -252,7 +294,7 @@ def deleted_instance_images(sender, instance, using='default', **kwargs):
         photo = getattr(instance, field.name)
         if photo:
             transaction.on_commit(lambda name=photo.name, storage=field.storage:
-                                  delete_unreferenced(name, storage, using), using=using, robust=True)
+                                  retire_unreferenced(name, storage, using), using=using, robust=True)
 
 
 def audit_media(*, apply=False, min_age_hours=24, using='default', now=None):
@@ -275,9 +317,10 @@ def audit_media(*, apply=False, min_age_hours=24, using='default', now=None):
         stat = path.stat()
         if stat.st_mtime > cutoff:
             continue
-        # Re-read references immediately before a destructive cleanup.
-        if apply and name in referenced_media(using):
-            continue
+        # A save may have reused/retired it while the collector read references.
+        if apply:
+            if name in referenced_media(using) or path.stat().st_mtime > cutoff:
+                continue
         files.append(name)
         total += stat.st_size
         if apply:

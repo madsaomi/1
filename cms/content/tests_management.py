@@ -3,6 +3,9 @@ import io
 import os
 import shutil
 import tempfile
+import tarfile
+import time
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -13,7 +16,8 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.conf import settings
-from django.test import TestCase, override_settings
+from django.db import connection, connections
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from .models import AdmissionsTelegram, Contacts, Course, CourseSkill, Location, Phone, SiteSettings, StudentResult, Teacher
@@ -315,7 +319,36 @@ class FullPublicationIntegrationTests(TestCase):
             self.assertEqual(uploaded.read(), media_before)
 
 
-class BackupRoundTripTests(TestCase):
+class BackupRoundTripTests(TransactionTestCase):
+    @unittest.skipUnless(connection.vendor == 'postgresql', 'PostgreSQL snapshot isolation check')
+    def test_database_dump_keeps_one_snapshot_during_a_concurrent_edit(self):
+        from .backup import dump_database
+        from .models import Faq
+        Faq.objects.create(question='До выгрузки', answer='Есть в снимке.')
+        errors = []
+
+        def edit_from_another_connection():
+            try:
+                Faq.objects.create(question='Во время выгрузки', answer='Не входит в снимок.')
+            except Exception as error:
+                errors.append(error)
+            finally:
+                connections.close_all()
+
+        def read_during_dump(*args, **kwargs):
+            before = Faq.objects.count()
+            editor = threading.Thread(target=edit_from_another_connection)
+            editor.start()
+            editor.join(timeout=10)
+            self.assertFalse(editor.is_alive(), 'Concurrent editor did not finish')
+            self.assertEqual(errors, [])
+            self.assertEqual(Faq.objects.count(), before)
+            kwargs['stdout'].write('[]')
+
+        with mock.patch('content.backup.call_command', side_effect=read_during_dump):
+            dump_database()
+        self.assertEqual(Faq.objects.count(), 2)
+
     def test_backup_restores_content_users_and_uploads_and_the_download_needs_the_token(self):
         from django.contrib.auth import get_user_model
         from .models import Faq
@@ -340,3 +373,47 @@ class BackupRoundTripTests(TestCase):
                 self.assertTrue(Faq.objects.filter(question='Сохранится?').exists())
                 self.assertTrue(get_user_model().objects.get(username='owner').check_password('a-long-test-password'))
                 self.assertEqual((media / 'gallery' / 'photo.jpg').read_bytes(), b'jpeg-bytes')
+
+    def test_database_download_keeps_its_photo_when_an_admin_replaces_it_before_media_download(self):
+        from .media import audit_media
+        from .backup import verify_media_references
+        token = 'x' * 40
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with override_settings(MEDIA_ROOT=root / 'media', BACKUP_TOKEN=token):
+                picture = io.BytesIO()
+                Image.new('RGB', (80, 60), 'yellow').save(picture, 'PNG')
+                teacher = Teacher.objects.create(name='Backup photo test', role='English',
+                                                 photo=ContentFile(picture.getvalue(), name='original.png'))
+                old_name, old_path = teacher.photo.name, Path(teacher.photo.path)
+                past = time.time() - 48 * 3600
+                os.utime(old_path, (past, past))
+                database = self.client.get('/backup/db', HTTP_AUTHORIZATION=f'Bearer {token}').content
+                picture = io.BytesIO()
+                Image.new('RGB', (80, 60), 'blue').save(picture, 'PNG')
+                teacher.photo = ContentFile(picture.getvalue(), name='replacement.png')
+                teacher.save()
+                audit_media(apply=True)
+                self.assertTrue(old_path.is_file())
+                archive = self.client.get('/backup/media', HTTP_AUTHORIZATION=f'Bearer {token}')
+                (root / 'database.json.gz').write_bytes(database)
+                (root / 'media.tar').write_bytes(b''.join(archive.streaming_content))
+                archive.close()
+                call_command('restore_backup', db=str(root / 'database.json.gz'), media=str(root / 'media.tar'),
+                             yes=True, stdout=io.StringIO())
+                restored = Teacher.objects.get(name='Backup photo test')
+                self.assertEqual(restored.photo.name, old_name)
+                self.assertEqual(verify_media_references(), 1)
+
+    def test_restore_rejects_an_archive_missing_referenced_media_or_an_unsafe_database_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / 'media.tar'
+            with tarfile.open(archive, 'w'):
+                pass
+            teacher = Teacher.objects.create(name='Missing photo test', role='English')
+            with override_settings(MEDIA_ROOT=root / 'media'):
+                for name in ('gallery/missing.jpg', '../outside.jpg'):
+                    Teacher.objects.filter(pk=teacher.pk).update(photo=name)
+                    with self.assertRaisesMessage(CommandError, 'Не найдены файлы, указанные в базе: 1'):
+                        call_command('restore_backup', media=str(archive), yes=True, stdout=io.StringIO())

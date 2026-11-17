@@ -5,7 +5,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from content.backup import restore_media
+from content.backup import restore_media, verify_media_references
 
 
 class Command(BaseCommand):
@@ -35,3 +35,8 @@ class Command(BaseCommand):
         if media:
             count = restore_media(media)
             self.stdout.write(self.style.SUCCESS(f'Файлы восстановлены: {count}.'))
+            try:
+                references = verify_media_references()
+            except ValueError as error:
+                raise CommandError(str(error)) from error
+            self.stdout.write(self.style.SUCCESS(f'Все файлы из базы доступны: {references}.'))

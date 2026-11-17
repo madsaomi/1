@@ -110,6 +110,7 @@ jobs:
           python3 manage.py migrate --noinput -v 0
           args="--db ../../backup/database.json.gz"
           if [ -f ../../backup/media.tar ]; then args="$args --media ../../backup/media.tar"; fi
+          # A media restore also verifies every restored FileField reference before anything is sent.
           python3 manage.py restore_backup $args --yes
           python3 manage.py shell -v 0 -c "
           from content.models import Teacher, StudentResult, Event, Course, MediaItem
