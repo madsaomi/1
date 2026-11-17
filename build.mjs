@@ -142,6 +142,11 @@ export function validateContent(data) {
   if (demo !== undefined && typeof demo !== 'boolean') throw new Error('demoMode must be true or false');
   if (data.site?.demoLabels !== undefined && typeof data.site.demoLabels !== 'boolean') throw new Error('demoLabels must be true or false');
   if (data.site?.analyticsToken !== undefined && !/^[0-9a-f]{32}$/.test(data.site.analyticsToken)) throw new Error('analyticsToken must be the 32-character Cloudflare token');
+  if (data.site?.holiday !== undefined) {
+    const { mode, text } = data.site.holiday || {};
+    if (!['auto', 'off', ...Object.keys(HOLIDAYS)].includes(mode)) throw new Error('holiday.mode must be auto, off or a known holiday');
+    if (text !== undefined && (typeof text !== 'string' || !text.trim() || text.length > 120)) throw new Error('holiday.text must be short text');
+  }
   const { stats = [], teachers = [], results = [] } = data;
   if (![stats, teachers, results].every(Array.isArray)) throw new Error('Stats, teachers and results must be arrays');
   for (const stat of stats) if (!text(stat.value, 12) || !text(stat.label, 40)) throw new Error('Stat needs a short value and label');
@@ -210,6 +215,30 @@ const showDemo = site => Boolean(site?.demoMode && site?.demoLabels !== false);
 
 // Samples must not be indexed: while demo mode is on, search engines are asked to skip the page.
 // Cloudflare Web Analytics: no cookies, so no consent banner. Off in demo mode and without a token.
+// Holiday greetings: dates are month-day in Nukus time (a range may cross the new year).
+export const HOLIDAYS = {
+  newyear: { from: '12-20', to: '01-10', text: 'С Новым годом!' },
+  march8: { from: '03-06', to: '03-09', text: 'С 8 Марта!' },
+  navruz: { from: '03-18', to: '03-25', text: 'С праздником Навруз!' },
+  independence: { from: '08-29', to: '09-02', text: 'С Днём независимости Узбекистана!' },
+  teachers: { from: '09-29', to: '10-02', text: 'С Днём учителя и наставника!' }
+};
+const HOLIDAY_ICONS = { independence: 'assets/flags/uz.svg' };
+
+// «auto» renders every greeting hidden and assets/holiday.js shows today's one; a chosen holiday is always on.
+export function renderHoliday(site) {
+  const mode = site?.holiday?.mode || 'auto';
+  if (mode === 'off') return '';
+  const names = mode === 'auto' ? Object.keys(HOLIDAYS) : [mode];
+  const close = `<button type="button" class="holiday-close" data-holiday-close aria-label="Скрыть поздравление">${svgIcon('close')}</button>`;
+  return names.map(name => {
+    const { from, to, text } = HOLIDAYS[name];
+    const message = site?.holiday?.text || text;
+    const icon = HOLIDAY_ICONS[name] || `assets/holiday/${name}.svg`;
+    return `<div class="holiday-banner" data-holiday="${name}" data-from="${from}" data-to="${to}"${mode === 'auto' ? '' : ' data-holiday-forced="true"'} role="note" hidden><img src="${icon}" alt="" width="20" height="20"><span>${escapeHTML(message)}</span>${close}</div>`;
+  }).join('');
+}
+
 export function renderAnalytics(site) {
   if (!site?.analyticsToken || site.demoMode) return '';
   return `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${site.analyticsToken}"}'></script>`;
@@ -710,6 +739,7 @@ export function generate(html, data) {
   html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts, { demo: showDemo(data.site) }));
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
   html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
+  html = replaceBlock(html, 'HOLIDAY', renderHoliday(data.site));
   html = replaceBlock(html, 'BANNER', renderDemoBanner(data.site));
   html = replaceBlock(html, 'STATS', renderStats(data.stats, data.site));
   html = replaceBlock(html, 'TEACHERS', renderTeachers(data.teachers, data.site, { featuredOnly: true }));
@@ -840,6 +870,7 @@ export function generateResults(html, data) {
   html = replaceBlock(html, 'BAND', '');
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
   html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
+  html = replaceBlock(html, 'HOLIDAY', renderHoliday(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'results.html'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
@@ -854,6 +885,7 @@ export function generateTeachers(html, data) {
   html = replaceBlock(html, 'BAND', '');
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
   html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
+  html = replaceBlock(html, 'HOLIDAY', renderHoliday(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'teachers.html'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
@@ -863,6 +895,7 @@ export function generateCareer(html, data) {
   validateContent(data);
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
   html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
+  html = replaceBlock(html, 'HOLIDAY', renderHoliday(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'career.html'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
@@ -873,6 +906,7 @@ export function generatePrivacy(html, data) {
   validateContent(data);
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
   html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
+  html = replaceBlock(html, 'HOLIDAY', renderHoliday(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'privacy.html'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }

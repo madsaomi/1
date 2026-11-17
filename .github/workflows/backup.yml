@@ -1,0 +1,156 @@
+name: Backup to Telegram
+
+# Every night at 03:00 Nukus time GitHub downloads the admin database and (when changed) the uploaded files,
+# encrypts them with BACKUP_PASSWORD and the backup bot sends them to the private chat.
+# On Mondays (and manual runs) it also restores the fresh copy into an empty database to prove the backup works.
+# Setup and the recovery steps: BACKUP.md.
+on:
+  schedule:
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+    inputs:
+      full:
+        description: 'Send media and run the restore check now'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BOT: ${{ secrets.BACKUP_BOT_TOKEN }}
+      CHAT: ${{ secrets.BACKUP_CHAT_ID }}
+      PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
+      ADMIN_URL: ${{ secrets.BACKUP_URL }}
+      TOKEN: ${{ secrets.BACKUP_TOKEN }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: restore_check
+          POSTGRES_USER: restore
+          POSTGRES_PASSWORD: restore
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U restore" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - name: Check settings
+        run: |
+          for name in BOT CHAT PASSWORD ADMIN_URL TOKEN; do
+            if [ -z "${!name}" ]; then echo "::error::Secret for $name is not set (see BACKUP.md)"; exit 1; fi
+          done
+          echo "DAY=$(TZ=Asia/Tashkent date +%d.%m.%Y)" >> "$GITHUB_ENV"
+          echo "STAMP=$(TZ=Asia/Tashkent date +%Y-%m-%d)" >> "$GITHUB_ENV"
+          full=false
+          if [ "$(TZ=Asia/Tashkent date +%u)" = "1" ] || [ "${{ inputs.full }}" = "true" ]; then full=true; fi
+          echo "FULL=$full" >> "$GITHUB_ENV"
+
+      - name: Download the database
+        run: |
+          mkdir -p backup
+          curl -fsS --max-time 300 -H "Authorization: Bearer $TOKEN" "${ADMIN_URL%/}/backup/db" -o backup/database.json.gz
+          gzip -t backup/database.json.gz
+          echo "DB_SIZE=$(du -h backup/database.json.gz | cut -f1)" >> "$GITHUB_ENV"
+
+      - name: Restore last media fingerprint
+        uses: actions/cache/restore@v4
+        with:
+          path: .media-hash
+          key: media-hash-${{ github.run_id }}
+          restore-keys: media-hash-
+
+      - name: Download uploads when they changed
+        run: |
+          curl -fsS --max-time 120 -H "Authorization: Bearer $TOKEN" "${ADMIN_URL%/}/backup/media-manifest" -o manifest.json
+          hash=$(python3 -c "import json;print(json.load(open('manifest.json'))['hash'])")
+          files=$(python3 -c "import json;print(json.load(open('manifest.json'))['files'])")
+          echo "MEDIA_FILES=$files" >> "$GITHUB_ENV"
+          if [ "$FULL" = "true" ] || [ "$(cat .media-hash 2>/dev/null)" != "$hash" ]; then
+            curl -fsS --max-time 900 -H "Authorization: Bearer $TOKEN" "${ADMIN_URL%/}/backup/media" -o backup/media.tar
+            tar -tf backup/media.tar > /dev/null
+            echo "MEDIA_SENT=true" >> "$GITHUB_ENV"
+            echo "MEDIA_SIZE=$(du -h backup/media.tar | cut -f1)" >> "$GITHUB_ENV"
+          else
+            echo "MEDIA_SENT=false" >> "$GITHUB_ENV"
+          fi
+          echo "$hash" > .media-hash
+
+      - name: Get the admin code for the restore check
+        if: env.FULL == 'true'
+        uses: actions/checkout@v4
+        with:
+          path: site
+
+      - name: Set up Python
+        if: env.FULL == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Check that the backup restores (Mondays and manual runs)
+        if: env.FULL == 'true'
+        env:
+          DJANGO_LOCAL: '1'
+          POSTGRES_DB: restore_check
+          POSTGRES_USER: restore
+          POSTGRES_PASSWORD: restore
+          POSTGRES_HOST: 127.0.0.1
+          MEDIA_ROOT: ${{ runner.temp }}/restored-media
+        run: |
+          python3 -m pip install -q -r site/cms/requirements.txt
+          cd site/cms
+          python3 manage.py migrate --noinput -v 0
+          args="--db ../../backup/database.json.gz"
+          if [ -f ../../backup/media.tar ]; then args="$args --media ../../backup/media.tar"; fi
+          python3 manage.py restore_backup $args --yes
+          python3 manage.py shell -v 0 -c "
+          from content.models import Teacher, StudentResult, Event, Course, MediaItem
+          from django.contrib.auth import get_user_model
+          print(f'курсов {Course.objects.count()}, преподавателей {Teacher.objects.count()}, результатов {StudentResult.objects.count()}, событий {Event.objects.count()}, слайдов {MediaItem.objects.count()}, админов {get_user_model().objects.count()}')
+          " > ../../restore-check.txt
+          cat ../../restore-check.txt
+
+      - name: Encrypt and send to Telegram
+        run: |
+          send_file() {
+            curl -fsS --max-time 300 "https://api.telegram.org/bot${BOT}/sendDocument" \
+              --form-string "chat_id=${CHAT}" --form-string "caption=$2" -F "document=@$1" > /dev/null
+          }
+          encrypt() { openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:PASSWORD -in "$1" -out "$2"; }
+          encrypt backup/database.json.gz "stanford-db-$STAMP.json.gz.enc"
+          send_file "stanford-db-$STAMP.json.gz.enc" "База $DAY ($DB_SIZE)"
+          media_note="медиа без изменений ($MEDIA_FILES файлов)"
+          if [ "$MEDIA_SENT" = "true" ]; then
+            encrypt backup/media.tar "stanford-media-$STAMP.tar.enc"
+            split -b 45m -d -a 2 "stanford-media-$STAMP.tar.enc" "stanford-media-$STAMP.tar.enc.part"
+            parts=$(ls stanford-media-$STAMP.tar.enc.part* | wc -l)
+            for part in stanford-media-$STAMP.tar.enc.part*; do send_file "$part" "Медиа $DAY: $part"; done
+            media_note="медиа $MEDIA_SIZE, частей: $parts"
+          fi
+          text="✅ Бэкап $DAY: база $DB_SIZE, $media_note."
+          if [ -f restore-check.txt ]; then text="$text
+          🔍 Проверка восстановления прошла: $(cat restore-check.txt)."; fi
+          curl -fsS --max-time 60 "https://api.telegram.org/bot${BOT}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" --data-urlencode "text=${text}" > /dev/null
+
+      - name: Remember media fingerprint
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: .media-hash
+          key: media-hash-${{ github.run_id }}
+
+      - name: Report a failed backup
+        if: failure() && env.BOT != '' && env.CHAT != ''
+        run: |
+          curl -fsS --max-time 60 "https://api.telegram.org/bot${BOT}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" \
+            --data-urlencode "text=❌ Бэкап $DAY не получился. Подробности: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" > /dev/null

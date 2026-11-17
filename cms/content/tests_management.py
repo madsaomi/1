@@ -313,3 +313,30 @@ class FullPublicationIntegrationTests(TestCase):
             self.assertEqual(after, before)
         with teacher.photo.open('rb') as uploaded:
             self.assertEqual(uploaded.read(), media_before)
+
+
+class BackupRoundTripTests(TestCase):
+    def test_backup_restores_content_users_and_uploads_and_the_download_needs_the_token(self):
+        from django.contrib.auth import get_user_model
+        from .models import Faq
+        token = 'x' * 40
+        with tempfile.TemporaryDirectory() as temporary:
+            media = Path(temporary) / 'media'
+            (media / 'gallery').mkdir(parents=True)
+            (media / 'gallery' / 'photo.jpg').write_bytes(b'jpeg-bytes')
+            with override_settings(MEDIA_ROOT=media, BACKUP_TOKEN=token):
+                get_user_model().objects.create_user('owner', password='a-long-test-password')
+                Faq.objects.create(question='Сохранится?', answer='Да.')
+                self.assertEqual(self.client.get('/backup/db').status_code, 404)
+                self.assertEqual(self.client.get('/backup/db', HTTP_AUTHORIZATION='Bearer wrong').status_code, 404)
+                manifest = self.client.get('/backup/media-manifest', HTTP_AUTHORIZATION=f'Bearer {token}').json()
+                self.assertEqual(manifest['files'], 1)
+                call_command('export_backup', str(Path(temporary) / 'out'), stdout=io.StringIO())
+                Faq.objects.all().delete()
+                get_user_model().objects.all().delete()
+                shutil.rmtree(media)
+                call_command('restore_backup', db=str(Path(temporary) / 'out' / 'database.json.gz'),
+                             media=str(Path(temporary) / 'out' / 'media.tar'), yes=True, stdout=io.StringIO())
+                self.assertTrue(Faq.objects.filter(question='Сохранится?').exists())
+                self.assertTrue(get_user_model().objects.get(username='owner').check_password('a-long-test-password'))
+                self.assertEqual((media / 'gallery' / 'photo.jpg').read_bytes(), b'jpeg-bytes')

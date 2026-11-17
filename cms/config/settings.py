@@ -152,6 +152,8 @@ if WHITENOISE_AVAILABLE:
     STORAGES['staticfiles'] = {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'}
 MEDIA_URL = 'media/'
 MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', BASE_DIR / 'media'))
+# Nightly backup download (config.views.backup). Shorter than 32 characters means switched off.
+BACKUP_TOKEN = os.environ.get('BACKUP_TOKEN', '') if len(os.environ.get('BACKUP_TOKEN', '')) >= 32 else ''
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # All logs to stdout: Railway collects them; security and lockout events are called out by name.

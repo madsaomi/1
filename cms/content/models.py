@@ -100,6 +100,15 @@ class SiteSettings(Singleton):
     site_url = models.URLField('Адрес сайта', blank=True, validators=[validate_https_site_url],
                                help_text='Нужен для canonical и превью в соцсетях. Только https://.')
     city = models.CharField('Город', max_length=60, default='Нукус')
+    HOLIDAYS = [('auto', 'Авто — по датам'), ('off', 'Выключено'), ('newyear', 'Новый год'), ('march8', '8 Марта'),
+                ('navruz', 'Навруз'), ('independence', 'День независимости'), ('teachers', 'День учителя')]
+    holiday_mode = models.CharField(
+        'Праздничное оформление', max_length=20, choices=HOLIDAYS, default='auto',
+        help_text='Авто: Новый год 20.12–10.01, 8 Марта 6–9.03, Навруз 18–25.03, День независимости 29.08–2.09, '
+                  'День учителя 29.09–2.10 (время Нукуса). Выбранный праздник показывается всегда, пока не выключите.')
+    holiday_text = models.CharField(
+        'Своё поздравление', max_length=120, blank=True,
+        help_text='Пусто — стандартный текст праздника. Перевод на UZ и QQ добавьте в «Переводы».')
     analytics_token = models.CharField(
         'Токен Cloudflare Web Analytics', max_length=32, blank=True,
         validators=[RegexValidator(r'^[0-9a-f]{32}$', 'Токен из Cloudflare: 32 символа, цифры и буквы a–f.')],

@@ -409,7 +409,7 @@ class AdminFormSaveTests(AdminTestCase):
         self.login()
         url = reverse('admin:content_sitesettings_change', args=[1])
         response = self.client.post(url, {'demo_mode': 'on', 'site_url': 'https://cms.example.org/cms',
-                                          'city': 'Нукус', 'media_items-TOTAL_FORMS': '0',
+                                          'city': 'Нукус', 'holiday_mode': 'auto', 'media_items-TOTAL_FORMS': '0',
                                           'media_items-INITIAL_FORMS': '0'})
         self.assertEqual(response.status_code, 302, response.context and response.context['adminform'].form.errors)
         saved = SiteSettings.load()

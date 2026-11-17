@@ -3,10 +3,11 @@ from django.contrib import admin
 from django.contrib.staticfiles.views import serve as serve_static
 from django.urls import path, re_path
 
-from config.views import healthz, private_media
+from config.views import backup, healthz, private_media
 
 urlpatterns = [
     path('healthz', healthz),  # must stay unauthenticated and outside the secret admin path
+    path('backup/<str:kind>', backup),  # only with BACKUP_TOKEN; see BACKUP.md
     path(settings.ADMIN_PATH, admin.site.urls),
 ]
 if settings.LOCAL or not settings.WHITENOISE_AVAILABLE:

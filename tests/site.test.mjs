@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML, openingHours, renderAnalytics } from '../build.mjs';
+import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML, openingHours, renderAnalytics, renderHoliday, HOLIDAYS } from '../build.mjs';
 
 const publishedData = readContent();
 const sourceHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -1285,4 +1285,15 @@ test('Cloudflare analytics is added only with a valid token and never in demo mo
   assert.throws(() => validateContent({ ...data, site: { ...data.site, analyticsToken: '"><script>' } }), /analyticsToken/);
   const caddy = fs.readFileSync(new URL('../Caddyfile', import.meta.url), 'utf8');
   assert(caddy.includes("script-src 'self' https://static.cloudflareinsights.com;") && caddy.includes("connect-src 'self' https://cloudflareinsights.com;"));
+});
+
+test('holiday greetings: automatic by dates, one chosen holiday always on, or switched off', () => {
+  const auto = renderHoliday({});
+  assert.equal((auto.match(/class="holiday-banner"/g) || []).length, 5);
+  assert(auto.includes('data-holiday="newyear" data-from="12-20" data-to="01-10"') && !auto.includes('data-holiday-forced'));
+  const chosen = renderHoliday({ holiday: { mode: 'navruz', text: 'Navroʻz <b>' } });
+  assert(chosen.includes('data-holiday="navruz"') && chosen.includes('data-holiday-forced="true"') && chosen.includes('Navroʻz &lt;b&gt;'));
+  assert.equal(renderHoliday({ holiday: { mode: 'off' } }), '');
+  assert.throws(() => validateContent({ ...data, site: { ...data.site, holiday: { mode: 'birthday' } } }), /holiday/);
+  for (const name of Object.keys(HOLIDAYS)) assert(fs.existsSync(new URL(`../${name === 'independence' ? 'assets/flags/uz.svg' : `assets/holiday/${name}.svg`}`, import.meta.url)));
 });
