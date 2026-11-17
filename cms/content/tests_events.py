@@ -72,6 +72,7 @@ class EventAdminTests(AdminTestCase):
         response = self.client.post('/admin/content/event/add/', {
             'title': 'Speaking Club', 'description': 'Практика', 'starts_at_0': '2030-02-03',
             'starts_at_1': '18:30:00', 'url': '', 'is_published': 'on', 'order': '0',
+            'media_items-TOTAL_FORMS': '0', 'media_items-INITIAL_FORMS': '0',
         })
         self.assertEqual(response.status_code, 302, response.context and response.context['adminform'].errors)
         self.assertEqual(Event.objects.get().starts_at, parse_datetime('2030-02-03T18:30:00+05:00'))

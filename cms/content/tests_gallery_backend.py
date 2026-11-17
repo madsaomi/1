@@ -335,3 +335,17 @@ class RealVideoTests(TestCase):
             encoded, poster = normalize_video(webm.read_bytes(), 'source.webm')
             self.assertIn(b'ftyp', encoded[:32])
             self.assertTrue(poster.startswith(b'\xff\xd8'))
+
+
+class EventGalleryTests(TestCase):
+    def test_an_event_owns_its_own_gallery_and_publishes_it(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .models import Event
+        from .serialization import _gallery_data
+        event = Event.objects.create(title='Speaking Club', starts_at=timezone.now() + timedelta(days=3))
+        MediaItem.objects.create(event=event, source_path='assets/uploads/demo/event.jpg', alt='Афиша')
+        practice = Practice.objects.create(title='Practice', description='A real description')
+        with self.assertRaises(ValidationError):
+            MediaItem(event=event, practice=practice, source_path='assets/one.jpg').full_clean()
+        self.assertEqual(_gallery_data(event, None), [{'type': 'image', 'src': 'assets/uploads/demo/event.jpg', 'alt': 'Афиша'}])

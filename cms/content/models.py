@@ -445,6 +445,7 @@ class MediaItem(Ordered):
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='media_items', null=True, blank=True)
     result = models.ForeignKey(StudentResult, on_delete=models.CASCADE, related_name='media_items', null=True, blank=True)
     practice = models.ForeignKey(Practice, on_delete=models.CASCADE, related_name='media_items', null=True, blank=True)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='media_items', null=True, blank=True)
     photo = models.ImageField('Фото', upload_to='gallery/photos/', blank=True, validators=PHOTO_VALIDATORS)
     video = models.FileField('Видео', upload_to='gallery/videos/', blank=True, validators=VIDEO_VALIDATORS,
                              help_text='MP4, MOV или WebM до 30 МБ и 90 секунд. Сжимается до MP4, максимум 8 МБ.')
@@ -461,10 +462,11 @@ class MediaItem(Ordered):
         verbose_name_plural = 'Фото и видео — порядок слайдов'
         constraints = [
             models.CheckConstraint(condition=(
-                models.Q(site_settings__isnull=False, teacher__isnull=True, result__isnull=True, practice__isnull=True)
-                | models.Q(site_settings__isnull=True, teacher__isnull=False, result__isnull=True, practice__isnull=True)
-                | models.Q(site_settings__isnull=True, teacher__isnull=True, result__isnull=False, practice__isnull=True)
-                | models.Q(site_settings__isnull=True, teacher__isnull=True, result__isnull=True, practice__isnull=False)),
+                models.Q(site_settings__isnull=False, teacher__isnull=True, result__isnull=True, practice__isnull=True, event__isnull=True)
+                | models.Q(site_settings__isnull=True, teacher__isnull=False, result__isnull=True, practice__isnull=True, event__isnull=True)
+                | models.Q(site_settings__isnull=True, teacher__isnull=True, result__isnull=False, practice__isnull=True, event__isnull=True)
+                | models.Q(site_settings__isnull=True, teacher__isnull=True, result__isnull=True, practice__isnull=False, event__isnull=True)
+                | models.Q(site_settings__isnull=True, teacher__isnull=True, result__isnull=True, practice__isnull=True, event__isnull=False)),
                 name='content_media_exactly_one_parent'),
             models.CheckConstraint(condition=(
                 (models.Q(photo='') & models.Q(video='') & ~models.Q(source_path=''))
@@ -481,10 +483,10 @@ class MediaItem(Ordered):
         return self.alt or ('Видео' if self.media_type == 'video' else 'Фото')
 
     def clean(self):
-        parents = [name for name in ('site_settings', 'teacher', 'result', 'practice')
+        parents = [name for name in ('site_settings', 'teacher', 'result', 'practice', 'event')
                    if getattr(self, name + '_id') is not None or self._state.fields_cache.get(name) is not None]
         if len(parents) != 1:
-            raise ValidationError('Слайд должен принадлежать ровно одному разделу, преподавателю или ученику.')
+            raise ValidationError('Слайд должен принадлежать ровно одному разделу, событию, преподавателю или ученику.')
         if sum(bool(value) for value in (self.photo, self.video, self.source_path)) != 1:
             raise ValidationError('Для одного слайда выберите только фото или только видео.')
         if self.poster_path and (not self.source_path or self.media_type != 'video'):
@@ -501,7 +503,7 @@ class MediaItem(Ordered):
     def save(self, *args, **kwargs):
         from django.db import transaction
         with transaction.atomic(using=kwargs.get('using')):
-            for name in ('site_settings', 'teacher', 'result', 'practice'):
+            for name in ('site_settings', 'teacher', 'result', 'practice', 'event'):
                 parent_id = getattr(self, name + '_id')
                 if parent_id is not None:
                     model = self._meta.get_field(name).remote_field.model

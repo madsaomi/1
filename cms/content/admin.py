@@ -133,6 +133,11 @@ class PracticeMediaInline(MediaItemInline):
     fk_name = 'practice'
 
 
+class EventMediaInline(MediaItemInline):
+    fk_name = 'event'
+    verbose_name_plural = 'Фото и видео события (до 8, не более 2 видео). Без них показывается логотип'
+
+
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(SingletonAdmin):
     inlines = [HeroMediaInline]
@@ -189,6 +194,7 @@ class DraftTemplateAdmin(ModelAdmin):
 
 @admin.register(Event)
 class EventAdmin(DraftTemplateAdmin):
+    inlines = [EventMediaInline]
     list_display = ['title', 'starts_at', 'is_published', 'order']
     list_editable = ['is_published', 'order']
     list_filter = ['is_published']

@@ -78,7 +78,7 @@ def publication_lock():
 
 def media_paths(data):
     """References from the explicit media schema, including video posters and legacy photos."""
-    owners = [*data.get('teachers', []), *data.get('results', []), *data.get('practices', []),
+    owners = [*data.get('teachers', []), *data.get('results', []), *data.get('practices', []), *data.get('events', []),
               *data.get('contacts', {}).get('locations', [])]
     paths = {item['photo'] for item in owners if item.get('photo')}
     galleries = [(data.get('site') or {}).get('heroMedia', [])]

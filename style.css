@@ -1223,7 +1223,6 @@ html[data-theme="dark"] .hero { background: var(--surface); box-shadow: none; }
 .hero h1 { font-size: var(--text-32); }
 .hero .actions { margin-top: var(--space-1); justify-content: flex-start; gap: var(--space-1); }
 .hero .hero-logo { min-height: 0; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; }
-.hero-logo picture { display: none; }
 .hero-reward-banner { margin-top: 0; padding: var(--space-3); box-shadow: none; border-radius: var(--radius-control); background: var(--surface-hover); }
 .hero-reward-banner:hover { transform: none; }
 .hero .hero-footnote { margin-top: 0; }

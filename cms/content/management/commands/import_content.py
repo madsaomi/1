@@ -149,8 +149,9 @@ class Command(BaseCommand):
             starts_at = parse_datetime(item['startsAt'])
             if starts_at is None or timezone.is_naive(starts_at):
                 raise ValueError('У события нужна дата startsAt с часовым поясом.')
-            self._save(Event(order=order, title=item['title'], description=item.get('description') or '',
-                             starts_at=starts_at, url=item.get('url') or ''))
+            event = self._save(Event(order=order, title=item['title'], description=item.get('description') or '',
+                                     starts_at=starts_at, url=item.get('url') or ''))
+            self._gallery(event, item.get('media', []), 'event')
 
         for order, item in enumerate(practices):
             practice = self._save(Practice(order=order, slug=item['id'], title=item['title'], description=item['description'],

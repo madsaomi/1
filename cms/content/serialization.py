@@ -388,6 +388,9 @@ def build_content(photo_files=None):
             item['description'] = event.description
         if event.url:
             item['url'] = event.url
+        gallery = _gallery_data(event, photo_files)
+        if gallery:
+            item['media'] = gallery
         events.append(item)
     if events:
         data['events'] = events
@@ -406,7 +409,7 @@ def validate_content(data):
     problems = []
     try:
         validate_gallery((data.get('site') or {}).get('heroMedia', []))
-        for group in ('teachers', 'results', 'practices'):
+        for group in ('teachers', 'results', 'practices', 'events'):
             for owner in data.get(group) or []:
                 validate_gallery(owner.get('media', []))
                 if group == 'results' and owner.get('media') and owner.get('consent') is not True:

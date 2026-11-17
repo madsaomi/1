@@ -130,3 +130,22 @@ class LearningCenterWordingMigrationTests(TestCase):
         added = Translation.objects.get(source='Учебный центр в Нукусе')
         self.assertEqual((added.uz, added.kaa), ('Nukusdagi öquv markazi', 'Nókistegi oqıw orayı'))
         self.assertEqual(build_translation_strings('kaa')['Учебный центр'], 'Oqıw orayı')
+
+
+class UzbekAlphabetTests(TestCase):
+    def test_old_spelling_becomes_2026_and_english_names_stay(self):
+        from django.apps import apps
+        from importlib import import_module
+        from .uz_alphabet import to_2026
+        self.assertEqual(to_2026('Barcha o‘qituvchilar, ma’lumot'), 'Barça öqituvçilar, maʼlumot')
+        self.assertEqual(to_2026('General English va Teaching Knowledge Test'), 'General English va Teaching Knowledge Test')
+        self.assertEqual(to_2026('Du–Sh, 09:00–19:00'), 'Du–Şa, 09:00–19:00')
+        item = Translation.objects.create(source='Учитель', uz='O‘qituvchi', kaa='Oqıtıwshı')
+        faq = Faq.objects.create(question='Вопрос?', answer='Ответ.', question_uz='Qachon?', answer_uz='Ertaga.')
+        forward = import_module('content.migrations.0018_uz_2026_alphabet').forward
+        forward(apps, None)
+        forward(apps, None)
+        item.refresh_from_db()
+        faq.refresh_from_db()
+        self.assertEqual((item.uz, item.kaa), ('Öqituvçi', 'Oqıtıwshı'), 'Karakalpak is not touched')
+        self.assertEqual(faq.question_uz, 'Qaçon?')
