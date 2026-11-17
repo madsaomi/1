@@ -141,6 +141,7 @@ export function validateContent(data) {
   const demo = data.site?.demoMode;
   if (demo !== undefined && typeof demo !== 'boolean') throw new Error('demoMode must be true or false');
   if (data.site?.demoLabels !== undefined && typeof data.site.demoLabels !== 'boolean') throw new Error('demoLabels must be true or false');
+  if (data.site?.analyticsToken !== undefined && !/^[0-9a-f]{32}$/.test(data.site.analyticsToken)) throw new Error('analyticsToken must be the 32-character Cloudflare token');
   const { stats = [], teachers = [], results = [] } = data;
   if (![stats, teachers, results].every(Array.isArray)) throw new Error('Stats, teachers and results must be arrays');
   for (const stat of stats) if (!text(stat.value, 12) || !text(stat.label, 40)) throw new Error('Stat needs a short value and label');
@@ -208,6 +209,12 @@ const demoTag = site => showDemo(site) ? ' <span class="demo-tag">Пример</
 const showDemo = site => Boolean(site?.demoMode && site?.demoLabels !== false);
 
 // Samples must not be indexed: while demo mode is on, search engines are asked to skip the page.
+// Cloudflare Web Analytics: no cookies, so no consent banner. Off in demo mode and without a token.
+export function renderAnalytics(site) {
+  if (!site?.analyticsToken || site.demoMode) return '';
+  return `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${site.analyticsToken}"}'></script>`;
+}
+
 export function renderRobots(site) {
   return site?.demoMode ? '<meta name="robots" content="noindex, nofollow">' : '';
 }
@@ -343,7 +350,13 @@ export function translatePage(html, lang, pack = loadLanguagePack(lang)) {
 }
 
 // One translated copy: translated text, local paths, its own canonical address and language metadata.
-export function generateLanguagePage(html, data, lang, page, pack) {
+// The privacy page adds its long legal text from assets/i18n/privacy-<lang>.js to the shared dictionary.
+export function languagePackFor(lang, page = '') {
+  const read = name => fs.readFileSync(new URL(`./assets/i18n/${name}.js`, import.meta.url), 'utf8');
+  return loadLanguagePack(lang, page === 'privacy.html' ? `${read(lang)}\n${read(`privacy-${lang}`)}` : read(lang));
+}
+
+export function generateLanguagePage(html, data, lang, page, pack = languagePackFor(lang, page)) {
   const translated = translatePage(html, lang, pack);
   return replaceBlock(translated, 'SEO', renderMetadata(data.site, page === 'index.html' ? '' : page, lang));
 }
@@ -696,6 +709,7 @@ export function generate(html, data) {
   html = replaceBlock(html, 'FILTERS', renderFilters(data.courses));
   html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts, { demo: showDemo(data.site) }));
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
   html = replaceBlock(html, 'BANNER', renderDemoBanner(data.site));
   html = replaceBlock(html, 'STATS', renderStats(data.stats, data.site));
   html = replaceBlock(html, 'TEACHERS', renderTeachers(data.teachers, data.site, { featuredOnly: true }));
@@ -825,6 +839,7 @@ export function generateResults(html, data) {
   html = replaceBlock(html, 'BADGE', data.results?.length ? renderLanyard() : '');
   html = replaceBlock(html, 'BAND', '');
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'results.html'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
@@ -838,6 +853,7 @@ export function generateTeachers(html, data) {
   html = replaceBlock(html, 'LOOP', '');
   html = replaceBlock(html, 'BAND', '');
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'teachers.html'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
@@ -846,6 +862,7 @@ export function generateCareer(html, data) {
   html = html.replace(/\r\n/g, '\n');
   validateContent(data);
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'career.html'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
@@ -855,6 +872,7 @@ export function generatePrivacy(html, data) {
   html = html.replace(/\r\n/g, '\n');
   validateContent(data);
   html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'privacy.html'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
@@ -898,7 +916,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(proces
     const folder = new URL(`./${lang}/`, import.meta.url);
     for (const { output, label } of generated) {
       const file = new URL(label, folder);
-      const translated = generateLanguagePage(output, data, lang, label, pack);
+      const translated = generateLanguagePage(output, data, lang, label, label === 'privacy.html' ? languagePackFor(lang, label) : pack);
       const source = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
       if (process.argv.includes('--check')) {
         if (translated !== source) { console.error(`Generated ${lang}/${label} is stale. Run node build.mjs`); stale = true; }

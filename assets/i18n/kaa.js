@@ -230,7 +230,7 @@ window.stanfordKaa = {
     "Политика конфиденциальности": "Qupıyalıq siyasatı",
     "Политика конфиденциальности — Stanford": "Qupıyalıq siyasatı — Stanford",
     "и обработки персональных данных": "hám jeke maǵlıwmatlardı qayta islew",
-    "ООО «Stanford Language Center» · г. Нукус": "«Stanford Language Center» JSHJ · Nókis qalası",
+    "ООО «Stanford Language Center» · г. Нукус": "«Stanford Language Center» JShJ · Nókis qalası",
     "На главную": "Bas betke",
     "Вернуться на главную": "Bas betke qaytıw",
     "Показать ещё": "Jáne kórsetiw",

@@ -19,7 +19,7 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 SOURCE_FILES = ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html',
-                'assets/i18n/uz.js', 'assets/i18n/kaa.js')
+                'assets/i18n/uz.js', 'assets/i18n/kaa.js', 'assets/i18n/privacy-uz.js', 'assets/i18n/privacy-kaa.js')
 OUTPUT_FILES = frozenset(('content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html',
                           'assets/i18n/uz.js', 'assets/i18n/kaa.js', 'robots.txt', 'sitemap.xml',
                           *(f'{lang}/{page}' for lang in ('uz', 'kaa')

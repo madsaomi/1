@@ -107,7 +107,8 @@ class Command(BaseCommand):
 
         site = data.get('site') or {}
         site_object = self._save(SiteSettings(demo_mode=site.get('demoMode', False), demo_labels=site.get('demoLabels', True),
-                                              site_url=site.get('url') or '', city=site.get('city') or ''))
+                                              site_url=site.get('url') or '', city=site.get('city') or '',
+                                              analytics_token=site.get('analyticsToken') or ''))
         self._gallery(site_object, site.get('heroMedia', []), 'site_settings')
 
         for order, stat in enumerate(data.get('stats') or []):

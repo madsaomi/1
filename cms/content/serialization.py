@@ -369,6 +369,8 @@ def build_content(photo_files=None):
                  'demoLabels': settings.demo_labels},
         'stats': [{'value': stat.value, 'label': stat.label} for stat in Stat.objects.all()],
     }
+    if settings.analytics_token:
+        data['site']['analyticsToken'] = settings.analytics_token
     hero_media = _gallery_data(settings, photo_files)
     if hero_media:
         data['site']['heroMedia'] = hero_media

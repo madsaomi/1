@@ -100,6 +100,11 @@ class SiteSettings(Singleton):
     site_url = models.URLField('Адрес сайта', blank=True, validators=[validate_https_site_url],
                                help_text='Нужен для canonical и превью в соцсетях. Только https://.')
     city = models.CharField('Город', max_length=60, default='Нукус')
+    analytics_token = models.CharField(
+        'Токен Cloudflare Web Analytics', max_length=32, blank=True,
+        validators=[RegexValidator(r'^[0-9a-f]{32}$', 'Токен из Cloudflare: 32 символа, цифры и буквы a–f.')],
+        help_text='Cloudflare → Web Analytics → сайт → токен из кода счётчика (значение "token"). Пусто — счётчика нет. '
+                  'В демо-режиме счётчик не подключается.')
 
     class Meta:
         verbose_name = verbose_name_plural = 'Настройки сайта'

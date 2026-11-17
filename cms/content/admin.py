@@ -136,7 +136,7 @@ class PracticeMediaInline(MediaItemInline):
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(SingletonAdmin):
     inlines = [HeroMediaInline]
-    fieldsets = [('Режим сайта', {'fields': ['demo_mode', 'demo_labels']}), ('Сайт', {'fields': ['site_url', 'city']})]
+    fieldsets = [('Режим сайта', {'fields': ['demo_mode', 'demo_labels']}), ('Сайт', {'fields': ['site_url', 'city', 'analytics_token']})]
 
 
 @admin.register(Stat)

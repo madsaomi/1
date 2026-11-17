@@ -1,0 +1,44 @@
+name: Uptime check
+
+# Every 10 minutes GitHub opens the public addresses; if one stays down after three tries,
+# the bot writes to Telegram. GitHub may start scheduled runs a few minutes late.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check addresses and alert Telegram
+        env:
+          # Repository variable UPTIME_URLS (space-separated) overrides the default list.
+          URLS: ${{ vars.UPTIME_URLS || 'https://stanford-lc.uz/healthz https://stanford-lc.uz/ https://stanford-lc.uz/career' }}
+          BOT_TOKEN: ${{ secrets.TELEGRAM_ALERT_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+        run: |
+          failed=""
+          for url in $URLS; do
+            ok=""
+            for attempt in 1 2 3; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo 000)
+              if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then ok=1; break; fi
+              sleep 20
+            done
+            if [ -z "$ok" ]; then failed="$failed\n• $url — ответ $code"; fi
+            echo "$url: ${ok:+ok}${ok:-FAILED ($code)}"
+          done
+          if [ -z "$failed" ]; then exit 0; fi
+          if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
+            text=$(printf '⚠️ Сайт Stanford не отвечает:%b\n\nПроверьте Railway.' "$failed")
+            curl -s -o /dev/null --max-time 20 "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${CHAT_ID}" --data-urlencode "text=${text}"
+          else
+            echo "Telegram secrets are not set: alert only in GitHub."
+          fi
+          exit 1

@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML, openingHours } from '../build.mjs';
+import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML, openingHours, renderAnalytics } from '../build.mjs';
 
 const publishedData = readContent();
 const sourceHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -428,10 +428,10 @@ test('CSP permits same-origin HR requests and approved map frames while keeping 
     return [name, values];
   }));
   assert.deepEqual([...directives.get('frame-src')].sort(), ['https://www.google.com', 'https://yandex.ru']);
-  assert.deepEqual(directives.get('connect-src'), ["'self'"]);
+  assert.deepEqual(directives.get('connect-src'), ["'self'", 'https://cloudflareinsights.com']);
   assert.deepEqual(directives.get('object-src'), ["'none'"]);
   assert.deepEqual(directives.get('frame-ancestors'), ["'none'"]);
-  assert.deepEqual(directives.get('script-src'), ["'self'"]);
+  assert.deepEqual(directives.get('script-src'), ["'self'", 'https://static.cloudflareinsights.com']);
 });
 
 test('rendered content escapes markup instead of injecting it', () => {
@@ -1218,6 +1218,7 @@ test('a staged build uses its own data and validates every page before replacing
     fs.mkdirSync(path.join(stage, 'assets', 'i18n'), { recursive: true });
     fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'uz.js'), 'window.stanfordUz = { strings: {}, patterns: [] };\n');
     fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'kaa.js'), 'window.stanfordKaa = { strings: {}, patterns: [] };\n');
+    for (const lang of ['uz', 'kaa']) fs.writeFileSync(path.join(stage, 'assets', 'i18n', `privacy-${lang}.js`), '');
     const fixture = {
       site: { url: 'https://staged.example', demoMode: false },
       courses: [{ id: 'staged-course', name: 'Проверочный курс', category: 'languages', description: 'Описание курса',
@@ -1274,4 +1275,14 @@ test('branch hours become opening hours for search engines and the email is a co
   assert(renderContacts(contacts).includes('href="mailto:school@example.org"'));
   assert(!renderContacts(contacts, { compact: true }).includes('mailto:'));
   assert.throws(() => validateContent({ ...data, contacts: { ...data.contacts, email: 'not an email' } }), /email/);
+});
+
+test('Cloudflare analytics is added only with a valid token and never in demo mode', () => {
+  const token = '0123456789abcdef0123456789abcdef';
+  assert.equal(renderAnalytics({ analyticsToken: token }), `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${token}"}'></script>`);
+  assert.equal(renderAnalytics({ analyticsToken: token, demoMode: true }), '');
+  assert.equal(renderAnalytics({}), '');
+  assert.throws(() => validateContent({ ...data, site: { ...data.site, analyticsToken: '"><script>' } }), /analyticsToken/);
+  const caddy = fs.readFileSync(new URL('../Caddyfile', import.meta.url), 'utf8');
+  assert(caddy.includes("script-src 'self' https://static.cloudflareinsights.com;") && caddy.includes("connect-src 'self' https://cloudflareinsights.com;"));
 });

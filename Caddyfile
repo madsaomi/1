@@ -9,7 +9,8 @@
 	header X-Content-Type-Options nosniff
 	header Referrer-Policy strict-origin-when-cross-origin
 	header X-Frame-Options DENY
-	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self'; frame-src https://yandex.ru https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	# Cloudflare Web Analytics: its beacon script and the endpoint it reports to (no cookies).
+	header Content-Security-Policy "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-src https://yandex.ru https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 	header Permissions-Policy "camera=(), microphone=(), geolocation=()"
 	# Railway serves the site over HTTPS only; browsers remember that for a year (no preload, no subdomains).
 	header Strict-Transport-Security "max-age=31536000"
