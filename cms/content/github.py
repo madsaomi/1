@@ -18,12 +18,12 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-SOURCE_FILES = ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html',
+SOURCE_FILES = ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html',
                 'assets/i18n/uz.js', 'assets/i18n/kaa.js')
-OUTPUT_FILES = frozenset(('content.js', 'index.html', 'results.html', 'career.html', 'teachers.html',
+OUTPUT_FILES = frozenset(('content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html',
                           'assets/i18n/uz.js', 'assets/i18n/kaa.js', 'robots.txt', 'sitemap.xml',
                           *(f'{lang}/{page}' for lang in ('uz', 'kaa')
-                            for page in ('index.html', 'results.html', 'career.html', 'teachers.html'))))
+                            for page in ('index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html'))))
 PHOTO_PATH = re.compile(r'assets/[a-z0-9/_-]+\.(?:jpe?g|webp|png)\Z')
 MANAGED_PHOTO = re.compile(r'assets/uploads/[0-9a-f]{64}\.jpg\Z')
 MEDIA_PATH = re.compile(r'assets/[a-z0-9/_-]+\.(?:jpe?g|webp|png|mp4)\Z')

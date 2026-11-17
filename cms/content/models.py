@@ -242,6 +242,8 @@ class Contacts(Singleton):
                                    help_text='Выключено — на сайте вместо телефонов надпись «Контакты уточняются».')
     hr_telegram = models.URLField('Telegram по вопросам работы', blank=True, validators=[telegram_validator])
     instagram = models.URLField('Instagram', blank=True, validators=[instagram_validator])
+    email = models.EmailField('Электронная почта', max_length=120, blank=True,
+                              help_text='Показывается в контактах сайта. Пусто — не показывается.')
 
     class Meta:
         verbose_name = verbose_name_plural = 'Контакты'
@@ -294,6 +296,8 @@ class Location(Ordered):
     slug = models.CharField('Код', max_length=40, unique=True, blank=True, validators=[slug_validator])
     name = models.CharField('Название', max_length=80)
     address = models.CharField('Адрес', max_length=160)
+    hours = models.CharField('График работы', max_length=80, blank=True,
+                             help_text='Например: Пн–Сб, 09:00–19:00. Пусто — график не показывается.')
     longitude = models.DecimalField('Долгота', max_digits=10, decimal_places=7, null=True, blank=True)
     latitude = models.DecimalField('Широта', max_digits=10, decimal_places=7, null=True, blank=True)
     google_embed = models.URLField('Google-карта для сайта', max_length=1000, blank=True, validators=[google_embed_validator],

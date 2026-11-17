@@ -294,7 +294,7 @@ class ContactsForm(forms.ModelForm):
 class ContactsAdmin(SingletonAdmin):
     form = ContactsForm
     inlines = [PhoneInline, TelegramInline]
-    fieldsets = [(None, {'fields': ['verified']}), ('Дополнительно', {'fields': ['instagram', 'hr_telegram']})]
+    fieldsets = [(None, {'fields': ['verified']}), ('Дополнительно', {'fields': ['email', 'instagram', 'hr_telegram']})]
 
 
 class MapLinkInline(TabularInline):
@@ -312,7 +312,7 @@ class LocationAdmin(ModelAdmin):
     list_editable = ['order']
     inlines = [MapLinkInline]
     fieldsets = [
-        (None, {'fields': ['name', 'address', 'photo']}),
+        (None, {'fields': ['name', 'address', 'hours', 'photo']}),
         ('Карта на сайте', {'fields': ['google_embed', ('longitude', 'latitude')]}),
         ('Служебное', {'fields': ['slug', 'order', 'photo_path'], 'classes': ['collapse']}),
     ]

@@ -21,6 +21,8 @@ export function svgIcon(name) {
     telegram: 'm22 2-7 20-4-9-9-4Z M22 2 11 13',
     'map-pin': 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
     instagram: 'M17 2H7a5 5 0 0 0-5 5v10a5 5 0 0 0 5 5h10a5 5 0 0 0 5-5V7a5 5 0 0 0-5-5Zm-5 15a5 5 0 1 1 5-5 5 5 0 0 1-5 5Zm5.5-9.8a1.2 1.2 0 1 1 1.2-1.2 1.2 1.2 0 0 1-1.2 1.2Z',
+    clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z M12 6v6l4 2',
+    mail: 'M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z m18 2-10 6L2 7',
     award: 'M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z M8.2 13.9 7 22l5-3 5 3-1.2-8.1'
   };
   return `<svg class="icon icon-${name}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${paths[name]}"/></svg>`;
@@ -100,7 +102,7 @@ export function validateContent(data) {
   }
   if (!data.contacts || typeof data.contacts !== 'object' || Array.isArray(data.contacts)) throw new Error('Contacts must be an object');
   if (data.contacts.verified) {
-    const { phones = [], telegrams = [], hrTelegram = '', instagram = '', locations = [] } = data.contacts;
+    const { phones = [], telegrams = [], hrTelegram = '', instagram = '', email = '', locations = [] } = data.contacts;
     if (!Array.isArray(phones) || !Array.isArray(telegrams)) throw new Error('Contact channels must be arrays');
     if (!phones.length && !telegrams.length) throw new Error('Verified contact must have an admissions channel');
     if (phones.some(phone => typeof phone !== 'string' || !/^\+[1-9]\d{7,14}$/.test(phone))) throw new Error('Use an international phone number');
@@ -109,12 +111,14 @@ export function validateContent(data) {
     if (new Set(phones).size !== phones.length || new Set(telegrams.map(url => url.toLowerCase())).size !== telegrams.length) throw new Error('Contact channels must be unique');
     if (hrTelegram && telegrams.some(url => url.toLowerCase() === hrTelegram.toLowerCase())) throw new Error('HR Telegram must be separate from admissions');
     if (instagram && !/^https:\/\/www\.instagram\.com\/[a-zA-Z0-9_.]{1,30}\/?$/.test(instagram)) throw new Error('Use a direct Instagram profile URL');
+    if (email && (typeof email !== 'string' || email.length > 120 || !/^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(email))) throw new Error('Use a valid email address');
     if (!Array.isArray(locations)) throw new Error('Locations must be an array');
     const locationIds = new Set();
     for (const location of locations) {
       if (!/^[a-z0-9-]+$/.test(location.id) || locationIds.has(location.id)) throw new Error('Location IDs must be unique slugs');
       locationIds.add(location.id);
       if (typeof location.name !== 'string' || !location.name.trim() || typeof location.address !== 'string' || !location.address.trim()) throw new Error('Location must have a name and address');
+      if (location.hours !== undefined && (typeof location.hours !== 'string' || !location.hours.trim() || location.hours.length > 80)) throw new Error('Location hours must be short text');
       if (location.coordinates !== undefined && (!Array.isArray(location.coordinates) || location.coordinates.length !== 2 || !Number.isFinite(location.coordinates[0]) || !Number.isFinite(location.coordinates[1]) || Math.abs(location.coordinates[0]) > 180 || Math.abs(location.coordinates[1]) > 90)) throw new Error('Use valid map coordinates: longitude, latitude');
       if (location.googleEmbed !== undefined) {
         let embed;
@@ -190,9 +194,10 @@ export function renderContacts(contacts, { compact = false } = {}) {
   if (contacts.phones?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Позвонить</${heading}><ul class="contact-list">${contacts.phones.map(phone => `<li><a class="contact-channel" href="tel:${escapeHTML(phone)}" aria-label="Позвонить: ${escapeHTML(displayPhone(phone))}">${svgIcon('phone')}<span>${escapeHTML(displayPhone(phone))}</span></a></li>`).join('')}</ul></div>`);
   if (!compact && contacts.telegrams?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Написать в Telegram</${heading}><ul class="contact-list">${contacts.telegrams.map(url => `<li><a class="contact-channel" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Написать в Telegram: @${escapeHTML(url.split('/').pop())}">${svgIcon('telegram')}<span>@${escapeHTML(url.split('/').pop())}</span>${svgIcon('external')}</a></li>`).join('')}</ul></div>`);
   const extras = [];
+  if (!compact && contacts.email) extras.push(`<a href="mailto:${escapeHTML(contacts.email)}">${svgIcon('mail')}<span>${escapeHTML(contacts.email)}</span></a>`);
   if (!compact && contacts.instagram) extras.push(`<a href="${escapeHTML(contacts.instagram)}" target="_blank" rel="noopener noreferrer">${svgIcon('instagram')}<span>Instagram</span>${svgIcon('external')}</a>`);
   // HR no longer gets messages directly from this block: candidates fill the career form instead.
-  if (!compact) extras.push(`<a class="contact-extras-link" href="career.html">${svgIcon('check')}<span>Заполнить анкету</span>${svgIcon('arrow-right')}</a>`);
+  if (!compact) extras.push(`<a class="contact-extras-link" href="career">${svgIcon('check')}<span>Заполнить анкету</span>${svgIcon('arrow-right')}</a>`);
   // The course dialog is where the visitor signs up: send them to the branch addresses instead of a messenger.
   const jump = compact ? `<p class="contact-jump"><a class="text-link" href="#enroll" data-dialog-jump>Приходите в центр: адреса филиалов${svgIcon('arrow-right')}</a></p>` : '';
   return `<div class="contact-channels">${groups.join('')}</div>${extras.length ? `<div class="contact-extras">${extras.join('')}</div>` : ''}${jump}`;
@@ -207,8 +212,20 @@ export function renderRobots(site) {
   return site?.demoMode ? '<meta name="robots" content="noindex, nofollow">' : '';
 }
 
+// «Пн–Сб, 09:00–19:00» → schema.org opening hours. Any other wording is shown on the page only.
+const WEEK = { 'Пн': 'Monday', 'Вт': 'Tuesday', 'Ср': 'Wednesday', 'Чт': 'Thursday', 'Пт': 'Friday', 'Сб': 'Saturday', 'Вс': 'Sunday' };
+export function openingHours(hours = '') {
+  const match = /^(Пн|Вт|Ср|Чт|Пт|Сб|Вс)\s*[–-]\s*(Пн|Вт|Ср|Чт|Пт|Сб|Вс),?\s+([01]\d|2[0-3]):([0-5]\d)\s*[–-]\s*([01]\d|2[0-3]):([0-5]\d)$/.exec(hours.trim());
+  if (!match) return null;
+  const days = Object.keys(WEEK);
+  const from = days.indexOf(match[1]);
+  const to = days.indexOf(match[2]);
+  if (to < from) return null;
+  return { '@type': 'OpeningHoursSpecification', dayOfWeek: days.slice(from, to + 1).map(day => WEEK[day]), opens: `${match[3]}:${match[4]}`, closes: `${match[5]}:${match[6]}` };
+}
+
 // Public pages listed for search engines; the career form is included, the 404 page is not.
-export const SITEMAP_PAGES = ['', 'results.html', 'teachers.html', 'career.html'];
+export const SITEMAP_PAGES = ['', 'results', 'teachers', 'career'];
 
 // robots.txt and sitemap.xml follow the site address from the admin, so a new domain needs only a republish.
 // In demo mode (or without an address) the sitemap stays empty: sample pages are not offered for indexing.
@@ -226,6 +243,8 @@ export function renderSitemap(site) {
 
 // Address of one public page in one language: Russian at the root, translations in /uz/ and /kaa/.
 export function pageAddress(site, page = '', lang = 'ru') {
+  // Public addresses have no «.html»: Caddy serves /career from career.html.
+  page = page.replace(/(?:^|\/)index\.html$/, '').replace(/\.html$/, '');
   const base = site.url.endsWith('/') ? site.url : `${site.url}/`;
   if (lang === 'ru') return page ? new URL(page, base).href : site.url;
   return new URL(`${lang}/${page}`, base).href;
@@ -248,7 +267,7 @@ export const LANGUAGES = ['uz', 'kaa'];
 const PACK_NAMES = { uz: 'stanfordUz', kaa: 'stanfordKaa' };
 const TRANSLATED_ATTRIBUTES = new Set(['aria-label', 'alt', 'title', 'placeholder', 'content']);
 const URL_ATTRIBUTES = new Set(['src', 'href', 'poster']);
-const PAGE_LINK = /^(?:index|results|teachers|career)\.html(?:[?#].*)?$/;
+const PAGE_LINK = /^(?:\.\/|(?:index|results|teachers|career|privacy)(?:\.html)?)(?:[?#].*)?$/;
 const CYRILLIC = /[А-Яа-яЁё]/;
 const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' };
 
@@ -343,11 +362,13 @@ export function renderStructuredData(site, contacts) {
     logo: new URL('assets/stanford-logo.png', base).href,
     image: new URL('assets/og-image.png', base).href,
     ...(contacts.phones?.length ? { telephone: contacts.phones } : {}),
+    ...(contacts.email ? { email: contacts.email } : {}),
     ...(sameAs.length ? { sameAs } : {}),
     location: (contacts.locations || []).map(location => ({
       '@type': 'Place',
       name: location.name,
       address: { '@type': 'PostalAddress', streetAddress: location.address, addressLocality: site.city || 'Нукус', addressCountry: 'UZ' },
+      ...(openingHours(location.hours) ? { openingHoursSpecification: openingHours(location.hours) } : {}),
       ...(location.coordinates?.length === 2 ? { geo: { '@type': 'GeoCoordinates', latitude: location.coordinates[1], longitude: location.coordinates[0] } } : {})
     }))
   };
@@ -405,7 +426,8 @@ export function renderMediaGallery(items = [], label = 'Stanford', { eager = fal
 export function renderPractices(practices = []) {
   if (!practices.length) return '';
   const artwork = { 'speaking-club': 'speaking', 'movie-club': 'movie', 'mock-exams': 'exams' };
-  return `<div class="practice-list">${practices.map(practice => {
+  // Phones get one card at a time with arrows and dots; from 768px it is the usual grid (the nav hides itself).
+  const cards = practices.map(practice => {
     const fallback = Object.hasOwn(artwork, practice.id) ? artwork[practice.id] : undefined;
     const image = practice.photo || (fallback ? `assets/practice/${fallback}.svg` : 'assets/stanford-icon.svg');
     const kind = practice.photo ? ' practice-media--photo' : fallback ? '' : ' practice-media--brand';
@@ -414,7 +436,8 @@ export function renderPractices(practices = []) {
       ? `<div class="practice-media practice-media--gallery">${renderMediaGallery(practice.media, practice.title)}</div>`
       : `<div class="practice-media${kind}"><img src="${escapeHTML(image)}"${responsiveAttributes(practice.photo)} alt="${escapeHTML(alt)}" width="640" height="400" loading="lazy" decoding="async"></div>`;
     return `<article class="practice-card">${media}<div class="practice-body">${practice.label ? `<span class="practice-kicker">${escapeHTML(practice.label)}</span>` : ''}<h3>${escapeHTML(practice.title)}</h3><p>${escapeHTML(practice.description)}</p></div></article>`;
-  }).join('')}</div>`;
+  }).join('');
+  return renderCarousel('practice-list practice-carousel', 'clubs-title', cards);
 }
 
 function toggleEmptySection(html, id, visible) {
@@ -429,6 +452,12 @@ export const HOME_LIMIT = 6;
 
 export function initials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
+}
+
+// Arrows and dots under a sideways row (assets/carousel.js); without JS the row still scrolls.
+const CAROUSEL_NAV = `<div class="carousel-nav" data-carousel-nav hidden><button type="button" class="carousel-arrow" data-carousel-prev aria-label="Предыдущий слайд">${svgIcon('arrow-left')}</button><div class="carousel-dots" data-carousel-dots></div><button type="button" class="carousel-arrow" data-carousel-next aria-label="Следующий слайд">${svgIcon('arrow-right')}</button></div>`;
+export function renderCarousel(trackClass, labelledBy, items) {
+  return `<div class="carousel" data-carousel><div class="${trackClass} carousel-track" data-carousel-track tabindex="0" role="region" aria-labelledby="${labelledBy}">${items}</div>${CAROUSEL_NAV}</div>`;
 }
 
 export function renderTeachers(teachers = [], site, { featuredOnly = false, heading = true, profile = false } = {}) {
@@ -455,8 +484,10 @@ export function renderTeachers(teachers = [], site, { featuredOnly = false, head
     // The full list uses the tilt card of assets/ui.js; the home section keeps the plain card.
     return `<article class="teacher-card"${profile ? ' data-tilt' : ''}>${profile ? '<span class="result-shine" aria-hidden="true"></span>' : ''}${portrait}<div class="teacher-body"><h3>${name}</h3><p>${escapeHTML(teacher.role)}</p>${chips ? `<ul class="teacher-chips">${chips}</ul>` : ''}</div></article>`;
   }).join('');
-  const more = featuredOnly ? `\n<a class="text-link results-more" href="teachers.html">Все преподаватели${svgIcon('arrow-right')}</a>` : '';
-  return `${head}<div class="team-grid">${cards}</div>${more}`;
+  const more = featuredOnly ? `\n<a class="text-link results-more" href="teachers">Все преподаватели${svgIcon('arrow-right')}</a>` : '';
+  // Home: one teacher at a time on phones, two or three side by side on wider screens.
+  const grid = featuredOnly && heading ? renderCarousel('team-grid home-carousel', 'teachers-title', cards) : `<div class="team-grid">${cards}</div>`;
+  return `${head}${grid}${more}`;
 }
 
 // One card per published student result; reused by the home section and the full results page.
@@ -476,8 +507,8 @@ export function renderResults(results = [], site, { featuredOnly = false } = {})
   }
   return `<section data-reveal class="section wrap results-section" id="results" aria-labelledby="results-title">
 <div class="section-top"><h2 id="results-title">Результаты студентов${demoTag(site)}</h2></div>
-<div class="results-grid">${renderResultCards(shown)}</div>
-<a class="text-link results-more" href="results.html">Все результаты${svgIcon('arrow-right')}</a>
+${featuredOnly ? renderCarousel('results-grid home-carousel', 'results-title', renderResultCards(shown)) : `<div class="results-grid">${renderResultCards(shown)}</div>`}
+<a class="text-link results-more" href="results">Все результаты${svgIcon('arrow-right')}</a>
 </section>`;
 }
 
@@ -499,7 +530,7 @@ export function renderLocations(contacts, { demo = false } = {}) {
       : !demo ? '' : `<div class="location-photo location-photo-demo" role="img" aria-label="Пример: место для фото входа, ${name}">${svgIcon('camera')}<span>Фото входа</span><span class="demo-tag">Пример</span></div>`;
     // A real photo is a small tile next to the map buttons; the demo placeholder keeps its own slot.
     const tile = location.photo ? photo : '';
-    return `<article class="location-card"><h4>${name}</h4><p>${address}</p>${tile ? '' : photo}${select}<div class="map-links">${tile}${links}</div></article>`;
+    return `<article class="location-card"><h4>${name}</h4><p>${address}</p>${location.hours ? `<p class="location-hours">${svgIcon('clock')}<span>${escapeHTML(location.hours)}</span></p>` : ''}${tile ? '' : photo}${select}<div class="map-links">${tile}${links}</div></article>`;
   }).join('');
   const map = first ? `<div class="branch-map-panel"><div class="map-toolbar"><p id="map-status" class="map-status" tabindex="-1" aria-live="polite">${escapeHTML(`${first.name} — ${first.address}`)}</p></div><iframe id="branch-map" class="branch-map" src="${escapeHTML(first.googleEmbed)}" title="${escapeHTML(`Карта: ${first.name}`)}" width="1100" height="360" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : '';
   const zoom = contacts.locations.some(location => location.photo) ? `<dialog class="photo-dialog" id="photo-dialog" aria-label="Фото входа"><button type="button" class="photo-dialog-close" data-photo-close aria-label="Закрыть окно">${svgIcon('close')}</button><img src="" alt="" width="1280" height="720" data-photo-full></dialog>` : '';
@@ -564,7 +595,8 @@ export function renderHeroReward(cashback) {
   if (!all.length) return '';
   const top = all.reduce((best, tier) => tier.reward > best.reward ? tier : best);
   const pills = cashbackExams.flatMap(exam => all.filter(tier => tier.exam === exam.label && tier.hero).sort((a, b) => b.reward - a.reward))
-    .map(tier => `<span>${escapeHTML(`${tier.exam} ${tier.score} · ${shortReward(tier.reward)}`)}</span>`).join('');
+    // A caption without digits (for example «? млн сум» while the amount is not announced) wins over the number.
+    .map(tier => `<span>${escapeHTML(`${tier.exam} ${tier.score} · ${tier.label && !/\d/.test(tier.label) ? tier.label : shortReward(tier.reward)}`)}</span>`).join('');
   return `<a class="hero-reward-banner" href="#cashback"><div class="hero-reward-header"><span class="hero-reward-tag">${svgIcon('award')}Кэшбэк за результат</span><strong class="hero-reward-val">до ${escapeHTML(rewardLabel(top))}</strong></div>${pills ? `<div class="hero-reward-pills">${pills}</div>` : ''}<p class="hero-reward-sub">Выплачиваем деньги за официальные баллы</p></a>`;
 }
 
@@ -653,8 +685,7 @@ export function renderEvents(events = []) {
     return `<article class="event-card${event.media?.length ? ' has-media' : ''}">${media}<div class="event-body"><div class="event-head"><span class="event-date" aria-hidden="true"><strong>${escapeHTML(day.format(date))}</strong><span>${escapeHTML(clock.format(date))}</span></span><div class="event-heading"><h4>${title}</h4><time datetime="${escapeHTML(event.startsAt)}">${escapeHTML(formatter.format(date))} · Нукус</time></div>${link}</div>${event.description ? `<p class="event-description">${escapeHTML(event.description)}</p>` : ''}<div class="event-countdown" data-countdown="${escapeHTML(event.startsAt)}" aria-label="До начала события">${units.map(([unit, label]) => `<div><span data-unit="${unit}">—</span><small>${label}</small></div>`).join('')}</div><p data-countdown-status></p></div></article>`;
   };
   const upcoming = [...events].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)).slice(0, EVENTS_LIMIT);
-  const nav = `<div class="carousel-nav" data-carousel-nav hidden><button type="button" class="carousel-arrow" data-carousel-prev aria-label="Предыдущий слайд">${svgIcon('arrow-left')}</button><div class="carousel-dots" data-carousel-dots></div><button type="button" class="carousel-arrow" data-carousel-next aria-label="Следующий слайд">${svgIcon('arrow-right')}</button></div>`;
-  return `<div class="events-section planned-events" id="events"><div class="section-top"><h3 id="events-title" data-text="events.heading">Запланированные события</h3></div><div class="carousel" data-carousel><div class="events-grid carousel-track" data-carousel-track tabindex="0" role="region" aria-labelledby="events-title">${upcoming.map(card).join('')}</div>${nav}</div></div>`;
+  return `<div class="events-section planned-events" id="events"><div class="section-top"><h3 id="events-title" data-text="events.heading">Запланированные события</h3></div>${renderCarousel('events-grid', 'events-title', upcoming.map(card).join(''))}</div>`;
 }
 
 export function generate(html, data) {
@@ -819,13 +850,23 @@ export function generateCareer(html, data) {
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
 
+// The privacy policy is static text from the owner's document; only metadata and versions are generated.
+export function generatePrivacy(html, data) {
+  html = html.replace(/\r\n/g, '\n');
+  validateContent(data);
+  html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'privacy.html'));
+  return versionContentAssets(applyTexts(html, data.texts), data);
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
   const data = readContent();
   const pages = [
     { file: new URL('./index.html', import.meta.url), build: generate, label: 'index.html' },
     { file: new URL('./results.html', import.meta.url), build: generateResults, label: 'results.html' },
     { file: new URL('./teachers.html', import.meta.url), build: generateTeachers, label: 'teachers.html' },
-    { file: new URL('./career.html', import.meta.url), build: generateCareer, label: 'career.html' }
+    { file: new URL('./career.html', import.meta.url), build: generateCareer, label: 'career.html' },
+    { file: new URL('./privacy.html', import.meta.url), build: generatePrivacy, label: 'privacy.html' }
   ];
   let stale = false;
   // Plain files generated from the same data: robots.txt and sitemap.xml.

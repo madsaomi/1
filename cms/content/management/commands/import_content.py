@@ -159,7 +159,7 @@ class Command(BaseCommand):
 
         source = data.get('contacts') or {}
         contacts = Contacts(verified=source.get('verified', False), hr_telegram=source.get('hrTelegram') or '',
-                            instagram=source.get('instagram') or '')
+                            instagram=source.get('instagram') or '', email=source.get('email') or '')
         contacts.save()
         for order, number in enumerate(source.get('phones') or []):
             self._save(Phone(contacts=contacts, order=order, number=number))
@@ -174,6 +174,7 @@ class Command(BaseCommand):
             else:
                 longitude, latitude = None, None
             location = self._save(Location(order=order, slug=item['id'], name=item['name'], address=item['address'],
+                                           hours=item.get('hours') or '',
                                            longitude=longitude, latitude=latitude,
                                            google_embed=item.get('googleEmbed') or '', photo_path=item.get('photo') or ''))
             for map_order, link in enumerate(item.get('maps') or []):

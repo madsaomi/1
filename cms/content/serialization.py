@@ -80,7 +80,7 @@ class _PageTextParser(HTMLParser):
 def read_page_texts(site_root):
     """Read slots from available site pages next to an imported content.js, in page order."""
     slots = {}
-    for name in ('index.html', 'results.html', 'career.html', 'teachers.html'):
+    for name in ('index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html'):
         path = Path(site_root) / name
         if not path.is_file():
             continue
@@ -341,9 +341,13 @@ def _contacts_data(photo_files=None):
         data['hrTelegram'] = contacts.hr_telegram
     if contacts.instagram:
         data['instagram'] = contacts.instagram
+    if contacts.email:
+        data['email'] = contacts.email
     locations = []
     for location in Location.objects.all():
         item = {'id': location.slug, 'name': location.name, 'address': location.address}
+        if location.hours.strip():
+            item['hours'] = location.hours.strip()
         if location.longitude is not None and location.latitude is not None:
             item['coordinates'] = [float(location.longitude), float(location.latitude)]
         if location.google_embed:

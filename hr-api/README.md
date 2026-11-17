@@ -19,7 +19,7 @@
 | Переменная | Обязательно | Описание |
 |---|---|---|
 | `TELEGRAM_BOT_TOKEN` | да | токен бота от @BotFather |
-| `TELEGRAM_HR_CHAT_ID` | да | chat id HR (HR должен нажать Start у бота) |
+| `TELEGRAM_HR_CHAT_ID` | да | chat id HR; несколько — через запятую, например `111111,222222`. Каждый HR должен нажать Start у бота |
 | `ALLOWED_ORIGIN` | да | адрес сайта, например `https://1-production-8f16.up.railway.app` |
 | `PORT` | нет | порт, по умолчанию `8787` |
 | `HR_DRY_RUN` | нет | `1` — проверить приём и PDF без отправки в Telegram (локально) |
@@ -39,9 +39,10 @@
 
 ## Как подключить бота
 1. Создать бота у @BotFather, получить токен.
-2. HR открывает бота и нажимает **Start** (бот не может писать первым).
+2. Каждый HR открывает бота и нажимает **Start** (бот не может писать первым и не пишет по @username).
 3. Узнать chat id: `https://api.telegram.org/bot<TOKEN>/getUpdates` → `message.chat.id`.
-4. Задать `TELEGRAM_BOT_TOKEN` и `TELEGRAM_HR_CHAT_ID` в сервисе.
+4. Задать `TELEGRAM_BOT_TOKEN` и `TELEGRAM_HR_CHAT_ID` в сервисе (несколько HR — chat id через запятую).
+   Анкета считается отправленной, если её получил хотя бы один HR; ошибки остальных видны в логах сервиса.
 
 ## Деплой
 1. Собрать образ: `docker build -t stanford-hr-api hr-api/` (или отдельный сервис Railway с root directory `hr-api`).

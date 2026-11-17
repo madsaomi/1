@@ -33,7 +33,7 @@ window.schoolContent = {
       {
         "score": "9.0",
         "reward": 100000000,
-        "label": "100 000 000 сум",
+        "label": "? млн сум",
         "hero": true
       }
     ],
@@ -61,7 +61,7 @@ window.schoolContent = {
       {
         "score": "1600",
         "reward": 100000000,
-        "label": "100 000 000 сум",
+        "label": "? млн сум",
         "hero": true
       }
     ]
@@ -175,11 +175,13 @@ window.schoolContent = {
     ],
     "hrTelegram": "https://t.me/hrstanfordlc",
     "instagram": "https://www.instagram.com/stanford_nukus/",
+    "email": "stanfordnukus@gmail.com",
     "locations": [
       {
         "id": "saraeva",
         "name": "Филиал на Сараева",
         "address": "улица Николая Сараева, 34",
+        "hours": "Пн–Сб, 09:00–19:00",
         "coordinates": [
           59.60799,
           42.467377
@@ -200,6 +202,7 @@ window.schoolContent = {
         "id": "abdirova",
         "name": "Филиал на Абдирова",
         "address": "улица Чарджоу Абдирова, 44А",
+        "hours": "Пн–Сб, 09:00–19:00",
         "coordinates": [
           59.62766,
           42.455094
@@ -263,7 +266,7 @@ window.schoolContent = {
     "courses.text3": "Все программы",
     "cashback.label1": "Мотивация и гарантия",
     "cashback.title1": "Кэшбэк до",
-    "cashback.label2": "100 000 000",
+    "cashback.label2": "? млн",
     "cashback.title2": "сум за ваш результат",
     "cashback.text1": "Мы уверены в качестве подготовки. Окончите курс в Stanford, зарегистрируйтесь на официальный экзамен через наш центр и получите денежную выплату за высокий балл.",
     "about.title1": "Как начать заниматься",

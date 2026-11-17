@@ -1615,3 +1615,90 @@ img[src$="stanford-icon.svg"] { object-fit: contain; }
 .photo-dialog img { display: block; width: 100%; height: auto; max-height: 85vh; object-fit: contain; }
 .photo-dialog-close { position: absolute; top: var(--space-1); right: var(--space-1); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--on-dark-muted); border-radius: 12px; background: var(--dark-panel); color: var(--on-dark); }
 @media (min-width: 1024px) { :is(.team-grid, .directory-page .team-grid) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* Home teachers and results: the same carousel as events. One whole card on phones, 2 from 768px, 3 from 1024px. */
+.carousel > .carousel-track.home-carousel { display: flex; grid-template-columns: none; gap: var(--space-2); margin: 0; padding: 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.carousel > .carousel-track.home-carousel::-webkit-scrollbar { display: none; }
+.carousel > .carousel-track.home-carousel:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.carousel > .carousel-track.home-carousel > * { flex: 0 0 100%; width: auto; max-width: none; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+@media (min-width: 768px) { .carousel > .carousel-track.home-carousel > * { flex-basis: calc((100% - var(--space-2)) / 2); } }
+@media (min-width: 1024px) { .carousel > .carousel-track.home-carousel > * { flex-basis: calc((100% - 2 * var(--space-2)) / 3); } }
+
+/* Branch schedule under the address. */
+.location-card:has([aria-pressed="true"]) > p:has(+ .location-hours) { margin-bottom: 4px; }
+.location-card > .location-hours { display: flex; align-items: center; gap: 8px; }
+.location-hours .icon { flex: none; width: 16px; height: 16px; color: var(--accent-text); }
+
+/* Contacts: phone and Telegram buttons in one row that wraps on narrow screens. */
+.contact-channels .contact-list { flex-direction: row; flex-wrap: wrap; }
+.contact-channels .contact-list > li { flex: 1 1 auto; }
+@media (min-width: 768px) {
+  .contact-channels { width: 100%; }
+  .contact-channels .contact-group { width: auto; }
+  .contact-channels .contact-channel { width: auto; }
+}
+
+/* The selected branch is already named in its card: the map caption stays for screen readers only. */
+.branch-map-panel .map-toolbar { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* «Все преподаватели» / «Все результаты»: a clear secondary button, full width on phones. */
+.text-link.results-more { display: flex; align-items: center; justify-content: center; gap: var(--space-1); width: fit-content; min-height: 48px; margin: var(--space-3) auto 0; padding: 12px 24px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font-weight: 700; text-decoration: none; transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), color var(--duration) var(--ease); }
+.text-link.results-more:hover { border-color: var(--brand); background: var(--tint); color: var(--accent-text); text-decoration: none; }
+.text-link.results-more .icon { color: var(--brand); transition: transform var(--duration) var(--ease); }
+.text-link.results-more:hover .icon { transform: translateX(4px); }
+@media (max-width: 767px) { .text-link.results-more { width: 100%; } }
+
+/* Career form: consent as a clear card and a full-width send button on phones. */
+.career-form .checkbox-field { padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-hover); cursor: pointer; transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease); }
+.career-form .checkbox-field:hover { border-color: var(--brand-a40); }
+.career-form .checkbox-field:has(input:checked) { border-color: var(--brand); background: var(--tint); }
+.career-form .checkbox-field input { width: 22px; height: 22px; margin-top: 1px; }
+.consent-link { color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.career-actions { flex-direction: column; align-items: stretch; text-align: center; }
+.career-actions .button { justify-content: center; min-height: 52px; }
+@media (min-width: 768px) {
+  .career-actions { flex-direction: row; align-items: center; text-align: left; }
+  .career-actions .button { min-width: 240px; }
+}
+
+/* Language switch with flags (assets/lang-menu.js). Without JS the plain select stays. */
+[data-enhanced="true"] .lang-toggle.is-replaced { display: none; }
+.lang-menu { position: relative; flex-shrink: 0; }
+.lang-menu-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; height: 44px; padding: 0 10px 0 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-14); font-weight: 700; letter-spacing: .04em; cursor: pointer; transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease); }
+.lang-menu-button:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+.lang-menu-button:focus-visible, .lang-menu-list:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.lang-menu-chevron { width: 16px; height: 16px; color: var(--muted); transition: transform var(--duration) var(--ease); }
+.lang-menu-button[aria-expanded="true"] .lang-menu-chevron { transform: rotate(180deg); }
+.lang-flag { flex: none; width: 20px; height: 14px; border-radius: 2px; background: url("assets/flags/ru.svg") center / cover no-repeat; }
+.lang-flag[data-flag="uz"] { background-image: url("assets/flags/uz.svg"); }
+.lang-flag[data-flag="kaa"] { background-image: url("assets/flags/kaa.svg"); }
+.lang-menu-list { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; min-width: 200px; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
+.lang-menu-list[hidden] { display: none; }
+.lang-menu-list [role="option"] { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 10px; color: var(--ink); font-size: var(--text-14); cursor: pointer; }
+.lang-menu-list [role="option"].is-active { background: var(--surface-hover); }
+.lang-menu-list [role="option"][aria-selected="true"] { background: var(--tint); color: var(--accent-text); }
+.lang-menu-code { font-weight: 700; letter-spacing: .04em; }
+.lang-menu-name { color: var(--muted); font-weight: 500; }
+.lang-menu-list [aria-selected="true"] .lang-menu-name { color: inherit; }
+.error-card > .lang-menu { position: absolute; inset-block-start: var(--space-2); inset-inline-end: var(--space-2); }
+
+/* Privacy policy: long legal text in a readable column. */
+.policy-body { max-width: 72ch; color: var(--ink); font-size: var(--text-16); line-height: 1.7; }
+.policy-body h2 { margin: var(--space-5) 0 var(--space-2); font-size: var(--text-20); line-height: 1.3; }
+.policy-body p { margin: 0 0 var(--space-2); color: var(--muted); }
+.policy-list { margin: 0 0 var(--space-2); padding-left: var(--space-3); color: var(--muted); }
+.policy-list li + li { margin-top: 4px; }
+.policy-body a { color: var(--accent-text); font-weight: 600; }
+.policy-contacts { display: grid; gap: var(--space-1); margin: var(--space-2) 0 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.policy-contacts > div { display: grid; gap: 2px; }
+.policy-contacts dt { color: var(--muted); font-size: var(--text-14); }
+.policy-contacts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+@media (min-width: 768px) { .policy-contacts > div { grid-template-columns: 180px minmax(0, 1fr); gap: var(--space-2); } }
+
+/* «Практика вне уроков»: a carousel only on phones and narrow windows; from 768px the usual grid. */
+@media (max-width: 767px) {
+  .carousel > .carousel-track.practice-carousel { display: flex; grid-template-columns: none; gap: var(--space-2); margin: 0; padding: 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .carousel > .carousel-track.practice-carousel::-webkit-scrollbar { display: none; }
+  .carousel > .carousel-track.practice-carousel > * { flex: 0 0 100%; width: auto; max-width: none; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+}
+

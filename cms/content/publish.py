@@ -15,6 +15,7 @@ from django.db import connection, transaction
 from .github import (GitHubClient, GitHubError, MANAGED_MEDIA, MANAGED_PHOTO, MAX_RELEASE_BYTES,
                      OUTPUT_FILES, SOURCE_FILES, allowed_media)
 from .serialization import (TRANSLATION_LANGUAGES, build_content, build_translation_strings, missing_translations,
+                            read_translation_strings,
                             read_content, validate_content, write_content, write_translation_strings)
 from .media import audit_media, small_variant_path, small_webp
 
@@ -254,7 +255,10 @@ def publish_site():
                     destination.write_bytes(content)
                 write_content(data, stage / 'content.js')
                 for language, strings in translations.items():
-                    write_translation_strings(stage / f'assets/i18n/{language}.js', strings)
+                    dictionary = stage / f'assets/i18n/{language}.js'
+                    # Translations shipped with the code (404 page, policy, new labels) stay until the admin
+                    # has its own; anything edited in the admin wins.
+                    write_translation_strings(dictionary, {**read_translation_strings(dictionary), **strings})
                 validate_release_media_size(stage, data)
                 variants = write_small_variants(stage, data)
                 result = subprocess.run([node, 'build.mjs'], cwd=stage, capture_output=True, text=True,

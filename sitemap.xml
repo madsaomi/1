@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://stanford-lc.uz</loc></url>
-  <url><loc>https://stanford-lc.uz/results.html</loc></url>
-  <url><loc>https://stanford-lc.uz/teachers.html</loc></url>
-  <url><loc>https://stanford-lc.uz/career.html</loc></url>
+  <url><loc>https://stanford-lc.uz/results</loc></url>
+  <url><loc>https://stanford-lc.uz/teachers</loc></url>
+  <url><loc>https://stanford-lc.uz/career</loc></url>
   <url><loc>https://stanford-lc.uz/uz/</loc></url>
-  <url><loc>https://stanford-lc.uz/uz/results.html</loc></url>
-  <url><loc>https://stanford-lc.uz/uz/teachers.html</loc></url>
-  <url><loc>https://stanford-lc.uz/uz/career.html</loc></url>
+  <url><loc>https://stanford-lc.uz/uz/results</loc></url>
+  <url><loc>https://stanford-lc.uz/uz/teachers</loc></url>
+  <url><loc>https://stanford-lc.uz/uz/career</loc></url>
   <url><loc>https://stanford-lc.uz/kaa/</loc></url>
-  <url><loc>https://stanford-lc.uz/kaa/results.html</loc></url>
-  <url><loc>https://stanford-lc.uz/kaa/teachers.html</loc></url>
-  <url><loc>https://stanford-lc.uz/kaa/career.html</loc></url>
+  <url><loc>https://stanford-lc.uz/kaa/results</loc></url>
+  <url><loc>https://stanford-lc.uz/kaa/teachers</loc></url>
+  <url><loc>https://stanford-lc.uz/kaa/career</loc></url>
 </urlset>

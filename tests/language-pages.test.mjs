@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { LANGUAGES, generateLanguagePage, readContent, renderSitemap, translatePage } from '../build.mjs';
 
 const read = name => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
-const PAGES = ['index.html', 'results.html', 'teachers.html', 'career.html'];
+const PAGES = ['index.html', 'results.html', 'teachers.html', 'career.html', 'privacy.html'];
 const pack = { strings: { 'Курсы и цены': 'Kurslar va narxlar', 'Язык сайта': 'Sayt tili', 'Фото: Анна': 'Foto: Anna', 'Курсы & цены': 'Kurslar & narxlar' },
   patterns: [[/^Подробнее: (.+)$/, (m, t) => `Batafsil: ${t(m[1])}`]] };
 
@@ -35,13 +35,13 @@ test('every public page has current /uz/ and /kaa/ copies with their own address
       assert.equal(copy, generateLanguagePage(read(page), data, lang, page), `${lang}/${page} must be rebuilt`);
       assert.match(copy, new RegExp(`<html lang="${lang}" data-lang-page="${lang}">`));
       if (data.site.url) {
-        const own = new URL(`${lang}/${page === 'index.html' ? '' : page}`, `${data.site.url.replace(/\/$/, '')}/`).href;
+        const own = new URL(`${lang}/${page === 'index.html' ? '' : page.replace(/\.html$/, '')}`, `${data.site.url.replace(/\/$/, '')}/`).href;
         assert(copy.includes(`<link rel="canonical" href="${own}">`), `${lang}/${page} canonical`);
         for (const code of ['ru', 'uz', 'kaa', 'x-default']) assert(copy.includes(`hreflang="${code}"`));
       }
       // Every local file the copy needs exists one folder up.
       for (const [, url] of copy.matchAll(/\s(?:src|href)="([^"#?]+)(?:[?#][^"]*)?"/g)) {
-        if (/^(?:[a-z]+:|\/)/.test(url) || /^(?:index|results|teachers|career)\.html$/.test(url)) continue;
+        if (/^(?:[a-z]+:|\/)/.test(url) || /^(?:\.\/|(?:index|results|teachers|career|privacy)(?:\.html)?)$/.test(url)) continue;
         assert(url.startsWith('../'), `${lang}/${page}: ${url} must point one folder up`);
         assert(fs.existsSync(new URL(`../${lang}/${url}`, import.meta.url)), `${lang}/${page}: missing ${url}`);
       }
@@ -53,6 +53,6 @@ test('the sitemap offers each page in all three languages, never in demo mode', 
   const site = { url: 'https://school.example' };
   const map = renderSitemap(site);
   assert.equal((map.match(/<loc>/g) || []).length, 12);
-  assert(map.includes('<loc>https://school.example/uz/</loc>') && map.includes('<loc>https://school.example/kaa/career.html</loc>'));
+  assert(map.includes('<loc>https://school.example/uz/</loc>') && map.includes('<loc>https://school.example/kaa/career</loc>'));
   assert.equal((renderSitemap({ ...site, demoMode: true }).match(/<loc>/g) || []).length, 0);
 });

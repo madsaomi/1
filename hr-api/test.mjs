@@ -64,3 +64,26 @@ test('resume PDF is generated in memory', async () => {
   assert.equal(pdf.subarray(0, 4).toString('ascii'), '%PDF');
   assert.ok(pdf.length > 2000);
 });
+
+test('every HR chat gets the resume; one failing chat does not lose the application', async () => {
+  const { sendResume } = await import('./telegram.mjs');
+  const original = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, { body }) => {
+    const chat = body.get('chat_id');
+    seen.push(chat);
+    const ok = chat !== 'blocked';
+    return new Response(JSON.stringify({ ok }), { status: ok ? 200 : 403 });
+  };
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    const args = { token: 't', pdf: Buffer.from('%PDF'), filename: 'a.pdf', position: 'Teacher' };
+    assert.equal(await sendResume({ ...args, chatIds: ['111', 'blocked'] }), true);
+    assert.deepEqual(seen, ['111', 'blocked']);
+    await assert.rejects(sendResume({ ...args, chatIds: ['blocked'] }), /telegram_send_failed/);
+  } finally {
+    globalThis.fetch = original;
+    console.error = quiet;
+  }
+});

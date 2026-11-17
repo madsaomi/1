@@ -8,7 +8,8 @@ import { sendResume } from './telegram.mjs';
 
 const PORT = Number(process.env.PORT || 8787);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const HR_CHAT = process.env.TELEGRAM_HR_CHAT_ID || '';
+// One or more HR chats, comma-separated: every one of them gets the resume.
+const HR_CHATS = (process.env.TELEGRAM_HR_CHAT_ID || '').split(',').map(chat => chat.trim()).filter(Boolean);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '';
 const DRY_RUN = process.env.HR_DRY_RUN === '1';
 const HOST = process.env.HOST || '0.0.0.0';
@@ -25,7 +26,7 @@ if (ALLOWED_ORIGIN) {
       && !origin.username && !origin.password;
   } catch { /* An invalid configured origin cannot enable intake. */ }
 }
-const INTAKE_CONFIGURED = originConfigured && (DRY_RUN || Boolean(BOT_TOKEN.trim() && HR_CHAT.trim()));
+const INTAKE_CONFIGURED = originConfigured && (DRY_RUN || Boolean(BOT_TOKEN.trim() && HR_CHATS.length));
 const MAX_BODY = 3.5 * 1024 * 1024;
 const RATE_WINDOW = 30 * 60 * 1000;
 const RATE_LIMIT = 4;
@@ -165,7 +166,7 @@ const server = http.createServer(async (request, response) => {
     const photo = await sanitizePhoto(application.photo);
     const date = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent' }).format(new Date());
     const pdf = await buildResume({ ...application, date }, photo);
-    if (!DRY_RUN) await sendResume({ token: BOT_TOKEN, chatId: HR_CHAT, pdf, filename: filename(), position: application.position });
+    if (!DRY_RUN) await sendResume({ token: BOT_TOKEN, chatIds: HR_CHATS, pdf, filename: filename(), position: application.position });
     console.log(`[career] 200 ${Date.now() - started}ms${DRY_RUN ? ' (dry run)' : ''}`);
     send(response, 200, { ok: true });
   } catch (error) {

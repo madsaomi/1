@@ -24,7 +24,7 @@ test('planned events and their countdowns are generated inside the practice sect
   const start = output.indexOf('id="clubs"');
   const end = output.indexOf('</section>', start);
   const practice = output.slice(start, end);
-  assert.match(practice, /class="practice-list"/);
+  assert.match(practice, /class="practice-list practice-carousel carousel-track"/);
   assert.match(practice, /id="events"/);
   assert.match(practice, /data-countdown="2027-01-05T18:00:00\+05:00"/);
   assert(practice.indexOf('id="events"') > practice.indexOf('<!-- PRACTICES_END -->'));

@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML } from '../build.mjs';
+import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML, openingHours } from '../build.mjs';
 
 const publishedData = readContent();
 const sourceHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -166,7 +166,7 @@ test('published contacts expose both admissions phones and keep Telegram out of 
   }
   for (const telegram of data.contacts.telegrams) assert(enroll.includes(`href="${telegram}"`));
   assert.equal(enroll.includes(`href="${data.contacts.hrTelegram}"`), false, 'HR Telegram is replaced by the career form');
-  assert(enroll.includes('href="career.html"'));
+  assert(enroll.includes('href="career"'));
   assert(enroll.includes(`href="${data.contacts.instagram}"`));
   assert(!dialog.includes('t.me/'), 'The course dialog asks the visitor to come to the centre instead of messaging');
   assert(dialog.includes('href="#enroll"'));
@@ -189,10 +189,10 @@ test('compact contacts keep phones and point to the branch addresses while the f
   for (const telegram of contacts.telegrams) assert.equal(full.split(`href="${telegram}"`).length - 1, 1);
   assert(!compact.includes('t.me/'));
   assert(compact.includes('href="#enroll"'));
-  assert(full.includes('href="career.html"'));
+  assert(full.includes('href="career"'));
   assert(full.includes(`href="${contacts.instagram}"`));
   assert(!full.includes(contacts.hrTelegram));
-  assert(!compact.includes('career.html'));
+  assert(!compact.includes('href="career'));
   assert(!compact.includes(contacts.hrTelegram));
   assert(!compact.includes(contacts.instagram));
   for (const tag of full.match(/<a\b[^>]*href="https:[^"]*"[^>]*>/g) || []) {
@@ -938,7 +938,7 @@ test('featured teachers and results: index shows only admin-configured tops, res
   const tops = renderTeachers(data.teachers, live, { featuredOnly: true });
   const topNames = [...tops.matchAll(/<h3>([^<]+)<\/h3>/g)].map(match => match[1]);
   assert.deepEqual(topNames, ['Азиз Каримов', 'Дилноза Юсупова', 'Рустем Жумабаев']);
-  assert(tops.includes('href="teachers.html"'), 'The home page links to the full teachers list');
+  assert(tops.includes('href="teachers"'), 'The home page links to the full teachers list');
   // A single-card grid stretches across the row, so mixed lists never leave gaps.
   assert(!tops.includes('Айгуль'));
   // Full list (results.html): everyone stays, featured first.
@@ -948,7 +948,7 @@ test('featured teachers and results: index shows only admin-configured tops, res
   // Fallback: with no featured teacher the section shows everyone instead of an empty grid.
   const none = renderTeachers(data.teachers.map(teacher => ({ ...teacher, featured: undefined })), live, { featuredOnly: true });
   assert.equal((none.match(/class="teacher-card"/g) || []).length, data.teachers.length);
-  assert(none.includes('href="teachers.html"'), 'The home section always offers the full teachers page');
+  assert(none.includes('href="teachers"'), 'The home section always offers the full teachers page');
   // Results: featured first on the home page, all cards on results.html.
   const resultTops = renderResults(data.results, live, { featuredOnly: true });
   assert.equal((resultTops.match(/class="result-card"/g) || []).length, 2);
@@ -964,7 +964,7 @@ test('featured teachers and results: index shows only admin-configured tops, res
   // while results.html stays about students only.
   const teachersPage = generateTeachers(fs.readFileSync(new URL('../teachers.html', import.meta.url), 'utf8'), { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
   assert.equal((teachersPage.match(/class="profile-card profile-card-teacher"/g) || []).length, data.teachers.length);
-  assert(teachersPage.includes('rel="canonical" href="https://stanford.example/teachers.html"'));
+  assert(teachersPage.includes('rel="canonical" href="https://stanford.example/teachers"'));
   assert(!teachersPage.includes('result-card'), 'The teachers page does not mix in student results');
   const resultsPage = generateResults(fs.readFileSync(new URL('../results.html', import.meta.url), 'utf8'), { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
   assert(!resultsPage.includes('teacher-card'), 'The results page does not mix in teachers');
@@ -1078,7 +1078,7 @@ test('the full results page ships every result and is generated from the same da
   const output = generateResults(template, data);
   assert.equal(generateResults(output, data), output);
   assert.equal((output.match(/class="profile-card profile-card-result"/g) || []).length, data.results.length);
-  assert(template.includes('href="index.html"') && template.includes('href="index.html#courses"'));
+  assert(template.includes('href="./"') && template.includes('href="./#courses"'));
   assert.match(template, /<script src="results\.js\?v=\d+"><\/script>/);
   assert(!/<script>([\s\S]*?)<\/script>/.test(template), 'The results page keeps scripts external for CSP');
   assert(!/style="/.test(template));
@@ -1094,8 +1094,8 @@ test('hidden demo labels let the owner preview sample data without the «При�
 test('all public pages share indexing settings and use their own canonical URL after a domain change', () => {
   const pages = [
     { file: 'index.html', build: generate, suffix: '' },
-    { file: 'results.html', build: generateResults, suffix: '/results.html' },
-    { file: 'career.html', build: generateCareer, suffix: '/career.html' }
+    { file: 'results.html', build: generateResults, suffix: '/results' },
+    { file: 'career.html', build: generateCareer, suffix: '/career' }
   ];
   for (const { file, build, suffix } of pages) {
     const template = fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -1212,7 +1212,7 @@ test('a staged build uses its own data and validates every page before replacing
   const temporaryRoot = path.resolve(os.tmpdir());
   const stage = fs.mkdtempSync(path.join(temporaryRoot, 'stanford-site-build-'));
   try {
-    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html']) {
+    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html']) {
       fs.copyFileSync(new URL(`../${file}`, import.meta.url), path.join(stage, file));
     }
     fs.mkdirSync(path.join(stage, 'assets', 'i18n'), { recursive: true });
@@ -1235,7 +1235,7 @@ test('a staged build uses its own data and validates every page before replacing
     assert(before.includes('data-course-id="staged-course"'));
     assert(before.includes('href="https://staged.example"'));
     assert(!before.includes('name="robots"'));
-    assert(fs.readFileSync(path.join(stage, 'career.html'), 'utf8').includes('href="https://staged.example/career.html"'));
+    assert(fs.readFileSync(path.join(stage, 'career.html'), 'utf8').includes('href="https://staged.example/career"'));
     fixture.courses[0].price = 456000;
     fs.writeFileSync(contentPath, `window.schoolContent = ${JSON.stringify(fixture)};\n`);
     const careerPath = path.join(stage, 'career.html');
@@ -1249,4 +1249,29 @@ test('a staged build uses its own data and validates every page before replacing
     assert(resolved.startsWith(`${temporaryRoot}${path.sep}`) && path.basename(resolved).startsWith('stanford-site-build-'));
     fs.rmSync(resolved, { recursive: true, force: true });
   }
+});
+
+test('a branch shows its schedule when one is set, and the home people sections become carousels', () => {
+  const contacts = structuredClone(data.contacts);
+  contacts.verified = true;
+  contacts.locations[0].hours = 'Пн–Сб, 09:00–19:00 <b>';
+  const html = renderLocations(contacts);
+  assert(html.includes('<p class="location-hours">') && html.includes('<span>Пн–Сб, 09:00–19:00 &lt;b&gt;</span>'));
+  delete contacts.locations[0].hours;
+  assert(!renderLocations(contacts).includes('location-hours'));
+  assert.throws(() => validateContent({ ...data, contacts: { ...data.contacts, locations: [{ ...data.contacts.locations[0], hours: 'x'.repeat(81) }] } }), /hours/);
+  const home = renderTeachers(data.teachers, data.site, { featuredOnly: true });
+  assert(home.includes('data-carousel') && home.includes('team-grid home-carousel carousel-track') && home.includes('aria-labelledby="teachers-title"'));
+  assert(!renderTeachers(data.teachers, data.site, { heading: false }).includes('data-carousel'), 'The full directory stays a grid');
+  assert(renderResults(data.results, data.site, { featuredOnly: true }).includes('results-grid home-carousel carousel-track'));
+});
+
+test('branch hours become opening hours for search engines and the email is a contact link', () => {
+  assert.deepEqual(openingHours('Пн–Сб, 09:00–19:00'), { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], opens: '09:00', closes: '19:00' });
+  assert.equal(openingHours('По записи'), null);
+  assert.equal(openingHours('Сб–Пн, 09:00–19:00'), null);
+  const contacts = { ...structuredClone(data.contacts), verified: true, email: 'school@example.org' };
+  assert(renderContacts(contacts).includes('href="mailto:school@example.org"'));
+  assert(!renderContacts(contacts, { compact: true }).includes('mailto:'));
+  assert.throws(() => validateContent({ ...data, contacts: { ...data.contacts, email: 'not an email' } }), /email/);
 });

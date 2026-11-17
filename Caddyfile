@@ -39,13 +39,23 @@
 	header @static Cache-Control "public, max-age=86400, must-revalidate"
 
 	@mutable {
-		path / /index.html /results.html /teachers.html /career.html /content.js /script.js /results.js /career.js /theme-init.js /style.css /robots.txt /sitemap.xml /uz /uz/* /kaa /kaa/*
+		path / /index.html /results.html /teachers.html /career.html /privacy.html /results /teachers /career /privacy /content.js /script.js /results.js /career.js /theme-init.js /style.css /robots.txt /sitemap.xml /uz /uz/* /kaa /kaa/*
 		not query v=*
 	}
 	header @mutable Cache-Control no-cache
 
-	# HR remains a separate service. Point this at its private address in production.
-	handle /career {
+	# Public page addresses have no «.html»: old links are sent to the short address once.
+	@html_index path_regexp html_index ^(/(?:uz/|kaa/)?)index\.html$
+	redir @html_index {re.html_index.1}{?query} 301
+	@html_page path_regexp html_page ^(/(?:uz/|kaa/)?)(results|teachers|career|privacy)\.html$
+	redir @html_page {re.html_page.1}{re.html_page.2}{?query} 301
+
+	# HR remains a separate service: only the form submission (POST /career) goes there; GET /career is the page.
+	@hr_submit {
+		path /career
+		method POST
+	}
+	handle @hr_submit {
 		request_body {
 			max_size 4MB
 		}
@@ -57,6 +67,8 @@
 	}
 	handle {
 		respond /healthz "ok" 200
+		# /career → career.html (the same in /uz/ and /kaa/).
+		try_files {path} {path}.html
 		file_server
 	}
 
