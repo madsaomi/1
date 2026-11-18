@@ -416,6 +416,20 @@ class AdminFormSaveTests(AdminTestCase):
         self.assertEqual(saved.site_url, 'https://cms.example.org/cms')
         self.assertTrue(saved.demo_mode)
 
+    def test_turnstile_site_key_is_checked_saved_and_published(self):
+        from .serialization import build_content
+        self.login()
+        url = reverse('admin:content_sitesettings_change', args=[1])
+        form = {'demo_mode': 'on', 'site_url': 'https://cms.example.org', 'city': 'Нукус', 'holiday_mode': 'auto',
+                'media_items-TOTAL_FORMS': '0', 'media_items-INITIAL_FORMS': '0'}
+        response = self.client.post(url, {**form, 'turnstile_site_key': 'secret key with spaces'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Ключ сайта из Cloudflare Turnstile')
+        self.assertNotIn('turnstileSiteKey', build_content()['site'])
+        response = self.client.post(url, {**form, 'turnstile_site_key': '1x00000000000000000000AA'})
+        self.assertEqual(response.status_code, 302, response.context and response.context['adminform'].form.errors)
+        self.assertEqual(build_content()['site']['turnstileSiteKey'], '1x00000000000000000000AA')
+
     def test_admin_rejects_an_http_site_url(self):
         self.login()
         response = self.client.post(reverse('admin:content_sitesettings_change', args=[1]),

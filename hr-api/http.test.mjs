@@ -171,6 +171,47 @@ test('complaints: anonymous ones carry no contacts, official ones need name, pho
   assert.equal((await fetch(`${base}/feedback`, { method: 'POST', headers: { origin: 'https://evil.example', 'content-type': 'application/json', 'x-career-request': '1' }, body: '{}' })).status, 403);
 });
 
+async function fakeCloudflare(t) {
+  const server = http.createServer((request, response) => {
+    let body = '';
+    request.on('data', chunk => { body += chunk; });
+    request.on('end', () => {
+      const form = new URLSearchParams(body);
+      const [token, action] = (form.get('response') || '').split(':');
+      response.writeHead(token === 'down' ? 500 : 200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ success: form.get('secret') === 'test-secret' && token === 'good', action }));
+    });
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => server.close());
+  return `http://127.0.0.1:${server.address().port}/siteverify`;
+}
+
+test('with the Turnstile secret every form needs a valid token of its own form; without it the token is ignored', async t => {
+  const verify = await fakeCloudflare(t);
+  const message = 'Преподаватель часто опаздывает на занятия, просим разобраться.';
+  const complaint = token => JSON.stringify({ kind: 'anonymous', topic: 'Другое', message, ...(token === undefined ? {} : { turnstileToken: token }) });
+  const post = (base, path, body) => fetch(`${base}${path}`, { method: 'POST', headers: {
+    origin, 'content-type': 'application/json', 'x-career-request': '1' }, body });
+  let base = await startApi(t, { TURNSTILE_SECRET_KEY: 'test-secret', TURNSTILE_VERIFY_URL: verify });
+  assert.equal((await post(base, '/feedback', complaint('good:feedback'))).status, 200);
+  for (const token of [undefined, 'bad:feedback', 'good:career']) {
+    const response = await post(base, '/feedback', complaint(token));
+    assert.equal(response.status, 403, String(token));
+    assert.equal((await response.json()).error, 'captcha');
+  }
+  base = await startApi(t, { TURNSTILE_SECRET_KEY: 'test-secret', TURNSTILE_VERIFY_URL: verify });
+  const down = await post(base, '/feedback', complaint('down:feedback'));
+  assert.equal(down.status, 503);
+  assert.equal((await down.json()).error, 'captcha_unavailable');
+  const career = await post(base, '/career', JSON.stringify({ turnstileToken: 'good:career' }));
+  assert.equal((await career.json()).error, 'validation', 'A valid token leads on to the usual form checks');
+  // Without the secret the forms work as before, even when the page sends a token.
+  base = await startApi(t);
+  assert.equal((await post(base, '/feedback', complaint('anything'))).status, 200);
+});
+
 test('complaint text for Telegram is plain and the anonymous one says no contacts were given', async () => {
   const { formatFeedback } = await import('./feedback.mjs');
   const text = formatFeedback({ kind: 'anonymous', topic: 'Другое', branch: '', message: '<b>Текст</b>' }, '18.11.2026, 10:00');

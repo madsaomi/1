@@ -114,6 +114,12 @@ class SiteSettings(Singleton):
         validators=[RegexValidator(r'^[0-9a-f]{32}$', 'Токен из Cloudflare: 32 символа, цифры и буквы a–f.')],
         help_text='Cloudflare → Web Analytics → сайт → токен из кода счётчика (значение "token"). Пусто — счётчика нет. '
                   'В демо-режиме счётчик не подключается.')
+    turnstile_site_key = models.CharField(
+        'Ключ сайта Cloudflare Turnstile', max_length=70, blank=True,
+        validators=[RegexValidator(r'^[0-3]x[0-9A-Za-z_-]{16,64}$', 'Ключ сайта из Cloudflare Turnstile, например 0x4AAAA….')],
+        help_text='Невидимая проверка «я не робот» в анкете и жалобах. Cloudflare → Turnstile → виджет → Site Key. '
+                  'Секретный ключ (Secret Key) вписывается только в Railway, в сервис форм: TURNSTILE_SECRET_KEY. '
+                  'Пусто — проверки нет. Задавайте оба ключа вместе.')
 
     class Meta:
         verbose_name = verbose_name_plural = 'Настройки сайта'

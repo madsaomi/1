@@ -73,7 +73,14 @@
     return true;
   };
 
+  // Optional «not a robot» check (Cloudflare Turnstile); the token is single-use.
+  const guard = form.querySelector('[data-turnstile]');
+  const guardToken = () => (guard ? form.querySelector('[name="cf-turnstile-response"]')?.value || '' : '');
+  const resetGuard = () => { try { if (guard && window.turnstile) window.turnstile.reset(guard); } catch { /* The next page load renders a new check. */ } };
+
   const errors = {
+    captcha: 'Проверка «я не робот» не пройдена. Обновите страницу и попробуйте ещё раз.',
+    captcha_unavailable: 'Проверка «я не робот» временно недоступна. Попробуйте через несколько минут.',
     rate_limited: 'Слишком много обращений подряд. Попробуйте через полчаса.',
     not_configured: 'Приём обращений пока не настроен. Позвоните в центр.',
     delivery_failed: 'Не получилось доставить обращение. Попробуйте ещё раз через несколько минут.',
@@ -84,6 +91,10 @@
     event.preventDefault();
     const body = collect();
     if (!check(body)) return;
+    if (guard) {
+      body.turnstileToken = guardToken();
+      if (!body.turnstileToken) return show('Подождите пару секунд: идёт проверка «я не робот».');
+    }
     submit.disabled = true;
     show('Отправляем…');
     try {
@@ -112,6 +123,7 @@
       show('Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.');
     } finally {
       submit.disabled = false;
+      resetGuard();
     }
   });
   updateKind();

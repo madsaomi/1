@@ -183,8 +183,13 @@
     about: value('about'),
     consent: form.elements.consent?.checked === true,
     company: value('company'),
-    photo: photoData
+    photo: photoData,
+    ...(guard ? { turnstileToken: guardToken() } : {})
   });
+  // Optional «not a robot» check (Cloudflare Turnstile); the token is single-use.
+  const guard = form.querySelector('[data-turnstile]');
+  const guardToken = () => (guard ? form.querySelector('[name="cf-turnstile-response"]')?.value || '' : '');
+  const resetGuard = () => { try { if (guard && window.turnstile) window.turnstile.reset(guard); } catch { /* The next page load renders a new check. */ } };
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -197,6 +202,10 @@
     }
     ['name', 'phone', 'telegram', 'education', 'certificates', 'about'].forEach(name => validateField(form.elements[name]));
     if (!form.reportValidity()) return;
+    if (guard && !guardToken()) {
+      setStatus('Подождите пару секунд: идёт проверка «я не робот».', 'error');
+      return;
+    }
     sending = true;
     submit?.setAttribute('disabled', '');
     const label = submit?.innerHTML || '';
@@ -215,6 +224,7 @@
         if (code === 429) throw new Error('rate');
         if (code === 413) throw new Error('size');
         if (code === 503) throw new Error('unavailable');
+        if (code === 403) throw new Error('captcha');
         if (code === 400) throw new Error('validation');
         throw new Error('delivery');
       }
@@ -223,6 +233,7 @@
     } catch (error) {
       const message = {
         rate: 'Слишком много попыток. Попробуйте позже.',
+        captcha: 'Проверка «я не робот» не пройдена. Обновите страницу и попробуйте ещё раз.',
         size: 'Фото слишком большое. Выберите другое.',
         validation: 'Проверьте поля анкеты и попробуйте ещё раз.',
         unavailable: 'Отправка временно недоступна. Попробуйте позже.',
@@ -231,6 +242,7 @@
       setStatus(message, 'error');
     } finally {
       sending = false;
+      resetGuard();
       submit?.removeAttribute('disabled');
       if (submit) submit.innerHTML = label;
     }

@@ -375,6 +375,8 @@ def build_content(photo_files=None):
             data['site']['holiday']['text'] = settings.holiday_text.strip()
     if settings.analytics_token:
         data['site']['analyticsToken'] = settings.analytics_token
+    if settings.turnstile_site_key:
+        data['site']['turnstileSiteKey'] = settings.turnstile_site_key
     hero_media = _gallery_data(settings, photo_files)
     if hero_media:
         data['site']['heroMedia'] = hero_media

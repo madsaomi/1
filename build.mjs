@@ -142,6 +142,7 @@ export function validateContent(data) {
   if (demo !== undefined && typeof demo !== 'boolean') throw new Error('demoMode must be true or false');
   if (data.site?.demoLabels !== undefined && typeof data.site.demoLabels !== 'boolean') throw new Error('demoLabels must be true or false');
   if (data.site?.analyticsToken !== undefined && !/^[0-9a-f]{32}$/.test(data.site.analyticsToken)) throw new Error('analyticsToken must be the 32-character Cloudflare token');
+  if (data.site?.turnstileSiteKey !== undefined && !TURNSTILE_SITE_KEY.test(data.site.turnstileSiteKey)) throw new Error('turnstileSiteKey must be a Cloudflare Turnstile site key');
   if (data.site?.holiday !== undefined) {
     const { mode, text } = data.site.holiday || {};
     if (!['auto', 'off', ...Object.keys(HOLIDAYS)].includes(mode)) throw new Error('holiday.mode must be auto, off or a known holiday');
@@ -243,6 +244,15 @@ export function renderHoliday(site) {
 export function renderAnalytics(site) {
   if (!site?.analyticsToken || site.demoMode) return '';
   return `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${site.analyticsToken}"}'></script>`;
+}
+
+// Cloudflare Turnstile: an invisible «not a robot» check in the HR and complaints forms. Without a site key
+// the forms work as before; the HR service checks the token only when it has the secret key.
+export const TURNSTILE_SITE_KEY = /^[0-3]x[0-9A-Za-z_-]{16,64}$/;
+export function renderTurnstile(site, action) {
+  if (!site?.turnstileSiteKey) return '';
+  return `<div class="cf-turnstile form-turnstile" data-turnstile data-sitekey="${escapeHTML(site.turnstileSiteKey)}" data-action="${action}" data-theme="auto" data-size="flexible" data-appearance="interaction-only"></div>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`;
 }
 
 export function renderRobots(site) {
@@ -921,6 +931,7 @@ export function generateCareer(html, data) {
   html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
   html = replaceBlock(html, 'HOLIDAY', renderHoliday(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'career.html'));
+  html = replaceBlock(html, 'TURNSTILE', renderTurnstile(data.site, 'career'));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
 
@@ -943,6 +954,7 @@ export function generateFeedback(html, data) {
   html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
   html = replaceBlock(html, 'HOLIDAY', renderHoliday(data.site));
   html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'feedback.html'));
+  html = replaceBlock(html, 'TURNSTILE', renderTurnstile(data.site, 'feedback'));
   html = replaceBlock(html, 'FEEDBACK_BRANCHES', (data.contacts?.locations || []).map(location => `<option value="${escapeHTML(location.name)}">${escapeHTML(location.name)}</option>`).join(''));
   return versionContentAssets(applyTexts(html, data.texts), data);
 }

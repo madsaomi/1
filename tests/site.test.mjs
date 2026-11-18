@@ -414,11 +414,11 @@ test('CSP permits same-origin HR requests and approved map frames while keeping 
     const [name, ...values] = item.split(/\s+/);
     return [name, values];
   }));
-  assert.deepEqual([...directives.get('frame-src')].sort(), ['https://www.google.com', 'https://yandex.ru']);
+  assert.deepEqual([...directives.get('frame-src')].sort(), ['https://challenges.cloudflare.com', 'https://www.google.com', 'https://yandex.ru']);
   assert.deepEqual(directives.get('connect-src'), ["'self'", 'https://cloudflareinsights.com']);
   assert.deepEqual(directives.get('object-src'), ["'none'"]);
   assert.deepEqual(directives.get('frame-ancestors'), ["'none'"]);
-  assert.deepEqual(directives.get('script-src'), ["'self'", 'https://static.cloudflareinsights.com']);
+  assert.deepEqual(directives.get('script-src'), ["'self'", 'https://static.cloudflareinsights.com', 'https://challenges.cloudflare.com']);
 });
 
 test('rendered content escapes markup instead of injecting it', () => {
@@ -1155,7 +1155,7 @@ test('Cloudflare analytics is added only with a valid token and never in demo mo
   assert.equal(renderAnalytics({}), '');
   assert.throws(() => validateContent({ ...data, site: { ...data.site, analyticsToken: '"><script>' } }), /analyticsToken/);
   const caddy = fs.readFileSync(new URL('../Caddyfile', import.meta.url), 'utf8');
-  assert(caddy.includes("script-src 'self' https://static.cloudflareinsights.com;") && caddy.includes("connect-src 'self' https://cloudflareinsights.com;"));
+  assert(caddy.includes("script-src 'self' https://static.cloudflareinsights.com https://challenges.cloudflare.com;") && caddy.includes("connect-src 'self' https://cloudflareinsights.com;"));
 });
 
 test('holiday greetings: automatic by dates, one chosen holiday always on, or switched off', () => {

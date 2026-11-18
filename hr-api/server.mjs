@@ -17,6 +17,10 @@ const FEEDBACK_BOT_TOKEN = process.env.FEEDBACK_BOT_TOKEN || '';
 const FEEDBACK_CHATS = (process.env.FEEDBACK_CHAT_ID || '').split(',').map(chat => chat.trim()).filter(Boolean);
 const DRY_RUN = process.env.HR_DRY_RUN === '1';
 const HOST = process.env.HOST || '0.0.0.0';
+// «Not a robot» check: with the secret key every form submission needs a valid Turnstile token.
+// Tests may point the check at a local stand-in, but only in dry run: real intake always asks Cloudflare.
+const TURNSTILE_SECRET = (process.env.TURNSTILE_SECRET_KEY || '').trim();
+const TURNSTILE_URL = DRY_RUN && process.env.TURNSTILE_VERIFY_URL ? process.env.TURNSTILE_VERIFY_URL : '';
 const proxyHopsValue = process.env.HR_TRUST_PROXY_HOPS || '0';
 if (!/^\d+$/.test(proxyHopsValue) || Number(proxyHopsValue) > 10) {
   throw new Error('HR_TRUST_PROXY_HOPS must be an integer from 0 to 10');
@@ -104,6 +108,38 @@ function originAllowed(request) {
   return Boolean(ALLOWED_ORIGIN) && origin === ALLOWED_ORIGIN;
 }
 
+// Cloudflare Turnstile: checks the single-use «not a robot» token that the HR and complaints forms send.
+// The visitor's address is not passed on; Cloudflare already sees it when the check runs in the browser.
+const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+
+async function verifyTurnstile({ secret, token, action, url = VERIFY_URL }) {
+  if (typeof token !== 'string' || !token || token.length > 2048) return false;
+  const response = await fetch(url, {
+    method: 'POST',
+    body: new URLSearchParams({ secret, response: token }),
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!response.ok) throw new Error('turnstile_unavailable');
+  const result = await response.json();
+  // The widget of one form cannot be reused for the other one.
+  return result?.success === true && (!result.action || result.action === action);
+}
+
+// Takes the token out of the form data (the forms validate only their own fields) and checks it when enabled.
+async function passesTurnstile(body, action, response) {
+  const token = body && typeof body === 'object' ? body.turnstileToken : undefined;
+  if (body && typeof body === 'object') delete body.turnstileToken;
+  if (!TURNSTILE_SECRET) return true;
+  try {
+    if (await verifyTurnstile({ secret: TURNSTILE_SECRET, token, action, url: TURNSTILE_URL || VERIFY_URL })) return true;
+    send(response, 403, { ok: false, error: 'captcha' });
+  } catch {
+    console.error(`[${action}] 503 turnstile unavailable`);
+    send(response, 503, { ok: false, error: 'captcha_unavailable' });
+  }
+  return false;
+}
+
 function filename() {
   const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date()).replaceAll('-', '');
   return `Stanford-anketa-${date}-${randomBytes(3).toString('hex')}.pdf`;
@@ -173,6 +209,7 @@ const server = http.createServer(async (request, response) => {
       send(response, 400, { ok: false, error: 'invalid_json' });
       return;
     }
+    if (!(await passesTurnstile(body, 'career', response))) return;
     const application = validateApplication(body);
     const photo = await sanitizePhoto(application.photo);
     const date = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent' }).format(new Date());
@@ -205,6 +242,7 @@ async function handleFeedback(request, response, started) {
       send(response, 400, { ok: false, error: 'invalid_json' });
       return;
     }
+    if (!(await passesTurnstile(body, 'feedback', response))) return;
     const feedback = validateFeedback(body);
     const date = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', dateStyle: 'short', timeStyle: 'short' }).format(new Date());
     if (!DRY_RUN) await sendText({ token: FEEDBACK_BOT_TOKEN, chatIds: FEEDBACK_CHATS, text: formatFeedback(feedback, date) });

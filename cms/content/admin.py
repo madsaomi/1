@@ -143,7 +143,7 @@ class EventMediaInline(MediaItemInline):
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(SingletonAdmin):
     inlines = [HeroMediaInline]
-    fieldsets = [('Режим сайта', {'fields': ['demo_mode', 'demo_labels']}), ('Сайт', {'fields': ['site_url', 'city', 'analytics_token']}), ('Праздники', {'fields': ['holiday_mode', 'holiday_text']})]
+    fieldsets = [('Режим сайта', {'fields': ['demo_mode', 'demo_labels']}), ('Сайт', {'fields': ['site_url', 'city', 'analytics_token', 'turnstile_site_key']}), ('Праздники', {'fields': ['holiday_mode', 'holiday_text']})]
 
 
 @admin.register(Stat)

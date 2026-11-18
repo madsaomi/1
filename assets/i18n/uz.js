@@ -4,6 +4,9 @@
 // stays in Russian, so new content from the admin never breaks the page.
 window.stanfordUz = {
   strings: {
+    "Проверка «я не робот» не пройдена. Обновите страницу и попробуйте ещё раз.": "«Men robot emasman» tekşiruvidan ötilmadi. Sahifani yangilang va qaytadan urinib köring.",
+    "Проверка «я не робот» временно недоступна. Попробуйте через несколько минут.": "«Men robot emasman» tekşiruvi vaqtinça işlamayapti. Bir necha daqiqadan keyin urinib köring.",
+    "Подождите пару секунд: идёт проверка «я не робот».": "Bir-ikki soniya kuting: «men robot emasman» tekşiruvi ketmoqda.",
     "Главная": "Boş sahifa",
     "Путь по сайту": "Sahifa yöli",
     "Стоимость": "Narxi",

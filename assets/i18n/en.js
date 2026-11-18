@@ -1,6 +1,9 @@
 // English. Edit translations in the admin: «Переводы» (the strings block is rebuilt on publication).
 window.stanfordEn = {
   strings: {
+    "Проверка «я не робот» не пройдена. Обновите страницу и попробуйте ещё раз.": "The “I’m not a robot” check failed. Refresh the page and try again.",
+    "Проверка «я не робот» временно недоступна. Попробуйте через несколько минут.": "The “I’m not a robot” check is temporarily unavailable. Try again in a few minutes.",
+    "Подождите пару секунд: идёт проверка «я не робот».": "Please wait a couple of seconds: the “I’m not a robot” check is running.",
     "Главная": "Home",
     "Путь по сайту": "Breadcrumb",
     "Стоимость": "Price",

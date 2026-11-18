@@ -2,6 +2,9 @@
 // Owner translations published by the CMS may override these defaults.
 window.stanfordKaa = {
   strings: {
+    "Проверка «я не робот» не пройдена. Обновите страницу и попробуйте ещё раз.": "«Men robot emespen» tekseriwinen ótpedi. Betti jańalap, qaytadan urınıp kóriń.",
+    "Проверка «я не робот» временно недоступна. Попробуйте через несколько минут.": "«Men robot emespen» tekseriwi waqıtsha islemey tur. Bir neshe minuttan keyin urınıp kóriń.",
+    "Подождите пару секунд: идёт проверка «я не робот».": "Bir-eki sekund kútiń: «men robot emespen» tekseriwi júrip atır.",
     "Главная": "Bas bet",
     "Путь по сайту": "Sayttaǵı jol",
     "Стоимость": "Bahası",

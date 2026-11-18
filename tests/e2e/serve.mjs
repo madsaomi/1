@@ -23,7 +23,9 @@ const data = context.window.schoolContent;
 const fixture = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/content.json'), 'utf8'));
 const photo = 'assets/og-image.png';
 const day = days => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
-data.site = { ...data.site, demoMode: true, demoLabels: true, holiday: { mode: 'off' } };
+data.site = { ...data.site, demoMode: true, demoLabels: true, holiday: { mode: 'off' },
+  // Optional Cloudflare test key (for example 1x00000000000000000000AA) to see the «not a robot» check.
+  ...(process.env.E2E_TURNSTILE_KEY ? { turnstileSiteKey: process.env.E2E_TURNSTILE_KEY } : {}) };
 data.stats = fixture.stats;
 data.teachers = fixture.teachers.map((teacher, index) => ({ ...teacher,
   ...(index === 0 ? { media: [{ type: 'image', src: photo, alt: 'Пример: портрет' }, { type: 'image', src: photo, alt: 'Пример: на уроке' }] } : {}) }));
