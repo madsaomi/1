@@ -1,5 +1,4 @@
 // Progressive enhancement: programs and prices remain available without JavaScript.
-const content = window.schoolContent;
 const money = value => new Intl.NumberFormat('ru-RU').format(value);
 const filters = [...document.querySelectorAll('[data-filter]')];
 const cards = [...document.querySelectorAll('[data-course-id]')];

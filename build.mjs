@@ -617,7 +617,7 @@ export function renderCourses(courses, contacts = {}) {
 <div class="course-face course-back" id="course-details-${id}"><h4 class="course-back-title" tabindex="-1">${name}</h4><p class="course-description">${escapeHTML(course.description)}</p>
 <ul class="course-details" aria-label="В программе">${course.skills.map(skill => `<li>${svgIcon('check')}<span>${escapeHTML(skill)}</span></li>`).join('')}</ul>
 <a class="text-link course-page-link" href="courses/${id}" aria-label="Всё о курсе: ${name}">Всё о курсе${svgIcon('arrow-right')}</a>
-<div class="course-back-actions">${phone ? `<a class="button course-call" href="tel:${escapeHTML(phone)}" aria-label="Записаться: ${name}">${svgIcon('phone')}<span>Позвонить и записаться</span></a>` : ''}<button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${name}">Назад${svgIcon('arrow-right')}</button></div></div>
+<div class="course-back-actions">${phone ? `<a class="button course-call" href="tel:${escapeHTML(phone)}" aria-label="Позвонить и записаться: ${name}">${svgIcon('phone')}<span>Позвонить и записаться</span></a>` : ''}<button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${name}">Назад${svgIcon('arrow-right')}</button></div></div>
 </div>
 </article>`;
   }).join('\n');
@@ -796,7 +796,8 @@ export function generate(html, data) {
   html = replaceBlock(html, 'SEO', [renderMetadata(data.site), renderStructuredData(data.site, data.contacts)].filter(Boolean).join('\n'));
   html = html.replace(/<!-- CONTACT_START:([a-z]+) -->[\s\S]*?<!-- CONTACT_END:\1 -->/g, (_, key) => `<!-- CONTACT_START:${key} -->\n${renderContacts(data.contacts, { compact: key === 'dialog' })}\n<!-- CONTACT_END:${key} -->`);
   // Dictionaries are loaded only by the translated copies (/uz/, /kaa/, /en/), each its own one.
-  html = replaceBlock(html, 'ASSET_VERSIONS', '<script src="content.js"></script>');
+  // Everything from content.js is already in the HTML; the page does not download the data file.
+  html = replaceBlock(html, 'ASSET_VERSIONS', '');
   return versionContentAssets(html, data);
 }
 
@@ -1013,7 +1014,7 @@ export function renderCoursePage(course, data) {
   const others = data.courses.filter(other => other.id !== course.id);
   const discount = course.specialPrice ? data.texts?.['courses.discount'] : '';
   const actions = [
-    phone && `<a class="button" href="tel:${escapeHTML(phone)}" aria-label="Записаться: ${title}">${svgIcon('phone')}<span>Позвонить и записаться</span></a>`,
+    phone && `<a class="button" href="tel:${escapeHTML(phone)}" aria-label="Позвонить и записаться: ${title}">${svgIcon('phone')}<span>Позвонить и записаться</span></a>`,
     telegram && `<a class="button-outline" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer">${svgIcon('telegram')}<span>Написать в Telegram</span></a>`
   ].filter(Boolean).join('');
   const hero = `<nav class="wrap breadcrumbs" aria-label="Путь по сайту"><ol><li><a href="./">Главная</a></li><li><a href="./#courses">Курсы и цены</a></li><li aria-current="page">${title}</li></ol></nav>

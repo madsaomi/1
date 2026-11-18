@@ -140,6 +140,17 @@ test('explicit proxy trust counts from the nearest hop and ignores forged leftmo
   assert.equal((await submit(base, { 'x-forwarded-for': '203.0.113.9' })).status, 400);
 });
 
+test('one form accepts at most the hourly ceiling from all visitors together; the other form is not affected', async t => {
+  const base = await startApi(t, { HR_FORM_LIMIT_PER_HOUR: '3', HR_TRUST_PROXY_HOPS: '1' });
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const response = await submit(base, { 'x-forwarded-for': `198.51.100.${attempt + 1}` });
+    assert.equal(response.status, attempt < 3 ? 400 : 429, `attempt ${attempt + 1}`);
+  }
+  const complaint = await fetch(`${base}/feedback`, { method: 'POST', headers: {
+    origin, 'content-type': 'application/json', 'x-career-request': '1' }, body: '{}' });
+  assert.equal(complaint.status, 400, 'Complaints keep their own ceiling');
+});
+
 test('invalid proxy hop settings prevent startup', async () => {
   for (const hops of ['-1', '1.5', '11', 'true']) {
     const child = spawn(process.execPath, ['server.mjs'], { cwd: directory,

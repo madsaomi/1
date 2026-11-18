@@ -10,6 +10,7 @@
     "check": "node --check script.js && node --check content.js && node --check theme-init.js && node --check assets/i18n/uz.js && node --check assets/i18n/kaa.js && node --check assets/i18n/en.js && node --check assets/i18n/privacy-en.js && node --check assets/i18n/language.js && node --check assets/course-flip.js && node --check assets/directory-view.js && node --check assets/media-gallery.js && node --check assets/carousel.js && node --check assets/lang-menu.js && node --check assets/holiday.js && node --check feedback.js && node --check assets/i18n/privacy-uz.js && node --check assets/i18n/privacy-kaa.js && node --check results.js && node --check career.js && node build.mjs --check && npm test && python tests/validate_html.py"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@playwright/test": "1.56.1"
   }
 }

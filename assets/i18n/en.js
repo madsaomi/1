@@ -399,6 +399,7 @@ window.stanfordEn = {
     "Не удалось отправить анкету. Проверьте интернет и попробуйте снова.": "Could not send the application. Check your internet and try again."
   },
   patterns: [
+    [/^Позвонить и записаться: (.+)$/, (m, t) => `Call to sign up: ${t(m[1])}`],
     [/^Всё о курсе: (.+)$/, (m, t) => `About the course: ${t(m[1])}`],
     [/^(.+) — курс в Нукусе \| Stanford$/, (m, t) => `${t(m[1])} — course in Nukus | Stanford`],
     [/^Фото и видео: (.+)$/, (m, t) => `Photos and videos: ${t(m[1])}`],

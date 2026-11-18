@@ -397,6 +397,7 @@ window.stanfordKaa = {
     "Готово": "Tayar"
   },
   patterns: [
+    [/^Позвонить и записаться: (.+)$/, (m, t) => `Qońıraw etip jazılıw: ${t(m[1])}`],
     [/^Всё о курсе: (.+)$/, (m, t) => `Kurs haqqında tolıq: ${t(m[1])}`],
     [/^(.+) — курс в Нукусе \| Stanford$/, (m, t) => `${t(m[1])} — Nókistegi kurs | Stanford`],
     [/^Фото и видео: (.+)$/, (m, t) => `Foto hám video: ${t(m[1])}`],

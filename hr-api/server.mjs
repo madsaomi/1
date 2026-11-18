@@ -40,12 +40,28 @@ const configured = path => (path === '/feedback' ? FEEDBACK_CONFIGURED : INTAKE_
 const MAX_BODY = 3.5 * 1024 * 1024;
 const RATE_WINDOW = 30 * 60 * 1000;
 const RATE_LIMIT = 4;
+// A ceiling for each form from all visitors together: a flood from many addresses cannot bury the Telegram chat.
+const FORM_WINDOW = 60 * 60 * 1000;
+const FORM_LIMIT = Number(process.env.HR_FORM_LIMIT_PER_HOUR || 40);
+if (!Number.isInteger(FORM_LIMIT) || FORM_LIMIT < 1 || FORM_LIMIT > 1000) {
+  throw new Error('HR_FORM_LIMIT_PER_HOUR must be an integer from 1 to 1000');
+}
 
 const attempts = new Map();
+const formAttempts = new Map();
+let proxyWarningShown = false;
 
 function clientIp(request) {
   const remote = request.socket.remoteAddress || 'unknown';
-  if (TRUST_PROXY_HOPS === 0) return remote;
+  if (TRUST_PROXY_HOPS === 0) {
+    // Behind Caddy every visitor arrives from the proxy address and they would share one limit.
+    if (request.headers['x-forwarded-for'] && !proxyWarningShown) {
+      proxyWarningShown = true;
+      console.warn('[limits] requests come through a proxy, but HR_TRUST_PROXY_HOPS=0: all visitors share one limit. '
+        + 'Behind the site Caddy set HR_TRUST_PROXY_HOPS=1 (see README).');
+    }
+    return remote;
+  }
   // Count from the nearest proxy. A supplied leftmost XFF must never select the rate-limit key.
   const forwarded = String(request.headers['x-forwarded-for'] || '').split(',').map(value => value.trim());
   const chain = [...forwarded, remote];
@@ -66,6 +82,15 @@ function rateLimited(ip) {
     for (const [key, times] of attempts) if (!times.some(time => now - time < RATE_WINDOW)) attempts.delete(key);
   }
   return false;
+}
+
+function formBusy(path) {
+  const now = Date.now();
+  const recent = (formAttempts.get(path) || []).filter(time => now - time < FORM_WINDOW);
+  const busy = recent.length >= FORM_LIMIT;
+  if (!busy) recent.push(now);
+  formAttempts.set(path, recent);
+  return busy;
 }
 
 function send(response, status, payload) {
@@ -192,6 +217,11 @@ const server = http.createServer(async (request, response) => {
   }
   // Separate limits per form; the address is only kept in memory for the limit and never sent anywhere.
   if (rateLimited(`${url.pathname}:${clientIp(request)}`)) {
+    send(response, 429, { ok: false, error: 'rate_limited' });
+    return;
+  }
+  if (formBusy(url.pathname)) {
+    console.warn(`[limits] ${url.pathname}: more than ${FORM_LIMIT} submissions in an hour, new ones wait`);
     send(response, 429, { ok: false, error: 'rate_limited' });
     return;
   }

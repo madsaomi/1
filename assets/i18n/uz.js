@@ -381,6 +381,7 @@ window.stanfordUz = {
   // Texts with numbers, names or two translatable halves. Each entry: [regular expression, builder];
   // the builder gets the match and the translate function for the parts.
   patterns: [
+    [/^Позвонить и записаться: (.+)$/, (m, t) => `Qönğiroq qiliş va yoziliş: ${t(m[1])}`],
     [/^Всё о курсе: (.+)$/, (m, t) => `Kurs haqida batafsil: ${t(m[1])}`],
     [/^(.+) — курс в Нукусе \| Stanford$/, (m, t) => `${t(m[1])} — Nukusdagi kurs | Stanford`],
     [/^Фото и видео: (.+)$/, (m, t) => `Foto va video: ${t(m[1])}`],

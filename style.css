@@ -1,4 +1,19 @@
 /* Stanford product UI. Local assets, mobile first, no runtime dependencies. */
+/* Contents, top to bottom (the order matters: later layers refine earlier ones, so new rules go at the end
+   of their layer or in a new section at the end, never in the middle):
+   1. Fonts and design tokens (:root, dark theme)            — colours, spacing, radii; only CSS variables
+   2. Base, header, phone menu, hero                        — the first screen of every page
+   3. Home sections: courses, stats, teachers, results, cashback, FAQ, branches and map
+   4. Motion layer                                          — reveal, stagger, springs; off with reduced motion
+   5. Lively sections: practice, «how to start», partners, results page
+   6. Career form
+   7. Showcase parts of assets/ui.js: pill navigation, text loop, rolling counters, badge, scroll band
+   8. Shared layout layer                                   — calm surfaces and spacing on every page (refines 2–7)
+   9. Later components: events, contacts, directory views, galleries, flip cards, family price,
+      complaints form, call bar
+  10. Course pages (/courses/<code>)
+   Checks after any change: npm run check, npm run e2e; for clean-ups without visual change compare
+   computed styles of every element before and after (see CLAUDE.md, «Проверки»). */
 @font-face {
   font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
   src: url('assets/fonts/inter-cyrillic-wght-normal.woff2') format('woff2');
@@ -634,7 +649,6 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   details[open]::details-content { block-size: auto; }
 }
 @media print { .stagger > * { opacity: 1 !important; transform: none !important; } }
-@keyframes panel-enter { from { opacity: .7; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes content-enter { from { opacity: .65; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (min-width: 768px) {
   .course-grid, .cashback-grid { margin-inline: 0; padding: 0; overflow: visible; scroll-snap-type: none; }
@@ -856,7 +870,7 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
 .results-back-label { white-space: nowrap; }
 @media (max-width: 560px) {
   .results-back { padding-inline: 12px; }
-  .results-back-label { display: none; }
+  .results-back-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 
 /* The new surfaces follow the same reduced-transparency rule as the glass layer. */
@@ -1404,11 +1418,10 @@ html[data-theme] footer { padding-block: var(--space-3); background: var(--surfa
 .media-gallery-slide { position: relative; flex: 0 0 100%; min-width: 0; height: 100%; margin: 0; scroll-snap-align: start; scroll-snap-stop: always; }
 .media-gallery-slide > :is(img, video) { display: block; width: 100%; height: 100%; max-width: 100%; object-fit: cover; border-radius: 0; }
 .media-gallery-slide > video { object-fit: contain; background: var(--dark-panel); }
-.media-gallery-controls { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 48px; padding: 4px 8px; background: var(--dark-panel); color: var(--on-dark); }
-.media-gallery-controls button { display: inline-grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 1px solid var(--on-dark-muted); border-radius: 12px; background: var(--dark-panel); color: var(--on-dark); }
-.media-gallery-controls button:hover { background: var(--on-dark); color: var(--dark-panel); }
+.media-gallery-controls { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); color: var(--on-dark); }
+.media-gallery-controls button { display: inline-grid; place-items: center; flex: 0 0 44px; padding: 0; }
 .media-gallery-controls button:focus-visible { outline-color: var(--brand); }
-.media-gallery-controls [role="status"] { font-size: var(--text-14); font-variant-numeric: tabular-nums; }
+.media-gallery-controls [role="status"] { font-variant-numeric: tabular-nums; }
 .hero-visual:has([data-media-gallery]) { display: flex; flex-direction: column; gap: var(--space-2); align-self: center; }
 .hero-visual > .media-gallery { width: 100%; }
 .hero-visual:has([data-media-gallery]) > picture { display: none; }
@@ -1540,7 +1553,6 @@ html[data-theme] footer { padding-block: var(--space-3); background: var(--surfa
 /* A teacher without a photo gets the logo in the same portrait frame as a photo, so the grid stays even. */
 .profile-card-teacher.is-flip-ready .profile-cover:has(.profile-brand) { aspect-ratio: 3 / 4; }
 /* Teacher galleries: a square frame, so with the arrows and name below the card matches a portrait card. */
-.profile-card-teacher.is-flip-ready .profile-cover--gallery .media-gallery-track { aspect-ratio: 1 / 1; }
 /* Student logo placeholder: the same 16:10 frame as a certificate photo gallery. */
 .profile-card-result.is-flip-ready .profile-cover:has(.profile-brand) { aspect-ratio: 16 / 10; }
 
@@ -1555,7 +1567,7 @@ img[src$="stanford-icon.svg"] { object-fit: contain; }
 
 /* Home teacher cards: one column with the cover on top, so photo, gallery and logo cards line up. */
 .team-grid .teacher-card { grid-template-columns: minmax(0, 1fr); align-content: start; }
-.team-grid .teacher-card > .teacher-photo { width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: 16px; }
+.team-grid .teacher-card > .teacher-photo { width: 100%; height: auto; border-radius: 16px; }
 
 /* Planned events: one row that scrolls sideways, with arrows and dots under it. */
 .events-grid.carousel-track { display: flex; gap: var(--space-2); overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }

@@ -13,7 +13,7 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     ...(process.env.CI ? {} : { channel: 'chrome' }),
-    reducedMotion: 'reduce',
+    contextOptions: { reducedMotion: 'reduce' },
     trace: 'retain-on-failure'
   },
   projects: [

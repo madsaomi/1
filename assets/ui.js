@@ -85,9 +85,12 @@
   each('[data-roll]', element => {
     const value = element.textContent.trim();
     if (reduced.matches || !/\d/.test(value)) return;
-    element.setAttribute('aria-label', value);
     element.textContent = '';
     element.classList.add('roll');
+    const spoken = document.createElement('span');
+    spoken.className = 'sr-only';
+    spoken.textContent = value;
+    element.append(spoken);
     const strips = [];
     for (const char of value) {
       const cell = document.createElement('span');
