@@ -52,8 +52,8 @@ jobs:
           curl -fsS http://localhost:8080/ -o /tmp/stanford-home.html
           grep -q Stanford /tmp/stanford-home.html
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/assets/i18n/uz.js)" = "200"
-          for prefix in '' /uz /kaa; do
-            for page in results teachers career privacy; do
+          for prefix in '' /uz /kaa /en; do
+            for page in results teachers career privacy feedback; do
               test "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080${prefix}/${page}")" = "200"
               curl -sS -D /tmp/stanford-redirect.txt -o /dev/null "http://localhost:8080${prefix}/${page}.html?source=smoke"
               grep -qE '^HTTP/[^ ]+ 301([[:space:]]|$)' /tmp/stanford-redirect.txt
@@ -63,10 +63,46 @@ jobs:
             grep -qE '^HTTP/[^ ]+ 301([[:space:]]|$)' /tmp/stanford-redirect.txt
             tr -d '\r' < /tmp/stanford-redirect.txt | grep -qiFx "Location: ${prefix}/?source=smoke"
           done
+          for page in /courses/ielts /uz/courses/ielts /kaa/courses/sat /en/courses/math; do
+            test "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080${page}")" = "200"
+          done
+          curl -sS -D /tmp/stanford-redirect.txt -o /dev/null "http://localhost:8080/uz/courses/ielts.html"
+          tr -d '\r' < /tmp/stanford-redirect.txt | grep -qiFx "Location: /uz/courses/ielts"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/results.js)" = "200"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/no-such-page)" = "404"
           curl -fsSI http://localhost:8080/ -o /tmp/stanford-headers.txt
           grep -qi '^content-security-policy:' /tmp/stanford-headers.txt
+
+  browser:
+    name: Browser tests (phone and desktop)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Playwright
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Click through the site
+        run: npm run e2e
+
+      - name: Keep traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
 
   cms:
     name: Content admin (Django) on Postgres

@@ -20,7 +20,9 @@ class NoRedirect(HTTPRedirectHandler):
 
 SOURCE_FILES = ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html',
                 'assets/i18n/uz.js', 'assets/i18n/kaa.js', 'assets/i18n/en.js', 'assets/i18n/privacy-uz.js', 'assets/i18n/privacy-kaa.js',
-                'assets/i18n/privacy-en.js')
+                'assets/i18n/privacy-en.js', 'templates/course.html')
+# One generated page per course and its translated copies; the set follows the courses in the admin.
+COURSE_PAGE = re.compile(r'(?:(?:uz|kaa|en)/)?courses/[a-z0-9-]+\.html\Z')
 OUTPUT_FILES = frozenset(('content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html',
                           'assets/i18n/uz.js', 'assets/i18n/kaa.js', 'assets/i18n/en.js', 'robots.txt', 'sitemap.xml',
                           *(f'{lang}/{page}' for lang in ('uz', 'kaa', 'en')
@@ -135,15 +137,16 @@ class GitHubClient:
             raise GitHubError('Суммарный размер публикации превышает 128 МБ.')
         changed = {}
         for path, content in files.items():
-            if path not in OUTPUT_FILES and not MANAGED_MEDIA.fullmatch(path):
+            if path not in OUTPUT_FILES and not MANAGED_MEDIA.fullmatch(path) and not COURSE_PAGE.fullmatch(path):
                 raise GitHubError('Публикация содержит файл вне разрешённого списка.')
             if len(content) > MAX_ASSET_BYTES:
                 raise GitHubError('Файл публикации превышает 8 МБ.')
             if snapshot['entries'].get(path, {}).get('sha') != blob_sha(content):
                 changed[path] = content
         removals = set(delete_paths)
-        if any(not MANAGED_MEDIA.fullmatch(path) or path in files or path not in snapshot['entries'] for path in removals):
-            raise GitHubError('Удалять можно только старые управляемые фото и видео вне текущей публикации.')
+        if any(not (MANAGED_MEDIA.fullmatch(path) or COURSE_PAGE.fullmatch(path)) or path in files or path not in snapshot['entries']
+               for path in removals):
+            raise GitHubError('Удалять можно только старые фото, видео и страницы удалённых курсов вне текущей публикации.')
         if self.head() != snapshot['parent']:
             raise GitHubError('Ветка изменилась во время сборки. Повторите публикацию с актуальными исходниками.')
         if not changed and not removals:

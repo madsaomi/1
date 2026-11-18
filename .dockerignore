@@ -24,6 +24,8 @@
 !kaa/**
 !en/
 !en/**
+!courses/
+!courses/**
 
 **/*.zip
 **/*.rar

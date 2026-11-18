@@ -230,6 +230,10 @@ class FullPublicationIntegrationTests(TestCase):
                      'script.js', 'results.js', 'career.js', 'theme-init.js', 'style.css', 'robots.txt', 'sitemap.xml'):
             shutil.copyfile(settings.SITE_ROOT / name, site / name)
         shutil.copytree(settings.SITE_ROOT / 'assets', site / 'assets')
+        shutil.copytree(settings.SITE_ROOT / 'templates', site / 'templates')
+        # A page of a course that is no longer in the admin; publication removes it.
+        (site / 'courses').mkdir()
+        (site / 'courses' / 'removed-course.html').write_text('<!doctype html>', encoding='utf-8')
         return site
 
     def edit_draft_and_upload_photo(self):
@@ -256,6 +260,11 @@ class FullPublicationIntegrationTests(TestCase):
             self.assertTrue(result['changed'])
             data = read_content(site / 'content.js')
             self.assertEqual(data['texts']['hero.text1'], 'Текст интеграционного теста публикации')
+            # Every published course gets its page and translated copies; the removed course loses its page.
+            for course in data['courses']:
+                for prefix in ('', 'uz/', 'kaa/', 'en/'):
+                    self.assertTrue((site / f"{prefix}courses/{course['id']}.html").is_file(), f"{prefix}{course['id']}")
+            self.assertFalse((site / 'courses' / 'removed-course.html').exists())
             self.assertIn('Текст интеграционного теста публикации', (site / 'index.html').read_text(encoding='utf-8'))
             for code, expected in (('uz', 'Nashr sinovi'), ('kaa', 'Járiyalaw sınawı')):
                 dictionary = site / 'assets' / 'i18n' / f'{code}.js'

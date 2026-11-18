@@ -1,6 +1,13 @@
 // English. Edit translations in the admin: «Переводы» (the strings block is rebuilt on publication).
 window.stanfordEn = {
   strings: {
+    "Главная": "Home",
+    "Путь по сайту": "Breadcrumb",
+    "Стоимость": "Price",
+    "Что входит в курс": "What the course includes",
+    "Филиалы и график работы": "Branches and opening hours",
+    "Другие курсы": "Other courses",
+    "Всё о курсе": "About the course",
     "Политика конфиденциальности и обработки персональных данных ООО «Stanford Language Center», г. Нукус.": "Privacy and personal data processing policy of «Stanford Language Center» LLC, Nukus.",
     "Как Stanford Language Center обрабатывает и защищает персональные данные.": "How Stanford Language Center processes and protects personal data.",
     "Сумма уточняется": "Amount to be announced",
@@ -389,6 +396,8 @@ window.stanfordEn = {
     "Не удалось отправить анкету. Проверьте интернет и попробуйте снова.": "Could not send the application. Check your internet and try again."
   },
   patterns: [
+    [/^Всё о курсе: (.+)$/, (m, t) => `About the course: ${t(m[1])}`],
+    [/^(.+) — курс в Нукусе \| Stanford$/, (m, t) => `${t(m[1])} — course in Nukus | Stanford`],
     [/^Фото и видео: (.+)$/, (m, t) => `Photos and videos: ${t(m[1])}`],
     [/^(.+)\. Программ: (\d+)\.$/, (m, t) => `${t(m[1])}. Programmes: ${m[2]}.`],
     [/^до ([\d\s]+) сум$/, m => `up to ${m[1]} UZS`],

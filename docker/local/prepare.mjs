@@ -2,7 +2,7 @@ import { cpSync, existsSync, writeFileSync, readFileSync, readdirSync } from 'no
 import vm from 'node:vm';
 const marker = '/site/.local-initialized';
 if (!existsSync(marker)) {
-  for (const path of ['build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html', 'results.js', 'career.js', 'feedback.js', 'script.js', 'theme-init.js', 'style.css', 'robots.txt', 'assets']) {
+  for (const path of ['build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html', 'results.js', 'career.js', 'feedback.js', 'script.js', 'theme-init.js', 'style.css', 'robots.txt', 'assets', 'templates']) {
     cpSync(`/source/${path}`, `/site/${path}`, { recursive: true });
   }
   writeFileSync(marker, 'Local isolated site copy\n');
@@ -11,6 +11,7 @@ if (!existsSync(marker)) {
 for (const path of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html', 'results.js', 'career.js', 'feedback.js', 'script.js', 'theme-init.js', 'style.css', 'robots.txt']) {
   cpSync(`/source/${path}`, `/site/${path}`);
 }
+cpSync('/source/templates', '/site/templates', { recursive: true });
 console.log('Local site volume ready; repository files are read-only.');
 // Refresh code and bundled artwork, but never overwrite CMS uploads or translations.
 for (const entry of readdirSync('/source/assets')) {

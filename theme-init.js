@@ -11,8 +11,8 @@
     const lang = localStorage.getItem('stanford-lang');
     const root = document.documentElement;
     if (['uz', 'kaa', 'en'].includes(lang) && !root.dataset.langPage && document.querySelector(`link[rel="alternate"][hreflang="${lang}"]`)) {
-      const cut = location.pathname.lastIndexOf('/') + 1;
-      location.replace(`${location.pathname.slice(0, cut)}${lang}/${location.pathname.slice(cut)}${location.search}${location.hash}`);
+      // Copies sit under /uz/, /kaa/ and /en/ at the site root: /courses/ielts → /uz/courses/ielts.
+      location.replace(`/${lang}${location.pathname}${location.search}${location.hash}`);
     }
   } catch { /* Without storage the page stays as it is. */ }
 })();

@@ -41,7 +41,7 @@ test('every public page has current /uz/ and /kaa/ copies with their own address
       }
       // Every local file the copy needs exists one folder up.
       for (const [, url] of copy.matchAll(/\s(?:src|href)="([^"#?]+)(?:[?#][^"]*)?"/g)) {
-        if (/^(?:[a-z]+:|\/)/.test(url) || /^(?:\.\/|(?:index|results|teachers|career|privacy|feedback)(?:\.html)?)$/.test(url)) continue;
+        if (/^(?:[a-z]+:|\/)/.test(url) || /^(?:\.\/|(?:index|results|teachers|career|privacy|feedback|courses\/[a-z0-9-]+)(?:\.html)?)$/.test(url)) continue;
         assert(url.startsWith('../'), `${lang}/${page}: ${url} must point one folder up`);
         assert(fs.existsSync(new URL(`../${lang}/${url}`, import.meta.url)), `${lang}/${page}: missing ${url}`);
       }

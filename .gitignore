@@ -14,6 +14,8 @@ desktop.ini
 __pycache__/
 *.py[cod]
 .playwright-mcp/
+test-results/
+playwright-report/
 
 # Local environment and private configuration
 .env

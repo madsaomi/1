@@ -4,6 +4,13 @@
 // stays in Russian, so new content from the admin never breaks the page.
 window.stanfordUz = {
   strings: {
+    "Главная": "Boş sahifa",
+    "Путь по сайту": "Sahifa yöli",
+    "Стоимость": "Narxi",
+    "Что входит в курс": "Kursga nimalar kiradi",
+    "Филиалы и график работы": "Filiallar va iş vaqti",
+    "Другие курсы": "Boşqa kurslar",
+    "Всё о курсе": "Kurs haqida batafsil",
     "Семья или 2 курса": "Oila yoki 2 kurs",
     "Скидка действует, если из одной семьи занимаются 2 ученика или один ученик записан на 2 курса. Условия и итоговую стоимость подтвердите перед оплатой.": "Bir oiladan 2 öquvçi öqisa yoki bitta öquvçi 2 ta kursga yozilsa, çegirma amal qiladi. Şartlar va yakuniy narxni tölovdan oldin aniqlang.",
     "Фото и видео": "Foto va video",
@@ -371,6 +378,8 @@ window.stanfordUz = {
   // Texts with numbers, names or two translatable halves. Each entry: [regular expression, builder];
   // the builder gets the match and the translate function for the parts.
   patterns: [
+    [/^Всё о курсе: (.+)$/, (m, t) => `Kurs haqida batafsil: ${t(m[1])}`],
+    [/^(.+) — курс в Нукусе \| Stanford$/, (m, t) => `${t(m[1])} — Nukusdagi kurs | Stanford`],
     [/^Фото и видео: (.+)$/, (m, t) => `Foto va video: ${t(m[1])}`],
     [/^Написать в Telegram: (.+)$/, m => `Telegramga yoziş: ${m[1]}`],
     [/^\/ 400 · максимум (\d+) слов$/, m => `/ 400 · köpi bilan ${m[1]} ta söz`],

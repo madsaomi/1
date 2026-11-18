@@ -28,6 +28,21 @@ class GitHubPublicationTests(SimpleTestCase):
             with self.assertRaises(GitHubError):
                 client.publish(snapshot, {'index.html': b'same'}, delete_paths=[path])
 
+    def test_course_pages_are_published_and_pages_of_removed_courses_leave_with_them(self):
+        client = self.github()
+        old = 'uz/courses/old-course.html'
+        snapshot = {'parent': 'parent', 'tree': 'tree', 'entries': {old: {'sha': 'old'}}}
+        responses = [{'sha': 'blob'}, {'sha': 'new-tree'}, {'sha': 'commit'}, {}]
+        with mock.patch.object(client, 'head', return_value='parent'), mock.patch.object(client, 'request', side_effect=responses) as request:
+            client.publish(snapshot, {'courses/ielts.html': b'<html>'}, delete_paths=[old])
+        tree = request.call_args_list[1].args[2]['tree']
+        self.assertEqual({entry['path'] for entry in tree}, {'courses/ielts.html', old})
+        for path in ['courses/../index.html', 'courses/IELTS.html', 'ru/courses/ielts.html', 'courses/ielts.js']:
+            with self.assertRaises(GitHubError):
+                client.publish(snapshot, {path: b'x'})
+        with self.assertRaises(GitHubError):
+            client.publish(snapshot, {}, delete_paths=['courses/never-published.html'])
+
     def github(self):
         return GitHubClient('owner/site', 'main', 'test-token')
 

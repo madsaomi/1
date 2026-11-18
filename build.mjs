@@ -272,9 +272,10 @@ export function renderRobotsTxt(site) {
   return `${lines.join('\n')}\n`;
 }
 
-export function renderSitemap(site) {
+export function renderSitemap(site, courses = []) {
   const base = site?.url ? (site.url.endsWith('/') ? site.url : `${site.url}/`) : '';
-  const urls = base && !site.demoMode ? ['ru', ...LANGUAGES].flatMap(lang => SITEMAP_PAGES.map(page => `  <url><loc>${escapeHTML(pageAddress(site, page, lang))}</loc></url>`)).join('\n') : '';
+  const pages = [...SITEMAP_PAGES, ...courses.map(course => `courses/${course.id}`)];
+  const urls = base && !site.demoMode ? ['ru', ...LANGUAGES].flatMap(lang => pages.map(page => `  <url><loc>${escapeHTML(pageAddress(site, page, lang))}</loc></url>`)).join('\n') : '';
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls ? `${urls}\n` : ''}</urlset>\n`;
 }
 
@@ -304,7 +305,7 @@ export const LANGUAGES = ['uz', 'kaa', 'en'];
 const PACK_NAMES = { uz: 'stanfordUz', kaa: 'stanfordKaa', en: 'stanfordEn' };
 const TRANSLATED_ATTRIBUTES = new Set(['aria-label', 'alt', 'title', 'placeholder', 'content']);
 const URL_ATTRIBUTES = new Set(['src', 'href', 'poster']);
-const PAGE_LINK = /^(?:\.\/|(?:index|results|teachers|career|privacy|feedback)(?:\.html)?)(?:[?#].*)?$/;
+const PAGE_LINK = /^(?:\.\/|(?:index|results|teachers|career|privacy|feedback|courses\/[a-z0-9-]+)(?:\.html)?)(?:[?#].*)?$/;
 const CYRILLIC = /[А-Яа-яЁё]/;
 const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' };
 
@@ -605,6 +606,7 @@ export function renderCourses(courses, contacts = {}) {
 <a class="course-enroll-btn course-flip-toggle" href="#course-details-${id}" data-flip-open aria-controls="course-details-${id}" aria-expanded="false" aria-label="Подробнее: ${name}">Подробнее${svgIcon('arrow-right')}</a></div>
 <div class="course-face course-back" id="course-details-${id}"><h4 class="course-back-title" tabindex="-1">${name}</h4><p class="course-description">${escapeHTML(course.description)}</p>
 <ul class="course-details" aria-label="В программе">${course.skills.map(skill => `<li>${svgIcon('check')}<span>${escapeHTML(skill)}</span></li>`).join('')}</ul>
+<a class="text-link course-page-link" href="courses/${id}" aria-label="Всё о курсе: ${name}">Всё о курсе${svgIcon('arrow-right')}</a>
 <div class="course-back-actions">${phone ? `<a class="button course-call" href="tel:${escapeHTML(phone)}" aria-label="Записаться: ${name}">${svgIcon('phone')}<span>Позвонить и записаться</span></a>` : ''}<button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${name}">Назад${svgIcon('arrow-right')}</button></div></div>
 </div>
 </article>`;
@@ -945,6 +947,118 @@ export function generateFeedback(html, data) {
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
 
+// ---------- Course pages: /courses/<code> and the translated copies /uz/courses/<code> … ----------
+// One page per course from the admin, built from templates/course.html. Only published data is shown:
+// the course card, results of students of this course (or the best results of the centre), branches and other courses.
+export const COURSE_TEMPLATE = new URL('./templates/course.html', import.meta.url);
+const plain = value => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+const courseTitle = course => [course.name, course.subtitle].filter(Boolean).join(' ');
+
+// A result belongs to a course when its exam or its course line names the course (IELTS ↔ «IELTS, 4 месяца»).
+export function courseResults(course, results = []) {
+  const name = plain(course.name);
+  return results.filter(result => [plain(result.exam), plain(result.course).split(/[,·(]/)[0].trim()].some(value => value === name || value === course.id));
+}
+
+// A teacher belongs to a course when the role lists it: «General English · IELTS».
+export function courseTeachers(course, teachers = []) {
+  const name = plain(course.name);
+  return teachers.filter(teacher => plain(teacher.role).split(/[·,/]/).some(part => part.trim() === name));
+}
+
+function renderCourseMeta(course) {
+  const title = escapeHTML(`${courseTitle(course)} — курс в Нукусе | Stanford`);
+  const description = escapeHTML(course.description);
+  return `<title>${title}</title>\n<meta name="description" content="${description}">\n<meta property="og:type" content="website">\n<meta property="og:title" content="${title}">\n<meta property="og:description" content="${description}">`;
+}
+
+// Machine-readable course card for search engines (a data block, never executed).
+export function renderCourseData(course, site) {
+  if (!site?.url) return '';
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'Course',
+    name: courseTitle(course),
+    description: course.description,
+    url: pageAddress(site, `courses/${course.id}`),
+    provider: { '@type': 'EducationalOrganization', name: 'Stanford Language Center', url: site.url },
+    offers: { '@type': 'Offer', category: 'Paid', price: course.price, priceCurrency: 'UZS' }
+  };
+  return `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`;
+}
+
+const featuredFirst = list => [...list].sort((a, b) => (b.featured === true) - (a.featured === true));
+
+export function renderCoursePage(course, data) {
+  const { contacts = {}, site } = data;
+  const id = escapeHTML(course.id);
+  const title = escapeHTML(courseTitle(course));
+  const phone = contacts.verified ? contacts.phones?.[0] : '';
+  const telegram = contacts.verified ? contacts.telegrams?.[0] : '';
+  const own = courseResults(course, data.results);
+  const results = featuredFirst(own.length ? own : data.results || []).slice(0, HOME_LIMIT);
+  const teachers = courseTeachers(course, data.teachers);
+  const others = data.courses.filter(other => other.id !== course.id);
+  const discount = course.specialPrice ? data.texts?.['courses.discount'] : '';
+  const actions = [
+    phone && `<a class="button" href="tel:${escapeHTML(phone)}" aria-label="Записаться: ${title}">${svgIcon('phone')}<span>Позвонить и записаться</span></a>`,
+    telegram && `<a class="button-outline" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer">${svgIcon('telegram')}<span>Написать в Telegram</span></a>`
+  ].filter(Boolean).join('');
+  const hero = `<nav class="wrap breadcrumbs" aria-label="Путь по сайту"><ol><li><a href="./">Главная</a></li><li><a href="./#courses">Курсы и цены</a></li><li aria-current="page">${title}</li></ol></nav>
+<section class="section wrap course-page-hero" aria-labelledby="course-title">
+<div class="course-page-intro"><div class="section-label">Stanford Language Center</div><h1 id="course-title">${escapeHTML(course.name)}${course.subtitle ? ` <span class="course-subtitle">${escapeHTML(course.subtitle)}</span>` : ''}</h1><p class="course-page-lead">${escapeHTML(course.description)}</p>${actions ? `<div class="course-page-actions">${actions}</div>` : ''}</div>
+<aside class="course-page-price" aria-labelledby="course-price-title"><h2 class="course-page-price-title" id="course-price-title">Стоимость</h2><p class="course-price"><strong>${money(course.price)}</strong> <span>сум / месяц</span></p>${course.specialPrice ? `<p class="course-special"><span>Семья или 2 курса</span><strong>${money(course.specialPrice)} сум</strong></p>` : ''}${discount ? `<p class="course-page-note">${escapeHTML(discount)}</p>` : ''}</aside>
+</section>`;
+  const program = `<section class="section wrap course-page-section" aria-labelledby="course-program-title"><h2 id="course-program-title">Что входит в курс</h2><ul class="course-details course-page-details">${course.skills.map(skill => `<li>${svgIcon('check')}<span>${escapeHTML(skill)}</span></li>`).join('')}</ul></section>`;
+  const resultsSection = results.length ? `<section class="section wrap course-page-section results-section" aria-labelledby="course-results-title"><div class="section-top"><h2 id="course-results-title">Результаты учеников${demoTag(site)}</h2></div>
+${renderCarousel('results-grid home-carousel', 'course-results-title', renderResultCards(results))}
+<a class="text-link results-more" href="results">Все результаты${svgIcon('arrow-right')}</a></section>` : '';
+  const teachersSection = teachers.length ? `<section class="section wrap course-page-section" aria-labelledby="course-teachers-title"><div class="section-top"><h2 id="course-teachers-title">Преподаватели${demoTag(site)}</h2></div>
+${renderTeachers(teachers, site, { heading: false })}
+<a class="text-link results-more" href="teachers">Все преподаватели${svgIcon('arrow-right')}</a></section>` : '';
+  const providers = { google: 'Google Maps', yandex: 'Яндекс Карты' };
+  const branches = contacts.verified && contacts.locations?.length ? `<section class="section wrap course-page-section" aria-labelledby="course-branches-title"><h2 id="course-branches-title">Филиалы и график работы</h2><div class="course-page-branches">${contacts.locations.map(location => `<article class="course-branch"><h3>${escapeHTML(location.name)}</h3><p>${escapeHTML(location.address)}</p>${location.hours ? `<p class="location-hours">${svgIcon('clock')}<span>${escapeHTML(location.hours)}</span></p>` : ''}${location.maps?.length ? `<p class="course-branch-maps">${location.maps.map(map => `<a class="text-link" href="${escapeHTML(map.url)}" target="_blank" rel="noopener noreferrer">${svgIcon('map-pin')}<span>${providers[map.provider] || 'Карта'}</span></a>`).join('')}</p>` : ''}</article>`).join('')}</div></section>` : '';
+  const more = others.length ? `<section class="section wrap course-page-section" aria-labelledby="course-more-title"><h2 id="course-more-title">Другие курсы</h2><ul class="course-page-others">${others.map(other => `<li><a href="courses/${escapeHTML(other.id)}"><span class="course-other-name">${escapeHTML(other.name)}${other.subtitle ? ` <span class="course-subtitle">${escapeHTML(other.subtitle)}</span>` : ''}</span><span class="course-other-price"><strong>${money(other.price)}</strong> <span>сум / месяц</span></span>${svgIcon('arrow-right')}</a></li>`).join('')}</ul></section>` : '';
+  return `<div class="course-page-main" data-course-page="${id}">${hero}\n${program}\n${resultsSection}\n${teachersSection}\n${branches}\n${more}</div>`;
+}
+
+export function generateCoursePage(html, course, data) {
+  html = html.replace(/\r\n/g, '\n');
+  html = replaceBlock(html, 'COURSE_META', renderCourseMeta(course));
+  html = replaceBlock(html, 'COURSE', renderCoursePage(course, data));
+  html = replaceBlock(html, 'COURSE_DATA', renderCourseData(course, data.site));
+  html = replaceBlock(html, 'FAB', renderContactFab(data.contacts));
+  html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
+  html = replaceBlock(html, 'HOLIDAY', renderHoliday(data.site));
+  html = replaceBlock(html, 'SEO', renderMetadata(data.site, `courses/${course.id}.html`));
+  return versionContentAssets(html, data);
+}
+
+// Course pages live one folder deeper than the other pages: every relative address gets one more «../».
+export function deeperPaths(html) {
+  const deeper = value => (!value || /^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(value)) ? value : value.startsWith('./') ? `../${value.slice(2)}` : `../${value}`;
+  return html.replace(/<[a-z][^>]*>/gi, tag => tag
+    .replace(/(\s(?:src|href|poster))="([^"]*)"/gi, (_, name, value) => `${name}="${deeper(value)}"`)
+    .replace(/(\ssrcset)="([^"]*)"/gi, (_, name, value) => `${name}="${value.split(',').map(candidate => {
+      const [url, ...descriptors] = candidate.trim().split(/\s+/);
+      return [deeper(url), ...descriptors].join(' ');
+    }).join(', ')}"`));
+}
+
+// Every course page with its translated copies: { 'courses/ielts.html': html, 'uz/courses/ielts.html': html, … }.
+export function buildCoursePages(data, template = fs.readFileSync(COURSE_TEMPLATE, 'utf8')) {
+  const pages = new Map();
+  const packs = Object.fromEntries(LANGUAGES.map(lang => [lang, loadLanguagePack(lang)]));
+  for (const course of data.courses) {
+    const label = `courses/${course.id}.html`;
+    const html = generateCoursePage(template, course, data);
+    pages.set(label, deeperPaths(html));
+    for (const lang of LANGUAGES) pages.set(`${lang}/${label}`, deeperPaths(generateLanguagePage(html, data, lang, label, packs[lang])));
+  }
+  return pages;
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
   const data = readContent();
   const pages = [
@@ -959,7 +1073,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(proces
   // Plain files generated from the same data: robots.txt and sitemap.xml.
   const textFiles = [
     { file: new URL('./robots.txt', import.meta.url), output: renderRobotsTxt(data.site), label: 'robots.txt' },
-    { file: new URL('./sitemap.xml', import.meta.url), output: renderSitemap(data.site), label: 'sitemap.xml' }
+    { file: new URL('./sitemap.xml', import.meta.url), output: renderSitemap(data.site, data.courses), label: 'sitemap.xml' }
   ];
   for (const { file, output, label } of textFiles) {
     const source = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
@@ -993,6 +1107,27 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(proces
         fs.mkdirSync(folder, { recursive: true });
         fs.writeFileSync(file, translated);
       }
+    }
+  }
+  // Course pages appear and disappear together with the courses in the admin.
+  const coursePages = buildCoursePages(data);
+  for (const [label, output] of coursePages) {
+    const file = new URL(`./${label}`, import.meta.url);
+    const source = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+    if (process.argv.includes('--check')) {
+      if (output !== source) { console.error(`Generated ${label} is stale. Run node build.mjs`); stale = true; }
+    } else if (output !== source) {
+      fs.mkdirSync(new URL('.', file), { recursive: true });
+      fs.writeFileSync(file, output);
+    }
+  }
+  for (const folder of ['courses', ...LANGUAGES.map(lang => `${lang}/courses`)]) {
+    const directory = new URL(`./${folder}/`, import.meta.url);
+    if (!fs.existsSync(directory)) continue;
+    for (const name of fs.readdirSync(directory)) {
+      if (!name.endsWith('.html') || coursePages.has(`${folder}/${name}`)) continue;
+      if (process.argv.includes('--check')) { console.error(`${folder}/${name} belongs to a removed course. Run node build.mjs`); stale = true; }
+      else fs.unlinkSync(new URL(name, directory));
     }
   }
   if (process.argv.includes('--check')) {

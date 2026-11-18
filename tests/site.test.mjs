@@ -1083,6 +1083,8 @@ test('a staged build uses its own data and validates every page before replacing
     for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html']) {
       fs.copyFileSync(new URL(`../${file}`, import.meta.url), path.join(stage, file));
     }
+    fs.mkdirSync(path.join(stage, 'templates'));
+    fs.copyFileSync(new URL('../templates/course.html', import.meta.url), path.join(stage, 'templates', 'course.html'));
     fs.mkdirSync(path.join(stage, 'assets', 'i18n'), { recursive: true });
     fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'uz.js'), 'window.stanfordUz = { strings: {}, patterns: [] };\n');
     fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'kaa.js'), 'window.stanfordKaa = { strings: {}, patterns: [] };\n');

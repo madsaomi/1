@@ -14,7 +14,7 @@ test('owner edits, additions and removals pass the full public-site checks witho
       'railway.json', '.dockerignore', 'package.json']) {
       fs.copyFileSync(new URL('../' + file, import.meta.url), path.join(stage, file));
     }
-    for (const directory of ['assets', 'tests']) {
+    for (const directory of ['assets', 'tests', 'templates']) {
       fs.cpSync(new URL('../' + directory, import.meta.url), path.join(stage, directory), { recursive: true });
     }
     const content = JSON.parse(fs.readFileSync(new URL('./fixtures/content.json', import.meta.url), 'utf8'));

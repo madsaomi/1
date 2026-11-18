@@ -4,10 +4,10 @@ function setupLanguage() {
   const packs = { uz: window.stanfordUz, kaa: window.stanfordKaa, en: window.stanfordEn };
   // /uz/ and /kaa/ hold copies translated at build time; there the switch opens the other copy instead.
   const pageCopy = Object.hasOwn(packs, document.documentElement.dataset?.langPage) ? document.documentElement.dataset.langPage : '';
+  // Copies sit under /uz/, /kaa/ and /en/ at the site root, also for deeper pages: /uz/courses/ielts.
   const addressFor = code => {
-    const path = location.pathname;
-    const folder = path.slice(0, path.lastIndexOf('/') + 1).replace(/(?:uz|kaa|en)\/$/, '');
-    return `${folder}${code === 'ru' ? '' : `${code}/`}${path.slice(path.lastIndexOf('/') + 1)}${location.hash}`;
+    const path = location.pathname.replace(/^\/(?:uz|kaa|en)(?=\/)/, '');
+    return `${code === 'ru' ? '' : `/${code}`}${path}${location.hash}`;
   };
   const select = document.querySelector('#lang-toggle');
   if (!select) return;

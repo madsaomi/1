@@ -2,6 +2,13 @@
 // Owner translations published by the CMS may override these defaults.
 window.stanfordKaa = {
   strings: {
+    "Главная": "Bas bet",
+    "Путь по сайту": "Sayttaǵı jol",
+    "Стоимость": "Bahası",
+    "Что входит в курс": "Kursqa ne kiredi",
+    "Филиалы и график работы": "Filiallar hám jumıs waqtı",
+    "Другие курсы": "Basqa kurslar",
+    "Всё о курсе": "Kurs haqqında tolıq",
     "Семья или 2 курса": "Shańaraq yamasa 2 kurs",
     "Скидка действует, если из одной семьи занимаются 2 ученика или один ученик записан на 2 курса. Условия и итоговую стоимость подтвердите перед оплатой.": "Bir shańaraqtan 2 oqıwshı oqısa yamasa bir oqıwshı 2 kursqa jazılsa, shegirme ámel etedi. Shártlerdi hám aqırǵı bahanı tólewden aldın anıqlań.",
     "Фото и видео": "Foto hám video",
@@ -387,6 +394,8 @@ window.stanfordKaa = {
     "Готово": "Tayar"
   },
   patterns: [
+    [/^Всё о курсе: (.+)$/, (m, t) => `Kurs haqqında tolıq: ${t(m[1])}`],
+    [/^(.+) — курс в Нукусе \| Stanford$/, (m, t) => `${t(m[1])} — Nókistegi kurs | Stanford`],
     [/^Фото и видео: (.+)$/, (m, t) => `Foto hám video: ${t(m[1])}`],
     [/^(.+)\. Программ: (\d+)\.$/, (m, t) => `${t(m[1])}. Baǵdarlamalar: ${m[2]}.`],
     [/^до ([\d\s]+) сум$/, m => `${m[1]} sumǵa shekem`],

@@ -12,7 +12,7 @@ from django.conf import settings
 from django.core.management.base import CommandError
 from django.db import connection, transaction
 
-from .github import (GitHubClient, GitHubError, MANAGED_MEDIA, MANAGED_PHOTO, MAX_RELEASE_BYTES,
+from .github import (COURSE_PAGE, GitHubClient, GitHubError, MANAGED_MEDIA, MANAGED_PHOTO, MAX_RELEASE_BYTES,
                      OUTPUT_FILES, SOURCE_FILES, allowed_media)
 from .serialization import (TRANSLATION_LANGUAGES, build_content, build_translation_strings, missing_translations,
                             read_translation_strings,
@@ -163,6 +163,27 @@ def copy_local_sources(stage, paths):
         shutil.copyfile(source, target)
 
 
+def course_pages(stage):
+    """Generated course pages of this release: courses/<code>.html and the copies in uz/, kaa/ and en/."""
+    pages = {}
+    for folder in ('courses', 'uz/courses', 'kaa/courses', 'en/courses'):
+        for path in sorted((stage / folder).glob('*.html')):
+            relative = path.relative_to(stage).as_posix()
+            if COURSE_PAGE.fullmatch(relative):
+                pages[relative] = path.read_bytes()
+    return pages
+
+
+def remove_old_course_pages(files):
+    """Local site: a course removed in the admin takes its pages with it (after the new pages are in place)."""
+    root = settings.SITE_ROOT.resolve()
+    for folder in ('courses', 'uz/courses', 'kaa/courses', 'en/courses'):
+        for path in (root / folder).glob('*.html'):
+            relative = path.relative_to(root).as_posix()
+            if COURSE_PAGE.fullmatch(relative) and relative not in files and not path.is_symlink():
+                path.unlink(missing_ok=True)
+
+
 def atomic_write(path, content):
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix='.publish-', dir=path.parent)
@@ -271,13 +292,17 @@ def publish_site():
                     reason = next((line.strip() for line in lines if 'Error' in line), 'проверьте содержимое в админке')
                     raise PublishError(f'Сайт не принял данные: {reason[:300]}')
                 files = {path: (stage / path).read_bytes() for path in sorted(OUTPUT_FILES)}
+                files.update(course_pages(stage))
                 files.update(photos)
                 files.update(variants)
                 if client:
                     obsolete = {path for path in snapshot['entries'] if MANAGED_MEDIA.fullmatch(path) and path not in retained_photos}
+                    # Pages of courses removed in the admin leave together with the course.
+                    obsolete |= {path for path in snapshot['entries'] if COURSE_PAGE.fullmatch(path) and path not in files}
                     release = client.publish(snapshot, files, delete_paths=obsolete)
                 else:
                     release = publish_local(files)
+                    remove_old_course_pages(files)
                     try:
                         cleanup_public_photos(retained_photos)
                     except OSError:
