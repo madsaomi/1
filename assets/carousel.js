@@ -13,7 +13,14 @@
     if (items.length < 2) return;
     const position = index => items[index].offsetLeft - items[0].offsetLeft;
     const go = index => track.scrollTo({ left: position(Math.max(0, Math.min(items.length - 1, index))), behavior: reduce ? 'auto' : 'smooth' });
-    const dots = items.map((item, index) => {
+    // Many slides: a «3 / 10» counter instead of a row of dots that is hard to hit with a finger.
+    const counter = items.length > 6 ? document.createElement('span') : null;
+    if (counter) {
+      counter.className = 'carousel-count';
+      counter.setAttribute('aria-live', 'polite');
+      dotsBox.append(counter);
+    }
+    const dots = counter ? [] : items.map((item, index) => {
       const dot = document.createElement('button');
       dot.type = 'button';
       dot.className = 'carousel-dot';
@@ -35,6 +42,7 @@
       nav.hidden = end <= 1;
       const atEnd = track.scrollLeft >= end - 1;
       const active = atEnd ? items.length - 1 : current();
+      if (counter) counter.textContent = `${active + 1} / ${items.length}`;
       dots.forEach((dot, index) => {
         if (index === active) dot.setAttribute('aria-current', 'true');
         else dot.removeAttribute('aria-current');

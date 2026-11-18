@@ -367,7 +367,8 @@ class Teacher(Ordered):
     qualification = models.CharField('Квалификация', max_length=40, blank=True, help_text='Например: IELTS 8.5, CELTA')
     experience = models.CharField('Опыт', max_length=40, blank=True, help_text='Например: 6 лет опыта')
     photo = models.ImageField('Фото', upload_to='teachers/', blank=True, validators=PHOTO_VALIDATORS,
-                              help_text='Вертикальное 4:5, JPG/PNG/WebP до 5 МБ. Фото сжимается автоматически. Без фото — логотип Stanford.')
+                              help_text='Вертикальное 4:5, по плечи или по пояс, лицо в верхней трети кадра, от 1000 px по ширине. '
+                                        'JPG/PNG/WebP до 5 МБ, сжимается автоматически. Без фото — логотип Stanford.')
     photo_path = models.CharField('Фото из файлов сайта', max_length=240, blank=True, validators=[photo_path_validator],
                                   help_text='Сохраняется при импорте. Загруженное фото имеет приоритет.')
     featured = models.BooleanField('Топ', default=False,
@@ -544,6 +545,8 @@ class PageText(models.Model):
                           help_text='Показывается, когда посетитель выбирает UZ. Пусто — останется русский текст.')
     kaa = models.TextField('По-каракалпакски', max_length=800, blank=True,
                            help_text='Показывается, когда посетитель выбирает QQ. Пусто — останется русский текст.')
+    en = models.TextField('По-английски', max_length=800, blank=True,
+                          help_text='Показывается, когда посетитель выбирает EN. Пусто — останется русский текст.')
     order = models.PositiveIntegerField('Порядок на странице', default=0, db_index=True, editable=False)
 
     class Meta:
@@ -579,6 +582,8 @@ class Faq(Ordered):
     answer_uz = models.TextField('Ответ по-узбекски', max_length=800, blank=True)
     question_kaa = models.CharField('Вопрос по-каракалпакски', max_length=160, blank=True)
     answer_kaa = models.TextField('Ответ по-каракалпакски', max_length=800, blank=True)
+    question_en = models.CharField('Вопрос по-английски', max_length=160, blank=True)
+    answer_en = models.TextField('Ответ по-английски', max_length=800, blank=True)
     is_published = models.BooleanField('Показывать на сайте', default=True)
 
     class Meta(Ordered.Meta):
@@ -604,16 +609,17 @@ class Translation(models.Model):
                               help_text='Точно как на сайте: с теми же знаками и регистром.')
     uz = models.CharField('По-узбекски', max_length=800, blank=True)
     kaa = models.CharField('По-каракалпакски', max_length=800, blank=True)
+    en = models.CharField('По-английски', max_length=800, blank=True)
 
     class Meta:
         ordering = ['source']
         verbose_name = 'Перевод'
-        verbose_name_plural = 'Переводы на узбекский и каракалпакский'
+        verbose_name_plural = 'Переводы на узбекский, каракалпакский и английский'
 
     def __str__(self):
         return self.source
 
     def clean(self):
         self.source = ' '.join((self.source or '').split())
-        if not self.source or not any((value or '').strip() for value in (self.uz, self.kaa)):
+        if not self.source or not any((value or '').strip() for value in (self.uz, self.kaa, self.en)):
             raise ValidationError('Укажите русский текст и хотя бы один перевод.')

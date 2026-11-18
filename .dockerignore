@@ -5,6 +5,8 @@
 !results.html
 !career.html
 !privacy.html
+!feedback.html
+!feedback.js
 !teachers.html
 !content.js
 !results.js
@@ -20,6 +22,8 @@
 !uz/**
 !kaa/
 !kaa/**
+!en/
+!en/**
 
 **/*.zip
 **/*.rar

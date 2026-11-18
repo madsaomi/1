@@ -2,13 +2,13 @@ import { cpSync, existsSync, writeFileSync, readFileSync, readdirSync } from 'no
 import vm from 'node:vm';
 const marker = '/site/.local-initialized';
 if (!existsSync(marker)) {
-  for (const path of ['build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'results.js', 'career.js', 'script.js', 'theme-init.js', 'style.css', 'robots.txt', 'assets']) {
+  for (const path of ['build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html', 'results.js', 'career.js', 'feedback.js', 'script.js', 'theme-init.js', 'style.css', 'robots.txt', 'assets']) {
     cpSync(`/source/${path}`, `/site/${path}`, { recursive: true });
   }
   writeFileSync(marker, 'Local isolated site copy\n');
 }
 // Refresh presentation sources on every rebuild; content and uploads stay in the volume.
-for (const path of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'results.js', 'career.js', 'script.js', 'theme-init.js', 'style.css', 'robots.txt']) {
+for (const path of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html', 'results.js', 'career.js', 'feedback.js', 'script.js', 'theme-init.js', 'style.css', 'robots.txt']) {
   cpSync(`/source/${path}`, `/site/${path}`);
 }
 console.log('Local site volume ready; repository files are read-only.');
@@ -25,7 +25,7 @@ const dictionary = source => {
   vm.runInNewContext(source, context, { timeout: 1000 });
   return Object.values(context.window)[0].strings;
 };
-for (const language of ['uz', 'kaa']) {
+for (const language of ['uz', 'kaa', 'en']) {
   const source = readFileSync(`/source/assets/i18n/${language}.js`, 'utf8');
   const target = `/site/assets/i18n/${language}.js`;
   if (!existsSync(target)) { writeFileSync(target, source); continue; }

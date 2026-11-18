@@ -4,13 +4,17 @@ import { isIP } from 'node:net';
 import { ValidationError, validateApplication } from './validation.mjs';
 import { sanitizePhoto } from './photo.mjs';
 import { buildResume } from './pdf.mjs';
-import { sendResume } from './telegram.mjs';
+import { sendResume, sendText } from './telegram.mjs';
+import { formatFeedback, validateFeedback } from './feedback.mjs';
 
 const PORT = Number(process.env.PORT || 8787);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 // One or more HR chats, comma-separated: every one of them gets the resume.
 const HR_CHATS = (process.env.TELEGRAM_HR_CHAT_ID || '').split(',').map(chat => chat.trim()).filter(Boolean);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '';
+// Complaints go to a separate bot and chat(s), so HR never sees them.
+const FEEDBACK_BOT_TOKEN = process.env.FEEDBACK_BOT_TOKEN || '';
+const FEEDBACK_CHATS = (process.env.FEEDBACK_CHAT_ID || '').split(',').map(chat => chat.trim()).filter(Boolean);
 const DRY_RUN = process.env.HR_DRY_RUN === '1';
 const HOST = process.env.HOST || '0.0.0.0';
 const proxyHopsValue = process.env.HR_TRUST_PROXY_HOPS || '0';
@@ -27,6 +31,8 @@ if (ALLOWED_ORIGIN) {
   } catch { /* An invalid configured origin cannot enable intake. */ }
 }
 const INTAKE_CONFIGURED = originConfigured && (DRY_RUN || Boolean(BOT_TOKEN.trim() && HR_CHATS.length));
+const FEEDBACK_CONFIGURED = originConfigured && (DRY_RUN || Boolean(FEEDBACK_BOT_TOKEN.trim() && FEEDBACK_CHATS.length));
+const configured = path => (path === '/feedback' ? FEEDBACK_CONFIGURED : INTAKE_CONFIGURED);
 const MAX_BODY = 3.5 * 1024 * 1024;
 const RATE_WINDOW = 30 * 60 * 1000;
 const RATE_LIMIT = 4;
@@ -116,8 +122,8 @@ const server = http.createServer(async (request, response) => {
   response.setHeader('vary', 'Origin');
   for (const [key, value] of Object.entries(cors)) response.setHeader(key, value);
 
-  if (request.method === 'OPTIONS' && url.pathname === '/career') {
-    if (!INTAKE_CONFIGURED) { send(response, 503, { ok: false, error: 'not_configured' }); return; }
+  if (request.method === 'OPTIONS' && ['/career', '/feedback'].includes(url.pathname)) {
+    if (!configured(url.pathname)) { send(response, 503, { ok: false, error: 'not_configured' }); return; }
     const method = request.headers['access-control-request-method'];
     const headers = String(request.headers['access-control-request-headers'] || '')
       .toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
@@ -132,11 +138,11 @@ const server = http.createServer(async (request, response) => {
     response.end('ok');
     return;
   }
-  if (request.method !== 'POST' || url.pathname !== '/career') {
+  if (request.method !== 'POST' || !['/career', '/feedback'].includes(url.pathname)) {
     send(response, 404, { ok: false, error: 'not_found' });
     return;
   }
-  if (!INTAKE_CONFIGURED) {
+  if (!configured(url.pathname)) {
     send(response, 503, { ok: false, error: 'not_configured' });
     return;
   }
@@ -148,11 +154,16 @@ const server = http.createServer(async (request, response) => {
     send(response, 415, { ok: false, error: 'unsupported_media_type' });
     return;
   }
-  if (rateLimited(clientIp(request))) {
+  // Separate limits per form; the address is only kept in memory for the limit and never sent anywhere.
+  if (rateLimited(`${url.pathname}:${clientIp(request)}`)) {
     send(response, 429, { ok: false, error: 'rate_limited' });
     return;
   }
 
+  if (url.pathname === '/feedback') {
+    await handleFeedback(request, response, started);
+    return;
+  }
   try {
     const raw = await readBody(request);
     let body;
@@ -183,6 +194,32 @@ const server = http.createServer(async (request, response) => {
     }
   }
 });
+
+async function handleFeedback(request, response, started) {
+  try {
+    let body;
+    try {
+      body = JSON.parse(await readBody(request));
+    } catch (error) {
+      if (error?.status === 413) throw error;
+      send(response, 400, { ok: false, error: 'invalid_json' });
+      return;
+    }
+    const feedback = validateFeedback(body);
+    const date = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', dateStyle: 'short', timeStyle: 'short' }).format(new Date());
+    if (!DRY_RUN) await sendText({ token: FEEDBACK_BOT_TOKEN, chatIds: FEEDBACK_CHATS, text: formatFeedback(feedback, date) });
+    console.log(`[feedback] 200 ${feedback.kind} ${Date.now() - started}ms${DRY_RUN ? ' (dry run)' : ''}`);
+    send(response, 200, { ok: true });
+  } catch (error) {
+    if (error instanceof ValidationError) send(response, 400, { ok: false, error: 'validation', field: error.field });
+    else if (error?.status === 413) send(response, 413, { ok: false, error: 'too_large' });
+    else if (String(error?.message) === 'telegram_send_failed') send(response, 502, { ok: false, error: 'delivery_failed' });
+    else {
+      console.error(`[feedback] 500 ${Date.now() - started}ms`);
+      send(response, 500, { ok: false, error: 'internal' });
+    }
+  }
+}
 
 server.listen(PORT, HOST, () => {
   console.log(`hr-api listening on ${server.address().port}`);

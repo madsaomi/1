@@ -134,6 +134,6 @@
     "ИНН": "STIR",
     "Телефон": "Telefon",
     "Сайт": "Sayt",
-    "Переводы на узбекский и каракалпакский языки даны для удобства; при расхождении действует текст на русском языке.": "Ózbek hám qaraqalpaq tillerindegi awdarmalar qolaylıq ushın berilgen; parq bolǵanda orıs tilindegi tekst ámel etedi."
+    "Переводы на узбекский, каракалпакский и английский языки даны для удобства; при расхождении действует текст на русском языке.": "Ózbek, qaraqalpaq hám inglis tillerindegi awdarmalar qolaylıq ushın berilgen; parq bolǵanda orıs tilindegi tekst ámel etedi."
   });
 })();

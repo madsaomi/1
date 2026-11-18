@@ -112,8 +112,8 @@ def _replace_legacy_texts(replacements):
         if slot:
             _preserve_slot_translation(slot)
             slot.text = new
-            slot.uz = slot.kaa = ''
-            slot.save(update_fields=['text', 'uz', 'kaa'])
+            slot.uz = slot.kaa = slot.en = ''
+            slot.save(update_fields=['text', 'uz', 'kaa', 'en'])
             count += 1
     return count
 

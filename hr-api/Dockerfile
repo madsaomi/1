@@ -12,7 +12,7 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --prod --frozen-lockfile
 
 COPY assets ./assets
-COPY validation.mjs photo.mjs pdf.mjs telegram.mjs server.mjs ./
+COPY validation.mjs photo.mjs pdf.mjs telegram.mjs feedback.mjs server.mjs ./
 
 USER node
 EXPOSE 8787

@@ -153,3 +153,27 @@ test('invalid proxy hop settings prevent startup', async () => {
     assert.match(errorOutput, /HR_TRUST_PROXY_HOPS must be an integer from 0 to 10/);
   }
 });
+
+test('complaints: anonymous ones carry no contacts, official ones need name, phone and consent', async t => {
+  // Each server allows 4 submissions per 30 minutes from one address, so the checks use two of them.
+  let base = await startApi(t);
+  const post = body => fetch(`${base}/feedback`, { method: 'POST', headers: {
+    origin, 'content-type': 'application/json', 'x-career-request': '1' }, body: JSON.stringify(body) });
+  const message = 'Преподаватель часто опаздывает на занятия, просим разобраться.';
+  const anonymous = await post({ kind: 'anonymous', topic: 'Обучение и преподаватель', branch: 'Филиал на Сараева', message });
+  assert.equal(anonymous.status, 200);
+  assert.equal((await post({ kind: 'anonymous', topic: 'Другое', message, name: 'Анна' })).status, 400, 'Anonymous must not accept a name');
+  assert.equal((await post({ kind: 'official', topic: 'Другое', message, name: 'Анна', phone: '+998901234567' })).status, 400, 'Consent is required');
+  base = await startApi(t);
+  const official = await post({ kind: 'official', topic: 'Оплата и документы', message, name: 'Анна Иванова', phone: '+998 90 123 45 67', consent: true });
+  assert.equal(official.status, 200);
+  assert.equal((await post({ kind: 'official', topic: 'Неизвестно', message, name: 'Анна', phone: '+998901234567', consent: true })).status, 400);
+  assert.equal((await fetch(`${base}/feedback`, { method: 'POST', headers: { origin: 'https://evil.example', 'content-type': 'application/json', 'x-career-request': '1' }, body: '{}' })).status, 403);
+});
+
+test('complaint text for Telegram is plain and the anonymous one says no contacts were given', async () => {
+  const { formatFeedback } = await import('./feedback.mjs');
+  const text = formatFeedback({ kind: 'anonymous', topic: 'Другое', branch: '', message: '<b>Текст</b>' }, '18.11.2026, 10:00');
+  assert(text.startsWith('🕶 Анонимная жалоба') && text.includes('Филиал: не указан') && text.includes('<b>Текст</b>'));
+  assert(!/Имя|Телефон/.test(text));
+});

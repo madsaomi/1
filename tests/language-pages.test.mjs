@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { LANGUAGES, generateLanguagePage, readContent, renderSitemap, translatePage } from '../build.mjs';
+import { LANGUAGES, generateLanguagePage, loadLanguagePack, readContent, renderSitemap, translatePage } from '../build.mjs';
 
 const read = name => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
-const PAGES = ['index.html', 'results.html', 'teachers.html', 'career.html', 'privacy.html'];
+const PAGES = ['index.html', 'results.html', 'teachers.html', 'career.html', 'privacy.html', 'feedback.html'];
 const pack = { strings: { 'Курсы и цены': 'Kurslar va narxlar', 'Язык сайта': 'Sayt tili', 'Фото: Анна': 'Foto: Anna', 'Курсы & цены': 'Kurslar & narxlar' },
   patterns: [[/^Подробнее: (.+)$/, (m, t) => `Batafsil: ${t(m[1])}`]] };
 
@@ -37,11 +37,11 @@ test('every public page has current /uz/ and /kaa/ copies with their own address
       if (data.site.url) {
         const own = new URL(`${lang}/${page === 'index.html' ? '' : page.replace(/\.html$/, '')}`, `${data.site.url.replace(/\/$/, '')}/`).href;
         assert(copy.includes(`<link rel="canonical" href="${own}">`), `${lang}/${page} canonical`);
-        for (const code of ['ru', 'uz', 'kaa', 'x-default']) assert(copy.includes(`hreflang="${code}"`));
+        for (const code of ['ru', 'uz', 'kaa', 'en', 'x-default']) assert(copy.includes(`hreflang="${code}"`));
       }
       // Every local file the copy needs exists one folder up.
       for (const [, url] of copy.matchAll(/\s(?:src|href)="([^"#?]+)(?:[?#][^"]*)?"/g)) {
-        if (/^(?:[a-z]+:|\/)/.test(url) || /^(?:\.\/|(?:index|results|teachers|career|privacy)(?:\.html)?)$/.test(url)) continue;
+        if (/^(?:[a-z]+:|\/)/.test(url) || /^(?:\.\/|(?:index|results|teachers|career|privacy|feedback)(?:\.html)?)$/.test(url)) continue;
         assert(url.startsWith('../'), `${lang}/${page}: ${url} must point one folder up`);
         assert(fs.existsSync(new URL(`../${lang}/${url}`, import.meta.url)), `${lang}/${page}: missing ${url}`);
       }
@@ -49,10 +49,21 @@ test('every public page has current /uz/ and /kaa/ copies with their own address
   }
 });
 
-test('the sitemap offers each page in all three languages, never in demo mode', () => {
+test('the sitemap offers each page in all four languages, never in demo mode', () => {
   const site = { url: 'https://school.example' };
   const map = renderSitemap(site);
-  assert.equal((map.match(/<loc>/g) || []).length, 12);
+  assert.equal((map.match(/<loc>/g) || []).length, 16);
   assert(map.includes('<loc>https://school.example/uz/</loc>') && map.includes('<loc>https://school.example/kaa/career</loc>'));
   assert.equal((renderSitemap({ ...site, demoMode: true }).match(/<loc>/g) || []).length, 0);
+});
+
+test('English covers every string the Uzbek and Karakalpak dictionaries translate, without Cyrillic', () => {
+  const en = loadLanguagePack('en');
+  for (const lang of ['uz', 'kaa']) {
+    for (const key of Object.keys(loadLanguagePack(lang).strings)) assert(Object.hasOwn(en.strings, key), `en.js is missing: ${key}`);
+  }
+  for (const value of Object.values(en.strings)) assert(!/[А-Яа-яЁё]/.test(value), `Cyrillic in English: ${value}`);
+  for (const page of ['index.html', 'results.html', 'teachers.html', 'career.html', 'privacy.html', 'feedback.html']) {
+    assert(/assets\/i18n\/en\.js/.test(read(`en/${page}`)), `en/${page} loads the English dictionary`);
+  }
 });

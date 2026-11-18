@@ -48,7 +48,7 @@ class PrepareReleaseTests(TestCase):
             '<p data-text="page.new_release">Новый текст разметки</p>', encoding='utf-8')
         dictionaries = self.site / 'assets' / 'i18n'
         dictionaries.mkdir(parents=True)
-        for language in ('uz', 'kaa'):
+        for language in ('uz', 'kaa', 'en'):
             strings = {
                 'Speaking Club': f'{language} speaking', 'Новый текст страницы': f'{language} new',
                 'Новый текст разметки': f'{language} markup', 'Новая общая строка': f'{language} general',

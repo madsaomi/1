@@ -5,7 +5,8 @@ import vm from 'node:vm';
 import { POSITIONS, EXPERIENCES, LEVELS, validateApplication } from '../hr-api/validation.mjs';
 
 const read = path => fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
-const implementations = ['script.js', 'assets/i18n/language.js'];
+// One shared language switch for every page (script.js used to carry an identical copy).
+const implementations = ['assets/i18n/language.js'];
 
 test('default UI and text attributes from all four pages are covered in UZ and QQ', () => {
   // A stable UI catalogue keeps owner-authored copy free to use the Russian fallback.
@@ -80,8 +81,8 @@ function languageHarness(name, { saved = 'ru', blockedStorage = false, observe =
   assert(from >= 0 && to > from);
   vm.runInNewContext(source.slice(from, to), {
     window: {
-      stanfordUz: packs.uz || { strings: { 'Кнопка': 'Tugma', 'Имя': 'Ism', 'Новый текст': 'Yangi matn', 'Язык сайта': 'Sayt tili' }, patterns: [] },
-      stanfordKaa: packs.kaa || { strings: { 'Кнопка': 'Túyme', 'Имя': 'Atı', 'Новый текст': 'Jańa tekst', 'Язык сайта': 'Sayt tili' }, patterns: [] }
+      stanfordUz: Object.hasOwn(packs, 'uz') ? packs.uz : { strings: { 'Кнопка': 'Tugma', 'Имя': 'Ism', 'Новый текст': 'Yangi matn', 'Язык сайта': 'Sayt tili' }, patterns: [] },
+      stanfordKaa: Object.hasOwn(packs, 'kaa') ? packs.kaa : { strings: { 'Кнопка': 'Túyme', 'Имя': 'Atı', 'Новый текст': 'Jańa tekst', 'Язык сайта': 'Sayt tili' }, patterns: [] }
     },
     document: { documentElement: root, querySelector: () => select },
     location: { pathname, hash, assign: address => visited.push(address) },
@@ -172,8 +173,8 @@ test('all pages and the reusable template offer a labelled native three-language
     for (const [value, label] of [['ru', 'RU'], ['uz', 'UZ'], ['kaa', 'QQ']]) {
       assert.match(page, new RegExp(`<option value="${value}" lang="${value}">${label}</option>`));
     }
-    assert.match(page, /<script src="assets\/i18n\/uz\.js\?v=\d+"><\/script>/);
-    assert.match(page, /<script src="assets\/i18n\/kaa\.js\?v=\d+"><\/script>/);
+    // Russian pages load no dictionaries; each translated copy loads only its own one.
+    assert.doesNotMatch(page, /assets\/i18n\/(?:uz|kaa|en)\.js/);
   }
 });
 
@@ -269,3 +270,45 @@ test('on the translated /uz/ and /kaa/ copies the switch opens the other languag
     assert.deepEqual(russian.visited, []);
   }
 });
+
+test('the home page uses the shared language switch instead of its own copy', () => {
+  const home = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const script = fs.readFileSync(new URL('../script.js', import.meta.url), 'utf8');
+  assert(/<script src="assets\/i18n\/language\.js\?v=\d+"><\/script>/.test(home));
+  assert(!script.includes('function setupLanguage()'));
+});
+
+test('copies load only their own dictionary and Russian pages open the copy for a missing language', () => {
+  for (const lang of ['uz', 'kaa', 'en']) {
+    for (const page of ['index.html', 'results.html', 'teachers.html', 'career.html', 'privacy.html', 'feedback.html']) {
+      const copy = read(`${lang}/${page}`);
+      const loaded = [...copy.matchAll(/assets\/i18n\/(uz|kaa|en)\.js/g)].map(match => match[1]);
+      assert.deepEqual([...new Set(loaded)], [lang], `${lang}/${page}`);
+    }
+  }
+  // Russian page without dictionaries: choosing UZ opens /uz/ at the same page and section.
+  const page = languageHarness('assets/i18n/language.js', { pathname: '/teachers', hash: '#top', packs: { uz: null, kaa: null } });
+  page.choose('uz');
+  assert.deepEqual(page.visited, ['/uz/teachers#top']);
+  assert.deepEqual(page.stored(), ['stanford-lang', 'uz']);
+});
+
+test('the head script sends a visitor who chose a translation straight to its copy', () => {
+  const run = ({ saved, langPage, hreflang = ['uz', 'kaa', 'en'], pathname = '/teachers', search = '', hash = '#top' }) => {
+    const replaced = [];
+    vm.runInNewContext(read('theme-init.js'), {
+      localStorage: { getItem: key => (key === 'stanford-lang' ? saved : null) },
+      matchMedia: () => ({ matches: false }),
+      document: { documentElement: { dataset: langPage ? { langPage } : {} },
+        querySelector: selector => (hreflang.some(code => selector.includes(`"${code}"`)) ? {} : null) },
+      location: { pathname, search, hash, replace: address => replaced.push(address) }
+    });
+    return replaced;
+  };
+  assert.deepEqual(run({ saved: 'uz' }), ['/uz/teachers#top']);
+  assert.deepEqual(run({ saved: 'en', pathname: '/' }), ['/en/#top']);
+  assert.deepEqual(run({ saved: 'ru' }), []);
+  assert.deepEqual(run({ saved: 'kaa', langPage: 'kaa' }), [], 'A copy never redirects');
+  assert.deepEqual(run({ saved: 'uz', hreflang: [] }), [], 'A page without translated copies (404) stays');
+});
+

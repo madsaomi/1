@@ -123,6 +123,8 @@ class HeroMediaInline(MediaItemInline):
 
 class TeacherMediaInline(MediaItemInline):
     fk_name = 'teacher'
+    verbose_name_plural = ('Фото и видео (первый слайд — портрет: вертикально 4:5, по плечи или по пояс, '
+                           'лицо в верхней трети кадра)')
 
 
 class ResultMediaInline(MediaItemInline):
@@ -409,12 +411,12 @@ def shorten(value, limit=90):
 @admin.register(PageText)
 class PageTextAdmin(ModelAdmin):
     """Texts are tied to places in the page, so they are edited but never added or removed here."""
-    list_display = ['place_display', 'section', 'text_display', 'uz_display', 'kaa_display']
+    list_display = ['place_display', 'section', 'text_display', 'uz_display', 'kaa_display', 'en_display']
     list_display_links = ['place_display', 'text_display']
     list_filter = ['section']
-    search_fields = ['text', 'uz', 'kaa']
+    search_fields = ['text', 'uz', 'kaa', 'en']
     list_per_page = 200
-    fields = ['where', 'text', 'uz', 'kaa']
+    fields = ['where', 'text', 'uz', 'kaa', 'en']
     readonly_fields = ['where']
 
     def has_add_permission(self, request):
@@ -439,6 +441,10 @@ class PageTextAdmin(ModelAdmin):
     def kaa_display(self, obj):
         return shorten(obj.kaa, 60) or '—'
 
+    @admin.display(description='По-английски')
+    def en_display(self, obj):
+        return shorten(obj.en, 60) or '—'
+
     @admin.display(description='Где на сайте')
     def where(self, obj):
         return str(obj)
@@ -446,13 +452,14 @@ class PageTextAdmin(ModelAdmin):
 
 @admin.register(Faq)
 class FaqAdmin(ModelAdmin):
-    list_display = ['question', 'has_uz', 'has_kaa', 'is_published', 'order']
+    list_display = ['question', 'has_uz', 'has_kaa', 'has_en', 'is_published', 'order']
     list_editable = ['is_published', 'order']
     search_fields = ['question', 'answer']
     fieldsets = [
         (None, {'fields': ['question', 'answer']}),
         ('По-узбекски', {'fields': ['question_uz', 'answer_uz']}),
         ('По-каракалпакски', {'fields': ['question_kaa', 'answer_kaa']}),
+        ('По-английски', {'fields': ['question_en', 'answer_en']}),
         ('Публикация', {'fields': ['is_published', 'order']}),
     ]
 
@@ -464,13 +471,17 @@ class FaqAdmin(ModelAdmin):
     def has_kaa(self, obj):
         return bool(obj.question_kaa.strip() and obj.answer_kaa.strip())
 
+    @admin.display(description='EN', boolean=True)
+    def has_en(self, obj):
+        return bool(obj.question_en.strip() and obj.answer_en.strip())
+
 
 @admin.register(Translation)
 class TranslationAdmin(ModelAdmin):
-    list_display = ['source_display', 'uz_display', 'kaa_display']
-    search_fields = ['source', 'uz', 'kaa']
+    list_display = ['source_display', 'uz_display', 'kaa_display', 'en_display']
+    search_fields = ['source', 'uz', 'kaa', 'en']
     list_per_page = 100
-    fields = ['source', 'uz', 'kaa']
+    fields = ['source', 'uz', 'kaa', 'en']
 
     @admin.display(description='Текст на сайте', ordering='source')
     def source_display(self, obj):
@@ -483,3 +494,7 @@ class TranslationAdmin(ModelAdmin):
     @admin.display(description='По-каракалпакски')
     def kaa_display(self, obj):
         return shorten(obj.kaa)
+
+    @admin.display(description='По-английски')
+    def en_display(self, obj):
+        return shorten(obj.en)

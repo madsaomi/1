@@ -100,92 +100,9 @@ locationButtons.forEach(button => button.addEventListener('click', () => {
   }
 }));
 
-const dialog = document.querySelector('#enroll-modal');
-const courseSelect = document.querySelector('#contact-course');
-const modalBody = document.querySelector('.modal-body');
-let dialogTrigger;
-let previousOverflow = '';
-function appendExternalIcon(link) {
-  const icon = document.createElement('span');
-  icon.setAttribute('aria-hidden', 'true');
-  icon.innerHTML = '<svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6 M10 14 21 3 M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>';
-  link.append(icon);
-}
-function updateCourseSummary() {
-  const course = content.courses.find(item => item.id === courseSelect.value);
-  const summary = document.querySelector('#selected-course');
-  summary.replaceChildren();
-  if (!course) return;
-  const title = document.createElement('h3');
-  title.textContent = [course.name, course.subtitle].filter(Boolean).join(' ');
-  const description = document.createElement('p'); description.textContent = course.description;
-  const price = document.createElement('div');
-  price.className = 'dialog-pricing';
-  const prices = document.createElement('dl');
-  prices.className = 'dialog-prices';
-  function addPrice(label, amount) {
-    const row = document.createElement('div');
-    const caption = document.createElement('dt'); caption.textContent = label;
-    const value = document.createElement('dd'); value.textContent = `${money(amount)} сум`;
-    const period = document.createElement('span'); period.textContent = 'в месяц';
-    value.append(period);
-    row.append(caption, value);
-    prices.append(row);
-  }
-  addPrice('Стоимость обучения', course.price);
-  if (course.specialPrice) addPrice('Семья или 2 курса', course.specialPrice);
-  price.append(prices);
-  const skills = document.createElement('ul');
-  skills.setAttribute('aria-label', 'В программе курса');
-  course.skills.forEach(skill => { const item = document.createElement('li'); item.textContent = skill; skills.append(item); });
-  const catalogLink = document.createElement('a');
-  catalogLink.className = 'link dialog-catalog-link';
-  catalogLink.href = `#course-${course.id}`;
-  catalogLink.dataset.revealCourse = course.id;
-  catalogLink.textContent = 'К карточке программы';
-  appendExternalIcon(catalogLink);
-  summary.append(title, description, price, skills, catalogLink);
-  if (course.category === 'exam') {
-    const examLink = document.createElement('a');
-    examLink.className = 'link dialog-exam-link';
-    examLink.href = course.target;
-    examLink.dataset.examDetails = course.id;
-    examLink.textContent = `О подготовке к ${course.name}`;
-    appendExternalIcon(examLink);
-    summary.append(examLink);
-  }
-  modalBody.scrollTop = 0;
-}
-function openModal(courseId, trigger) {
-  if (typeof dialog.showModal !== 'function') { location.hash = 'prices'; return; }
-  closeMenu();
-  if (content.courses.some(course => course.id === courseId)) courseSelect.value = courseId;
-  updateCourseSummary();
-  dialogTrigger = trigger;
-  previousOverflow = document.body.style.overflow;
-  dialog.showModal();
-  document.body.style.overflow = 'hidden';
-  modalBody.scrollTop = 0;
-  courseSelect.focus({ preventScroll: true });
-}
-function closeDialogForNavigation() {
-  if (dialog.open) { dialogTrigger = null; dialog.close(); }
-}
-function revealExam(courseId) {
-  const course = content.courses.find(item => item.id === courseId && item.category === 'exam');
-  if (!course) return false;
-  const panel = document.querySelector(course.target);
-  if (!panel) return false;
-  closeDialogForNavigation();
-  const details = panel.querySelector('details');
-  if (details) details.open = true;
-  panel.focus({ preventScroll: true });
-  return true;
-}
 function revealCourse(courseId) {
   const card = cards.find(item => item.dataset.courseId === courseId);
   if (!card) return false;
-  closeDialogForNavigation();
   const category = filters.some(button => button.dataset.filter === card.dataset.category) ? card.dataset.category : 'all';
   filterCourses(category, filterLabel(category));
   card.focus({ preventScroll: true });
@@ -196,32 +113,6 @@ function revealCourseFromHash() {
   if (match && revealCourse(match[1])) cards.find(card => card.dataset.courseId === match[1]).scrollIntoView({ block: 'start' });
 }
 window.addEventListener('hashchange', revealCourseFromHash);
-
-document.addEventListener('click', event => {
-  // The course dialog signs the visitor up at a branch: close it, then bring the contacts section into view.
-  const jump = event.target.closest('[data-dialog-jump]');
-  if (jump) {
-    event.preventDefault();
-    closeDialogForNavigation();
-    document.querySelector(jump.getAttribute('href'))?.scrollIntoView({
-      block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
-    });
-    return;
-  }
-  const examLink = event.target.closest('[data-exam-details]');
-  if (examLink) { revealExam(examLink.dataset.examDetails); return; }
-  const trigger = event.target.closest('.open-enroll-btn, [data-open-course]');
-  if (!trigger) return;
-  event.preventDefault();
-  openModal(trigger.dataset.openCourse, trigger);
-});
-courseSelect.addEventListener('change', updateCourseSummary);
-document.querySelector('#modal-close').addEventListener('click', () => dialog.close());
-dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
-dialog.addEventListener('close', () => {
-  document.body.style.overflow = previousOverflow;
-  if (dialogTrigger?.isConnected) dialogTrigger.focus();
-});
 
 filterCourses(defaultCategory, filterLabel(defaultCategory));
 revealCourseFromHash();
@@ -281,101 +172,7 @@ setupCashbackTabs();
 
 // Card lists use a stable responsive grid; no automatic horizontal scrolling.
 
-// The three-language selector always translates from the original Russian HTML.
-function setupLanguage() {
-  const packs = { uz: window.stanfordUz, kaa: window.stanfordKaa };
-  // /uz/ and /kaa/ hold copies translated at build time; there the switch opens the other copy instead.
-  const pageCopy = Object.hasOwn(packs, document.documentElement.dataset?.langPage) ? document.documentElement.dataset.langPage : '';
-  const addressFor = code => {
-    const path = location.pathname;
-    const folder = path.slice(0, path.lastIndexOf('/') + 1).replace(/(?:uz|kaa)\/$/, '');
-    return `${folder}${code === 'ru' ? '' : `${code}/`}${path.slice(path.lastIndexOf('/') + 1)}${location.hash}`;
-  };
-  const select = document.querySelector('#lang-toggle');
-  if (!select) return;
-  const attributes = ['aria-label', 'alt', 'title', 'placeholder', 'content'];
-  const cyrillic = /[А-Яа-яЁё]/;
-  const texts = new Map();
-  const attrs = new Map();
-  let lang = 'ru';
-  const translate = value => {
-    const raw = value.trim();
-    if (!raw) return value;
-    const pack = packs[lang];
-    if (!pack) return value;
-    let out = pack.strings[raw.replace(/\s+/g, ' ')];
-    if (out === undefined) {
-      for (const [pattern, build] of pack.patterns || []) {
-        const match = raw.match(pattern);
-        if (match) { out = build(match, translate); break; }
-      }
-    }
-    if (out === undefined) return value;
-    return value.match(/^\s*/)[0] + out + value.match(/\s*$/)[0];
-  };
-  const translateAttribute = (element, name) => {
-    const value = element.getAttribute(name);
-    if (!value || !cyrillic.test(value)) return;
-    const next = translate(value);
-    if (next === value) return;
-    if (!attrs.has(element)) attrs.set(element, {});
-    attrs.get(element)[name] = { source: value, translated: next };
-    element.setAttribute(name, next);
-  };
-  const translateNode = node => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      if (!cyrillic.test(node.data)) return;
-      const next = translate(node.data);
-      if (next !== node.data) { texts.set(node, { source: node.data, translated: next }); node.data = next; }
-      return;
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE || node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return;
-    attributes.forEach(name => translateAttribute(node, name));
-    node.childNodes.forEach(translateNode);
-  };
-  const restore = () => {
-    texts.forEach((entry, node) => { if (node.data === entry.translated) node.data = entry.source; });
-    attrs.forEach((values, element) => Object.entries(values).forEach(([name, entry]) => {
-      if (element.getAttribute(name) === entry.translated) element.setAttribute(name, entry.source);
-    }));
-    texts.clear();
-    attrs.clear();
-  };
-  const observer = typeof MutationObserver === 'undefined' ? null : new MutationObserver(records => {
-    if (lang === 'ru') return;
-    records.forEach(record => {
-      if (record.type === 'childList') record.addedNodes.forEach(translateNode);
-      else if (record.type === 'characterData') translateNode(record.target);
-      else translateAttribute(record.target, record.attributeName);
-    });
-    observer.takeRecords(); // our own replacements need no second pass
-  });
-  observer?.observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: attributes });
-  const setLanguage = next => {
-    // Always translate from the Russian source, including a direct UZ ↔ QQ change.
-    restore();
-    lang = next === 'ru' || (Object.hasOwn(packs, next) && packs[next]) ? next : 'ru';
-    if (lang !== 'ru') translateNode(document.documentElement);
-    document.documentElement.lang = lang;
-    select.value = lang;
-    observer?.takeRecords();
-  };
-  select.addEventListener('change', () => {
-    if (pageCopy) {
-      const next = select.value === 'ru' || Object.hasOwn(packs, select.value) ? select.value : pageCopy;
-      try { localStorage.setItem('stanford-lang', next); } catch { /* Keep the choice for this visit only. */ }
-      if (next !== pageCopy) location.assign(addressFor(next));
-      return;
-    }
-    setLanguage(select.value);
-    try { localStorage.setItem('stanford-lang', lang); } catch { /* Keep the choice for this visit only. */ }
-  });
-  let saved;
-  try { saved = localStorage.getItem('stanford-lang'); } catch { /* Settings are optional. */ }
-  // A translated copy always shows its own language; text added later by scripts is still translated.
-  setLanguage(pageCopy || saved || 'ru');
-}
-setupLanguage();
+// The language switch lives in assets/i18n/language.js, shared by every page.
 
 // Expose enhancement-only controls only after successful initialization.
 document.documentElement.dataset.enhanced = "true";

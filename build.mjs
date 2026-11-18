@@ -204,6 +204,7 @@ export function renderContacts(contacts, { compact = false } = {}) {
   if (!compact && contacts.instagram) extras.push(`<a href="${escapeHTML(contacts.instagram)}" target="_blank" rel="noopener noreferrer">${svgIcon('instagram')}<span>Instagram</span>${svgIcon('external')}</a>`);
   // HR no longer gets messages directly from this block: candidates fill the career form instead.
   if (!compact) extras.push(`<a class="contact-extras-link" href="career">${svgIcon('check')}<span>Заполнить анкету</span>${svgIcon('arrow-right')}</a>`);
+  if (!compact) extras.push(`<a class="contact-extras-link" href="feedback">${svgIcon('mail')}<span>Жалобы и предложения</span>${svgIcon('arrow-right')}</a>`);
   // The course dialog is where the visitor signs up: send them to the branch addresses instead of a messenger.
   const jump = compact ? `<p class="contact-jump"><a class="text-link" href="#enroll" data-dialog-jump>Приходите в центр: адреса филиалов${svgIcon('arrow-right')}</a></p>` : '';
   return `<div class="contact-channels">${groups.join('')}</div>${extras.length ? `<div class="contact-extras">${extras.join('')}</div>` : ''}${jump}`;
@@ -299,11 +300,11 @@ export function renderMetadata(site, page = '', lang = 'ru') {
 // ---------- Translated copies of the public pages (/uz/, /kaa/) ----------
 // The same dictionaries as the language switch, applied at build time so search engines see each language.
 // A string without a translation stays in Russian, exactly as in the browser.
-export const LANGUAGES = ['uz', 'kaa'];
-const PACK_NAMES = { uz: 'stanfordUz', kaa: 'stanfordKaa' };
+export const LANGUAGES = ['uz', 'kaa', 'en'];
+const PACK_NAMES = { uz: 'stanfordUz', kaa: 'stanfordKaa', en: 'stanfordEn' };
 const TRANSLATED_ATTRIBUTES = new Set(['aria-label', 'alt', 'title', 'placeholder', 'content']);
 const URL_ATTRIBUTES = new Set(['src', 'href', 'poster']);
-const PAGE_LINK = /^(?:\.\/|(?:index|results|teachers|career|privacy)(?:\.html)?)(?:[?#].*)?$/;
+const PAGE_LINK = /^(?:\.\/|(?:index|results|teachers|career|privacy|feedback)(?:\.html)?)(?:[?#].*)?$/;
 const CYRILLIC = /[А-Яа-яЁё]/;
 const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' };
 
@@ -386,6 +387,16 @@ export function languagePackFor(lang, page = '') {
 }
 
 export function generateLanguagePage(html, data, lang, page, pack = languagePackFor(lang, page)) {
+  // Only this language's dictionary, right before the shared switch; versions follow the file content.
+  const scripts = [`assets/i18n/${lang}.js`, ...(page === 'privacy.html' ? [`assets/i18n/privacy-${lang}.js`] : [])]
+    .map(src => `<script src="${src}"></script>\n  `).join('');
+  html = html.replace(/<script src="assets\/i18n\/language\.js/, match => `${scripts}${match}`);
+  html = versionContentAssets(html, data);
+  // Translations need no Cyrillic font up front; Uzbek and Karakalpak preload their small letters font instead.
+  const cyrillic = '<link rel="preload" href="assets/fonts/inter-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>';
+  html = html.replace(`  ${cyrillic}
+`, lang === 'en' ? '' : `  ${cyrillic.replace('inter-cyrillic-wght-normal', 'inter-uz-kaa-wght-normal')}
+`);
   const translated = translatePage(html, lang, pack);
   return replaceBlock(translated, 'SEO', renderMetadata(data.site, page === 'index.html' ? '' : page, lang));
 }
@@ -419,11 +430,13 @@ export function renderStructuredData(site, contacts) {
 }
 
 // A publication changes these URLs whenever the data or translations change, even if the old files are cached.
-export function versionContentAssets(html, data, dictionary = fs.readFileSync(new URL('./assets/i18n/uz.js', import.meta.url)), karakalpakDictionary = fs.readFileSync(new URL('./assets/i18n/kaa.js', import.meta.url))) {
+export function versionContentAssets(html, data, dictionary = fs.readFileSync(new URL('./assets/i18n/uz.js', import.meta.url)), karakalpakDictionary = fs.readFileSync(new URL('./assets/i18n/kaa.js', import.meta.url)), englishDictionary = fs.readFileSync(new URL('./assets/i18n/en.js', import.meta.url))) {
   const version = value => parseInt(createHash('sha256').update(value).digest('hex').slice(0, 12), 16).toString();
-  const versions = { 'content.js': version(JSON.stringify(data)), 'assets/i18n/uz.js': version(dictionary), 'assets/i18n/kaa.js': version(karakalpakDictionary) };
-  return html.replace(/\b(src|href)="(content\.js|assets\/i18n\/(?:uz|kaa)\.js)(?:\?v=[^"]*)?"/g,
-    (_, attribute, file) => `${attribute}="${file}?v=${versions[file]}"`);
+  const versions = { 'content.js': version(JSON.stringify(data)), 'assets/i18n/uz.js': version(dictionary), 'assets/i18n/kaa.js': version(karakalpakDictionary), 'assets/i18n/en.js': version(englishDictionary) };
+  // Policy translations get a version from their own content as well.
+  const fileVersion = file => versions[file] ?? (versions[file] = version(fs.readFileSync(new URL(`./${file}`, import.meta.url))));
+  return html.replace(/\b(src|href)="(content\.js|assets\/i18n\/(?:privacy-)?(?:uz|kaa|en)\.js)(?:\?v=[^"]*)?"/g,
+    (_, attribute, file) => `${attribute}="${file}?v=${fileVersion(file)}"`);
 }
 
 export function renderDemoBanner(site) {
@@ -580,7 +593,9 @@ export function renderLocations(contacts, { demo = false } = {}) {
 }
 
 // Both faces are static HTML: the programme remains readable without JavaScript.
-export function renderCourses(courses) {
+export function renderCourses(courses, contacts = {}) {
+  // The back of each card ends with a way to sign up: sign-up happens by phone.
+  const phone = contacts.verified ? contacts.phones?.[0] : '';
   return courses.map(course => {
     const id = escapeHTML(course.id);
     const name = escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '));
@@ -590,7 +605,7 @@ export function renderCourses(courses) {
 <a class="course-enroll-btn course-flip-toggle" href="#course-details-${id}" data-flip-open aria-controls="course-details-${id}" aria-expanded="false" aria-label="Подробнее: ${name}">Подробнее${svgIcon('arrow-right')}</a></div>
 <div class="course-face course-back" id="course-details-${id}"><h4 class="course-back-title" tabindex="-1">${name}</h4><p class="course-description">${escapeHTML(course.description)}</p>
 <ul class="course-details" aria-label="В программе">${course.skills.map(skill => `<li>${svgIcon('check')}<span>${escapeHTML(skill)}</span></li>`).join('')}</ul>
-<button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${name}">Назад${svgIcon('arrow-right')}</button></div>
+<div class="course-back-actions">${phone ? `<a class="button course-call" href="tel:${escapeHTML(phone)}" aria-label="Записаться: ${name}">${svgIcon('phone')}<span>Позвонить и записаться</span></a>` : ''}<button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${name}">Назад${svgIcon('arrow-right')}</button></div></div>
 </div>
 </article>`;
   }).join('\n');
@@ -635,9 +650,11 @@ export function renderHeroReward(cashback) {
   if (!cashback) return '';
   const all = cashbackExams.flatMap(exam => (cashback[exam.key] || []).map(tier => ({ ...tier, exam: exam.label })));
   if (!all.length) return '';
-  const top = all.reduce((best, tier) => tier.reward > best.reward ? tier : best);
+  // «до …» names the largest amount that is announced; a tier whose caption has no digits («Сумма уточняется») is skipped.
+  const announced = all.filter(tier => !tier.label || /\d/.test(tier.label));
+  const top = (announced.length ? announced : all).reduce((best, tier) => tier.reward > best.reward ? tier : best);
   const pills = cashbackExams.flatMap(exam => all.filter(tier => tier.exam === exam.label && tier.hero).sort((a, b) => b.reward - a.reward))
-    // A caption without digits (for example «? млн сум» while the amount is not announced) wins over the number.
+    // A caption without digits (for example «Сумма уточняется») wins over the number.
     .map(tier => `<span>${escapeHTML(`${tier.exam} ${tier.score} · ${tier.label && !/\d/.test(tier.label) ? tier.label : shortReward(tier.reward)}`)}</span>`).join('');
   return `<a class="hero-reward-banner" href="#cashback"><div class="hero-reward-header"><span class="hero-reward-tag">${svgIcon('award')}Кэшбэк за результат</span><strong class="hero-reward-val">до ${escapeHTML(rewardLabel(top))}</strong></div>${pills ? `<div class="hero-reward-pills">${pills}</div>` : ''}<p class="hero-reward-sub">Выплачиваем деньги за официальные баллы</p></a>`;
 }
@@ -647,10 +664,15 @@ export function renderNavCta(contacts) {
   return `<a class="button nav-cta" href="#enroll" aria-label="Записаться в центре: адреса филиалов">Записаться в центре${svgIcon('arrow-right')}</a>`;
 }
 
-// Floating shortcut to the branch addresses, always within thumb reach on phones.
+// Phones: a bar at the bottom of the screen to call or write right away (sign-up happens by phone or in person).
 export function renderContactFab(contacts) {
   if (!contacts.verified) return '';
-  return `<a class="contact-fab" href="#enroll" aria-label="Записаться в центре: адреса филиалов">${svgIcon('map-pin')}</a>`;
+  const phone = contacts.phones?.[0];
+  const telegram = contacts.telegrams?.[0];
+  if (!phone && !telegram) return '';
+  const call = phone ? `<a class="call-bar-call" href="tel:${escapeHTML(phone)}">${svgIcon('phone')}<span>Позвонить</span></a>` : '';
+  const write = telegram ? `<a class="call-bar-telegram" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer">${svgIcon('telegram')}<span>Telegram</span></a>` : '';
+  return `<nav class="call-bar" aria-label="Быстрая связь">${call}${write}</nav>`;
 }
 
 export function renderCTA(contacts) {
@@ -733,7 +755,7 @@ export function renderEvents(events = []) {
 export function generate(html, data) {
   html = html.replace(/\r\n/g, '\n');
   validateContent(data);
-  html = replaceBlock(html, 'COURSES', renderCourses(data.courses));
+  html = replaceBlock(html, 'COURSES', renderCourses(data.courses, data.contacts));
   html = replaceBlock(html, 'CTA', renderCTA(data.contacts));
   html = replaceBlock(html, 'FILTERS', renderFilters(data.courses));
   html = replaceBlock(html, 'LOCATIONS', renderLocations(data.contacts, { demo: showDemo(data.site) }));
@@ -759,10 +781,10 @@ export function generate(html, data) {
     return data.teachers?.length ? clean : clean.replace(/>$/, ' hidden>');
   });
   html = applyTexts(html, data.texts);
-  html = replaceBlock(html, 'OPTIONS', data.courses.map(course => `<option value="${escapeHTML(course.id)}">${escapeHTML([course.name, course.subtitle].filter(Boolean).join(' '))}</option>`).join(''));
   html = replaceBlock(html, 'SEO', [renderMetadata(data.site), renderStructuredData(data.site, data.contacts)].filter(Boolean).join('\n'));
   html = html.replace(/<!-- CONTACT_START:([a-z]+) -->[\s\S]*?<!-- CONTACT_END:\1 -->/g, (_, key) => `<!-- CONTACT_START:${key} -->\n${renderContacts(data.contacts, { compact: key === 'dialog' })}\n<!-- CONTACT_END:${key} -->`);
-  html = replaceBlock(html, 'ASSET_VERSIONS', '<script src="content.js"></script><script src="assets/i18n/uz.js"></script><script src="assets/i18n/kaa.js"></script>');
+  // Dictionaries are loaded only by the translated copies (/uz/, /kaa/, /en/), each its own one.
+  html = replaceBlock(html, 'ASSET_VERSIONS', '<script src="content.js"></script>');
   return versionContentAssets(html, data);
 }
 
@@ -911,6 +933,18 @@ export function generatePrivacy(html, data) {
   return versionContentAssets(applyTexts(html, data.texts), data);
 }
 
+// Complaints page: static form; the branch list comes from the contacts data.
+export function generateFeedback(html, data) {
+  html = html.replace(/\r\n/g, '\n');
+  validateContent(data);
+  html = replaceBlock(html, 'ROBOTS', renderRobots(data.site));
+  html = replaceBlock(html, 'ANALYTICS', renderAnalytics(data.site));
+  html = replaceBlock(html, 'HOLIDAY', renderHoliday(data.site));
+  html = replaceBlock(html, 'SEO', renderMetadata(data.site, 'feedback.html'));
+  html = replaceBlock(html, 'FEEDBACK_BRANCHES', (data.contacts?.locations || []).map(location => `<option value="${escapeHTML(location.name)}">${escapeHTML(location.name)}</option>`).join(''));
+  return versionContentAssets(applyTexts(html, data.texts), data);
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
   const data = readContent();
   const pages = [
@@ -918,7 +952,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(proces
     { file: new URL('./results.html', import.meta.url), build: generateResults, label: 'results.html' },
     { file: new URL('./teachers.html', import.meta.url), build: generateTeachers, label: 'teachers.html' },
     { file: new URL('./career.html', import.meta.url), build: generateCareer, label: 'career.html' },
-    { file: new URL('./privacy.html', import.meta.url), build: generatePrivacy, label: 'privacy.html' }
+    { file: new URL('./privacy.html', import.meta.url), build: generatePrivacy, label: 'privacy.html' },
+    { file: new URL('./feedback.html', import.meta.url), build: generateFeedback, label: 'feedback.html' }
   ];
   let stale = false;
   // Plain files generated from the same data: robots.txt and sitemap.xml.

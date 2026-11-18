@@ -80,7 +80,7 @@ class _PageTextParser(HTMLParser):
 def read_page_texts(site_root):
     """Read slots from available site pages next to an imported content.js, in page order."""
     slots = {}
-    for name in ('index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html'):
+    for name in ('index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html'):
         path = Path(site_root) / name
         if not path.is_file():
             continue
@@ -486,7 +486,7 @@ def validate_content(data):
 UZ_BLOCK = re.compile(r'(\bstrings:\s*\{\n)([\s\S]*?)(\n  \},\s*\n(?:\s*//[^\n]*\n)*\s*patterns:)')
 _JS_STRING = r"""'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*\""""
 UZ_PAIR = re.compile(rf'({_JS_STRING})\s*:\s*({_JS_STRING})')
-TRANSLATION_LANGUAGES = ('uz', 'kaa')
+TRANSLATION_LANGUAGES = ('uz', 'kaa', 'en')
 
 
 def normalize_text(value):

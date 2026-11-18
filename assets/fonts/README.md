@@ -1,6 +1,6 @@
 # Inter webfonts
 
-These unmodified WOFF2 files are self-hosted font assets, not an installed npm dependency.
+These WOFF2 files are self-hosted font assets, not an installed npm dependency. They are unmodified, except the small `inter-uz-kaa` cut described at the end (subsetting is allowed by the OFL).
 
 - Family: Inter, normal style, variable weight axis 100–900 (default 400).
 - Font name-table version: `Version 4.001;git-66647c0bb`.
@@ -31,3 +31,5 @@ unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U
 ```
 
 Verification: WOFF2 signature and declared length checked; compressed table stream decoded using Node's built-in Brotli implementation. Name and `fvar` tables confirm Inter and the weight range. `cmap` covers all 95 printable ASCII characters and all 66 Russian letters (including Ё/ё), plus №. No browser rendering verification is implied.
+
+`inter-uz-kaa-wght-normal.woff2` — вырезка из `inter-latin-ext` только с буквами Ğ ğ İ Ń ń Ş ş Ǵ ǵ (узбекский и каракалпакский), 4 КБ вместо 85 КБ. Сделано fontTools: `pyftsubset inter-latin-ext-wght-normal.woff2 --unicodes="U+011E-011F,U+0130,U+0143-0144,U+015E-015F,U+01F4-01F5" --layout-features="*" --flavor=woff2`. Если в словари добавятся новые буквы вне Latin-1, пересоберите её.

@@ -40,20 +40,20 @@
 	header @static Cache-Control "public, max-age=86400, must-revalidate"
 
 	@mutable {
-		path / /index.html /results.html /teachers.html /career.html /privacy.html /results /teachers /career /privacy /content.js /script.js /results.js /career.js /theme-init.js /style.css /robots.txt /sitemap.xml /uz /uz/* /kaa /kaa/*
+		path / /index.html /results.html /teachers.html /career.html /privacy.html /feedback.html /results /teachers /career /privacy /feedback /content.js /script.js /results.js /career.js /feedback.js /theme-init.js /style.css /robots.txt /sitemap.xml /uz /uz/* /kaa /kaa/* /en /en/*
 		not query v=*
 	}
 	header @mutable Cache-Control no-cache
 
 	# Public page addresses have no «.html»: old links are sent to the short address once.
-	@html_index path_regexp html_index ^(/(?:uz/|kaa/)?)index\.html$
+	@html_index path_regexp html_index ^(/(?:uz/|kaa/|en/)?)index\.html$
 	redir @html_index {re.html_index.1}{?query} 301
-	@html_page path_regexp html_page ^(/(?:uz/|kaa/)?)(results|teachers|career|privacy)\.html$
+	@html_page path_regexp html_page ^(/(?:uz/|kaa/|en/)?)(results|teachers|career|privacy|feedback)\.html$
 	redir @html_page {re.html_page.1}{re.html_page.2}{?query} 301
 
-	# HR remains a separate service: only the form submission (POST /career) goes there; GET /career is the page.
+	# HR remains a separate service: only form submissions (POST /career, POST /feedback) go there; GET shows the pages.
 	@hr_submit {
-		path /career
+		path /career /feedback
 		method POST
 	}
 	handle @hr_submit {

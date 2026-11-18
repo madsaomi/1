@@ -23,3 +23,21 @@ export async function sendResume({ token, chatIds, chatId, pdf, filename, positi
   if (failed === chats.length) throw new Error('telegram_send_failed');
   return true;
 }
+
+// A plain text message to every chat of a list (complaints). Succeeds when at least one chat received it.
+export async function sendText({ token, chatIds, text }) {
+  const results = await Promise.allSettled(chatIds.map(async chatId => {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(20000)
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.ok !== true) throw new Error('telegram_send_failed');
+  }));
+  const failed = results.filter(result => result.status === 'rejected').length;
+  if (failed) console.error(`[feedback] telegram: ${failed} of ${chatIds.length} chats did not receive the message`);
+  if (failed === chatIds.length) throw new Error('telegram_send_failed');
+  return true;
+}

@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML, openingHours, renderAnalytics, renderHoliday, HOLIDAYS } from '../build.mjs';
+import { readContent, validateContent, generate, generateResults, generateCareer, generateTeachers, versionContentAssets, applyTexts, renderContacts, renderLocations, renderCourses, renderFilters, renderCTA, renderRobots, renderStats, renderTeachers, renderResults, renderDemoBanner, initials, escapeHTML, openingHours, renderAnalytics, renderHoliday, HOLIDAYS, generateFeedback } from '../build.mjs';
 
 const publishedData = readContent();
 const sourceHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -151,7 +151,7 @@ function contactFixture(overrides = {}) {
   };
 }
 
-test('published contacts expose both admissions phones and keep Telegram out of the sign-up dialog', () => {
+test('published contacts expose both admissions phones, Telegram and the secondary links', () => {
   assert.equal(data.contacts.verified, true);
   assert.deepEqual(Array.from(data.contacts.phones), ['+998913036001', '+998994576001']);
   assert.deepEqual(Array.from(data.contacts.telegrams), ['https://t.me/stanford_nukus', 'https://t.me/Nukus_Stanford']);
@@ -159,22 +159,11 @@ test('published contacts expose both admissions phones and keep Telegram out of 
   assert.equal(data.contacts.instagram, 'https://www.instagram.com/stanford_nukus/');
   assert.equal(data.site.city, 'Нукус');
   const enroll = html.split('<!-- CONTACT_START:enroll -->')[1].split('<!-- CONTACT_END:enroll -->')[0];
-  const dialog = html.split('<!-- CONTACT_START:dialog -->')[1].split('<!-- CONTACT_END:dialog -->')[0];
-  for (const phone of data.contacts.phones) {
-    assert(enroll.includes(`href="tel:${phone}"`));
-    assert(dialog.includes(`href="tel:${phone}"`));
-  }
+  for (const phone of data.contacts.phones) assert(enroll.includes(`href="tel:${phone}"`));
   for (const telegram of data.contacts.telegrams) assert(enroll.includes(`href="${telegram}"`));
   assert.equal(enroll.includes(`href="${data.contacts.hrTelegram}"`), false, 'HR Telegram is replaced by the career form');
   assert(enroll.includes('href="career"'));
   assert(enroll.includes(`href="${data.contacts.instagram}"`));
-  assert(!dialog.includes('t.me/'), 'The course dialog asks the visitor to come to the centre instead of messaging');
-  assert(dialog.includes('href="#enroll"'));
-  assert(!dialog.includes(data.contacts.hrTelegram));
-  assert(!dialog.includes(data.contacts.instagram));
-  assert(!dialog.includes('maps.app.goo.gl'));
-  assert(!dialog.includes('yandex.uz/maps'));
-  assert(!/<iframe\b/i.test(dialog));
   assert(!/Запись временно недоступна|Контакты уточняются/.test(html));
 });
 
@@ -219,13 +208,11 @@ test('locations expose every supplied map as a safe link and escape names and ad
     assert.match(tag, /rel="[^"]*\bnoopener\b[^\"]*\bnoreferrer\b[^"]*"/);
   }
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
-  const dialog = html.split('<!-- CONTACT_START:dialog -->')[1].split('<!-- CONTACT_END:dialog -->')[0];
   assert(data.contacts.locations.length > 0, 'Published locations must be configured');
   for (const location of data.contacts.locations) {
     for (const { url } of location.maps) {
       assert.equal(html.split(`href="${url}"`).length - 1, 1, `Map link must appear once: ${url}`);
       assert(main.includes(`href="${url}"`));
-      assert(!dialog.includes(url));
     }
   }
   assert.equal(renderLocations(contactFixture({ locations: [] })), '');
@@ -463,17 +450,16 @@ test('metadata is emitted only for a configured real HTTPS URL', () => {
 test('public HTML has no invented biographies, contacts or unfinished translations', () => {
   assert(!/Lorem Johnson|Ipsum Williams|Долор Сит|Лорем Ипсум|Адиписцинг|123-45-67|stanford_central|Ташкент \/ Нукус/.test(html));
   assert(html.includes('id="lang-toggle"'), 'The page keeps its Uzbek language switch');
-  assert(html.includes('<script src="assets/i18n/uz.js'), 'The Uzbek dictionary must be loaded');
+  assert(!html.includes('assets/i18n/uz.js'), 'Russian pages load no dictionaries: the /uz/ copy does');
+  assert(fs.readFileSync(new URL('../uz/index.html', import.meta.url), 'utf8').includes('<script src="../assets/i18n/uz.js?v='));
   assert(!html.includes('enroll-form'));
   assert(!/<script>([\s\S]*?)<\/script>/.test(html));
   assert(!/style="/.test(html));
 });
 
-test('native modal, no lead-copy flow, and no automatic content motion', () => {
-  assert(html.includes('<dialog '));
+test('no lead-copy flow and no automatic content motion', () => {
   assert(!html.includes('prepared-message'));
   const js = fs.readFileSync(new URL('../script.js', import.meta.url), 'utf8');
-  assert(js.includes('dialog.showModal()'));
   assert(!/cloneNode|faculty-loop|pointermove|FormData|clipboard/.test(js));
   const css = fs.readFileSync(new URL('../style.css', import.meta.url), 'utf8');
   // PLAN-042: the teachers marquee was replaced by static cards, so nothing loops.
@@ -690,98 +676,6 @@ test('catalog includes all programme details in static HTML and labels its flip 
   }
 });
 
-test('course dialog shows the monthly price and, when set, the family price', () => {
-  const { context, nodes, element } = runtime();
-  const course = data.courses.find(item => item.id === 'general-english');
-  context.openModal(course.id, element());
-  const summary = nodes['#selected-course'];
-  assert.equal(summary.children[0].textContent, course.name);
-  assert.equal(summary.children[1].textContent, course.description);
-  assert.equal(summary.children[3].tagName, 'UL');
-  assert.equal(summary.children[4].href, `#course-${course.id}`);
-  const [prices] = descendantTags(summary.children[2], 'dl');
-  assert(prices, 'Expected semantic price list');
-  assert.equal(descendantTags(prices, 'dt').length, 2);
-  assert.equal(descendantTags(prices, 'dd').length, 2);
-  const pricesText = nodeText(prices);
-  assert(pricesText.includes(new Intl.NumberFormat('ru-RU').format(course.price)));
-  assert(pricesText.includes(new Intl.NumberFormat('ru-RU').format(course.specialPrice)));
-  assert.match(pricesText, /Стоимость обучения/u);
-  assert.match(pricesText, /Семья или 2 курса/u);
-  nodes['#contact-course'].value = 'ielts';
-  nodes['#contact-course'].handlers.change();
-  const ielts = data.courses.find(item => item.id === 'ielts');
-  const [ieltsPrices] = descendantTags(summary.children[2], 'dl');
-  assert.equal(descendantTags(ieltsPrices, 'dt').length, 1);
-  assert.equal(descendantTags(ieltsPrices, 'dd').length, 1);
-  assert(nodeText(ieltsPrices).includes(new Intl.NumberFormat('ru-RU').format(ielts.price)));
-  assert(!ielts.specialPrice, 'IELTS has no family price in the data');
-  assert(!/Семья или 2 курса/u.test(nodeText(summary.children[2])), 'A course without a family price shows none');
-});
-
-test('dialog opens and switches courses at the top of its own scroll area, restoring page state on close', () => {
-  const { context, nodes, document, element } = runtime();
-  const trigger = element();
-  const body = nodes['.modal-body'];
-  body.scrollTop = 240;
-  context.openModal('general-english', trigger);
-  assert.equal(body.scrollTop, 0);
-  assert.equal(document.body.style.overflow, 'hidden');
-  body.scrollTop = 180;
-  nodes['#contact-course'].value = 'sat';
-  nodes['#contact-course'].handlers.change();
-  assert.equal(body.scrollTop, 0);
-  nodes['#enroll-modal'].close();
-  assert.equal(document.body.style.overflow, 'auto');
-  assert.equal(trigger.focused, true);
-  body.scrollTop = 120;
-  context.openModal('ielts', element());
-  assert.equal(body.scrollTop, 0);
-});
-
-test('unsupported dialog falls back to static prices without locking page scroll or changing focus', () => {
-  const { context, nodes, document, element } = runtime();
-  const trigger = element();
-  context.location = { hash: '' };
-  nodes['#enroll-modal'].showModal = undefined;
-  context.openModal('sat', trigger);
-  assert.equal(context.location.hash, 'prices');
-  assert.equal(document.body.style.overflow, 'auto');
-  assert.equal(nodes['#enroll-modal'].open, undefined);
-  assert.equal(trigger.focused, undefined);
-});
-
-test('exam details navigation validates IDs, opens the matching panel and transfers focus out of dialog', () => {
-  for (const id of ['ielts', 'sat']) {
-    const { context, nodes, document, element, documentHandlers } = runtime();
-    const trigger = element();
-    context.openModal(id, trigger);
-    const examLink = nodes['#selected-course'].children.find(child => child.dataset?.examDetails === id);
-    assert(examLink, `Missing exam details link: ${id}`);
-    assert.equal(examLink.href, `#${id}`);
-    context.revealExam('does-not-exist');
-    context.revealExam('general-english');
-    assert.equal(nodes['#enroll-modal'].open, true);
-    assert.equal(nodes[`#${id}`].querySelector('details').open, false);
-    assert.equal(nodes[`#${id}`].focused, undefined);
-    assert.equal(document.body.style.overflow, 'hidden');
-    const event = {
-      target: { closest: selector => selector === '[data-exam-details]' ? examLink : null },
-      preventDefault() { this.defaultPrevented = true; }
-    };
-    documentHandlers.click(event);
-    assert.equal(nodes['#enroll-modal'].open, false);
-    assert.equal(document.body.style.overflow, 'auto');
-    assert.equal(trigger.focused, undefined);
-    const panel = nodes[`#${id}`];
-    assert.equal(panel.querySelector('details').open, true);
-    assert.equal(panel.focused, true);
-    assert.equal(panel.focusOptions.preventScroll, true);
-    const other = nodes[id === 'ielts' ? '#sat' : '#ielts'];
-    assert.equal(other.querySelector('details').open, false);
-  }
-});
-
 test('whole client initializes without storage and filters the static cards', () => {
   const { context, cards, document, nodes } = runtime();
   assert.equal(document.documentElement.dataset.enhanced, 'true');
@@ -790,20 +684,6 @@ test('whole client initializes without storage and filters the static cards', ()
   assert(nodes['#course-filter-status'].textContent.includes('2'));
   context.filterCourses('all', 'Все');
   assert.equal(cards.filter(card => !card.hidden).length, data.courses.length);
-});
-
-test('native modal selects the exact course and restores scroll and trigger focus', () => {
-  const { context, nodes, element, document } = runtime();
-  const trigger = element();
-  context.openModal('general-english-kaa', trigger);
-  assert.equal(nodes['#contact-course'].value, 'general-english-kaa');
-  assert.equal(nodes['#enroll-modal'].open, true);
-  assert.equal(document.body.style.overflow, 'hidden');
-  assert(nodes['#selected-course'].children[0].textContent.includes('каракалпакском'));
-  assert.equal(nodes['#selected-course'].children[3].children.length, data.courses.find(course => course.id === 'general-english-kaa').skills.length);
-  nodes['#enroll-modal'].close();
-  assert.equal(document.body.style.overflow, 'auto');
-  assert.equal(trigger.focused, true);
 });
 
 test('filter counts match actual categories and are hidden from duplicate screen-reader text', () => {
@@ -850,18 +730,6 @@ test('price navigation reveals a filtered course, but an unknown ID leaves the f
   assert.equal(cards.filter(card => !card.hidden).length, data.courses.filter(course => course.category === sat.category).length);
   assert.equal(cards.find(card => card.dataset.courseId === 'sat').hidden, false);
   assert.equal(cards.find(card => card.dataset.courseId === 'sat').focused, true);
-});
-
-test('explicit navigation out of dialog keeps focus on the course instead of the old trigger', () => {
-  const { context, nodes, cards, element, document } = runtime();
-  const trigger = element();
-  context.openModal('ielts', trigger);
-  assert.equal(nodes['#selected-course'].children[4].href, '#course-ielts');
-  context.revealCourse('ielts');
-  assert.equal(nodes['#enroll-modal'].open, false);
-  assert.equal(document.body.style.overflow, 'auto');
-  assert.equal(trigger.focused, undefined);
-  assert.equal(cards.find(card => card.dataset.courseId === 'ielts').focused, true);
 });
 
 test('hash navigation reveals and scrolls to a course after a conflicting filter', () => {
@@ -1212,13 +1080,14 @@ test('a staged build uses its own data and validates every page before replacing
   const temporaryRoot = path.resolve(os.tmpdir());
   const stage = fs.mkdtempSync(path.join(temporaryRoot, 'stanford-site-build-'));
   try {
-    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html']) {
+    for (const file of ['build.mjs', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html']) {
       fs.copyFileSync(new URL(`../${file}`, import.meta.url), path.join(stage, file));
     }
     fs.mkdirSync(path.join(stage, 'assets', 'i18n'), { recursive: true });
     fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'uz.js'), 'window.stanfordUz = { strings: {}, patterns: [] };\n');
     fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'kaa.js'), 'window.stanfordKaa = { strings: {}, patterns: [] };\n');
-    for (const lang of ['uz', 'kaa']) fs.writeFileSync(path.join(stage, 'assets', 'i18n', `privacy-${lang}.js`), '');
+    fs.writeFileSync(path.join(stage, 'assets', 'i18n', 'en.js'), 'window.stanfordEn = { strings: {}, patterns: [] };\n');
+    for (const lang of ['uz', 'kaa', 'en']) fs.writeFileSync(path.join(stage, 'assets', 'i18n', `privacy-${lang}.js`), '');
     const fixture = {
       site: { url: 'https://staged.example', demoMode: false },
       courses: [{ id: 'staged-course', name: 'Проверочный курс', category: 'languages', description: 'Описание курса',
@@ -1296,4 +1165,16 @@ test('holiday greetings: automatic by dates, one chosen holiday always on, or sw
   assert.equal(renderHoliday({ holiday: { mode: 'off' } }), '');
   assert.throws(() => validateContent({ ...data, site: { ...data.site, holiday: { mode: 'birthday' } } }), /holiday/);
   for (const name of Object.keys(HOLIDAYS)) assert(fs.existsSync(new URL(`../${name === 'independence' ? 'assets/flags/uz.svg' : `assets/holiday/${name}.svg`}`, import.meta.url)));
+});
+
+test('the complaints page lists the branches from the contacts and is linked from contacts and every footer', () => {
+  const page = generateFeedback(fs.readFileSync(new URL('../feedback.html', import.meta.url), 'utf8'), { ...data, contacts: { ...data.contacts, verified: true } });
+  for (const location of data.contacts.locations) assert(page.includes(`<option value="${location.name}">${location.name}</option>`));
+  assert(page.includes('<meta name="feedback-endpoint" content="/feedback">') && page.includes('value="anonymous"'));
+  assert(renderContacts({ ...structuredClone(data.contacts), verified: true }).includes('href="feedback"'));
+  for (const file of ['index.html', 'results.html', 'teachers.html', 'career.html', 'privacy.html', 'feedback.html']) {
+    assert(fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').includes('<a href="feedback">Жалобы и предложения</a>'), file);
+  }
+  const caddy = fs.readFileSync(new URL('../Caddyfile', import.meta.url), 'utf8');
+  assert(caddy.includes('path /career /feedback') && caddy.includes('method POST'));
 });

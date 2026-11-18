@@ -30,3 +30,4 @@ cms/media/
 cms/staticfiles/
 cms/.local-credentials
 cms/.local-2fa/
+demo-photos/

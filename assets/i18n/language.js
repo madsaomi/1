@@ -1,12 +1,12 @@
 // Shared language enhancement for the directory and career pages.
 (() => {
 function setupLanguage() {
-  const packs = { uz: window.stanfordUz, kaa: window.stanfordKaa };
+  const packs = { uz: window.stanfordUz, kaa: window.stanfordKaa, en: window.stanfordEn };
   // /uz/ and /kaa/ hold copies translated at build time; there the switch opens the other copy instead.
   const pageCopy = Object.hasOwn(packs, document.documentElement.dataset?.langPage) ? document.documentElement.dataset.langPage : '';
   const addressFor = code => {
     const path = location.pathname;
-    const folder = path.slice(0, path.lastIndexOf('/') + 1).replace(/(?:uz|kaa)\/$/, '');
+    const folder = path.slice(0, path.lastIndexOf('/') + 1).replace(/(?:uz|kaa|en)\/$/, '');
     return `${folder}${code === 'ru' ? '' : `${code}/`}${path.slice(path.lastIndexOf('/') + 1)}${location.hash}`;
   };
   const select = document.querySelector('#lang-toggle');
@@ -79,6 +79,12 @@ function setupLanguage() {
     observer?.takeRecords();
   };
   select.addEventListener('change', () => {
+    // Russian pages carry no dictionaries: the translated copy of the page is opened instead.
+    if (!pageCopy && select.value !== 'ru' && Object.hasOwn(packs, select.value) && !packs[select.value]) {
+      try { localStorage.setItem('stanford-lang', select.value); } catch { /* Keep the choice for this visit only. */ }
+      location.assign(addressFor(select.value));
+      return;
+    }
     if (pageCopy) {
       const next = select.value === 'ru' || Object.hasOwn(packs, select.value) ? select.value : pageCopy;
       try { localStorage.setItem('stanford-lang', next); } catch { /* Keep the choice for this visit only. */ }

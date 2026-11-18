@@ -226,7 +226,7 @@ class FullPublicationIntegrationTests(TestCase):
     def copy_site(self, root):
         site = root / 'site'
         site.mkdir()
-        for name in ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html',
+        for name in ('build.mjs', 'content.js', 'index.html', 'results.html', 'career.html', 'teachers.html', 'privacy.html', 'feedback.html',
                      'script.js', 'results.js', 'career.js', 'theme-init.js', 'style.css', 'robots.txt', 'sitemap.xml'):
             shutil.copyfile(settings.SITE_ROOT / name, site / name)
         shutil.copytree(settings.SITE_ROOT / 'assets', site / 'assets')
@@ -263,7 +263,7 @@ class FullPublicationIntegrationTests(TestCase):
                 self.assertEqual(published['Текст интеграционного теста публикации'], expected)
                 # Strings shipped with the code but not in the admin yet (the 404 page) survive a publication.
                 self.assertIn('Страница не найдена', published)
-                self.assertRegex((site / 'index.html').read_text(encoding='utf-8'), rf'assets/i18n/{code}\.js\?v=\d+')
+                self.assertRegex((site / code / 'index.html').read_text(encoding='utf-8'), rf'assets/i18n/{code}\.js\?v=\d+')
             photo = next(item['photo'] for item in data['teachers'] if item['name'] == teacher.name)
             self.assertRegex(photo, r'^assets/uploads/[0-9a-f]{64}\.jpg$')
             self.assertTrue((site / photo).is_file())

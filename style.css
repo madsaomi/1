@@ -9,11 +9,17 @@
   src: url('assets/fonts/inter-latin-wght-normal.woff2') format('woff2');
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
-/* Latin Extended: Uzbek Ş ş and Ğ ğ (2026 alphabet). Loaded only when such letters are on the page. */
+/* The few letters of Uzbek (Ş ş Ğ ğ İ) and Karakalpak (Ń ń Ǵ ǵ): a 4 KB cut of Latin Extended instead of 85 KB. */
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url('assets/fonts/inter-uz-kaa-wght-normal.woff2') format('woff2');
+  unicode-range: U+011E-011F,U+0130,U+0143-0144,U+015E-015F,U+01F4-01F5;
+}
+/* The rest of Latin Extended, only if such letters ever appear (for example in a name typed in the admin). */
 @font-face {
   font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
   src: url('assets/fonts/inter-latin-ext-wght-normal.woff2') format('woff2');
-  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+  unicode-range: U+0100-011D,U+0120-012F,U+0132-0142,U+0145-015D,U+0160-01F3,U+01F6-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
 :root {
   color-scheme: light;
@@ -109,7 +115,6 @@ em { font-style: normal; }
 #navigation.open ~ .nav-backdrop { display: block; position: fixed; z-index: 1; inset: 0; background: var(--overlay-glass); animation: backdrop-in 260ms var(--ease); }
 .header .menu { position: relative; z-index: 3; }
 html:has(#navigation.open) { overflow: hidden; }
-html:has(#navigation.open) .contact-fab { display: none; }
 @keyframes drawer-in { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 #navigation a { display: inline-flex; align-items: center; min-height: 56px; padding: 8px 16px; font-size: var(--text-16); font-weight: 600; border-radius: 0; transition: background var(--duration) var(--ease); }
@@ -178,10 +183,6 @@ html[data-theme="dark"] .hero .text-link { background: var(--surface-raised); bo
 .why-list p { margin: 0; color: var(--muted); font-size: var(--text-14); line-height: 1.5; }
 
 .courses-section { position: relative; }
-.contact-fab { position: fixed; z-index: 40; right: var(--space-2); bottom: var(--space-2); place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--brand); color: var(--on-brand); box-shadow: 0 8px 24px var(--brand-a40); text-decoration: none; transition: transform 220ms var(--spring), box-shadow var(--duration) var(--ease); }
-.contact-fab .icon { width: 24px; height: 24px; }
-.contact-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 32px var(--brand-a50); text-decoration: none; }
-.contact-fab:focus-visible { outline-color: var(--focus); }
 .course-decor { position: absolute; top: var(--space-8); width: 216px; height: 264px; pointer-events: none; z-index: 0; }
 .course-decor-left { left: 0; }
 .course-decor-right { right: 0; }
@@ -385,7 +386,7 @@ details[open] > summary > .icon { transform: rotate(45deg); }
 .contact-channel:hover .icon-external { color: var(--brand); opacity: 1; }
 .contact-extras { display: flex; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--border); }
 .contact-extras a { display: inline-flex; align-items: center; gap: 8px; font-size: var(--text-14); font-weight: 500; color: var(--ink); text-decoration: none; transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), color var(--duration) var(--ease); }
-.contact-extras a:hover { border-color: var(--brand); color: var(--accent-text); background: var(--tint); text-decoration: none; }
+.contact-extras a:hover { color: var(--accent-text); background: var(--tint); text-decoration: none; }
 .contact-extras a .icon { width: 16px; height: 16px; color: var(--brand); flex-shrink: 0; }
 .contact-extras a .icon-external { width: 12px; height: 12px; color: var(--muted); }
 .contact-extras a:hover .icon-external { color: var(--brand); }
@@ -603,31 +604,6 @@ footer { margin-top: var(--space-4); padding-block: var(--space-4) calc(56px + v
 .footer-links { display: flex; align-items: center; flex-wrap: wrap; gap: 0 var(--space-3); font-size: var(--text-14); color: var(--muted); }
 .footer-links a { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 48px; }
 .footer-links a:hover { color: var(--ink); }
-.modal-backdrop { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: var(--space-1); border: 0; background: var(--transparent); color: var(--ink); }
-.modal-backdrop:not([open]) { display: none; }
-.modal-backdrop[open] { display: grid; place-items: center; }
-.modal-card { display: flex; flex-direction: column; width: min(640px, 100%); max-height: calc(100dvh - 16px); overflow: hidden; border: 1px solid var(--border-strong); box-shadow: var(--shadow-modal); }
-.modal-topbar { display: flex; flex-shrink: 0; align-items: flex-start; gap: var(--space-2); border-bottom: 1px solid var(--border); }
-.modal-header { min-width: 0; }
-.modal-header h2 { font-size: var(--text-24); }
-.modal-header p { margin-top: var(--space-1); color: var(--muted); font-size: var(--text-16); }
-.modal-close { display: grid; place-items: center; flex-shrink: 0; width: 48px; height: 48px; margin-left: auto; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); }
-.modal-close:hover { background: var(--surface-hover); }
-.modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.modal-card label { display: block; margin-bottom: var(--space-1); font-size: var(--text-14); font-weight: 600; }
-.modal-card select { width: 100%; min-height: 48px; padding: 8px 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); font-size: var(--text-16); }
-.selected-course { margin-block: var(--space-3); }
-.selected-course h3 { margin-bottom: var(--space-2); font-size: var(--text-24); }
-.selected-course p, .selected-course ul { color: var(--muted); font-size: var(--text-16); }
-.selected-course ul { padding-left: var(--space-3); margin-block: var(--space-2); }
-.selected-course li { margin-block: var(--space-1); }
-.dialog-prices { display: grid; gap: var(--space-2); margin-block: var(--space-3) var(--space-2); }
-.dialog-prices > div { padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); }
-.dialog-prices dt { font-size: var(--text-14); color: var(--muted); }
-.dialog-prices dd { margin: var(--space-1) 0 0; font-size: var(--text-24); font-weight: 600; font-variant-numeric: tabular-nums; }
-.dialog-prices dd span { display: block; font-size: var(--text-14); font-weight: 400; color: var(--muted); }
-.dialog-catalog-link, .dialog-exam-link { margin: var(--space-1) var(--space-2) 0 0; }
-.modal-backdrop[open] .modal-card { animation: panel-enter 200ms var(--ease); }
 /* PLAN-050: the phone menu and the page behind the course dialog are frosted too; the dialog card itself stays solid. */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   #navigation { background: var(--menu-glass); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
@@ -682,8 +658,6 @@ details[open] > :not(summary) { animation: content-enter 180ms var(--ease); }
   .contact-channels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .branch-map { height: 250px; min-height: 250px; }
   .footer-main { flex-direction: row; align-items: center; justify-content: space-between; }
-  .modal-backdrop { padding: var(--space-3); }
-  .modal-card { max-height: calc(100dvh - 48px); }
 }
 @media (min-width: 1024px) {
   .hero-copy { justify-content: center; }
@@ -954,7 +928,6 @@ html[data-theme] .course-head .course-price strong { color: var(--on-brand); }
     
   }
   .course-grid > * { width: 100%; max-width: none; scroll-snap-align: none; }
-  html[data-theme] .contact-fab { display: none; }
   html[data-theme] footer { padding-bottom: calc(56px + var(--space-4)); }
 }
 
@@ -1030,7 +1003,7 @@ html[data-theme] .course-head .course-price strong { color: var(--on-brand); }
 }
 .checkbox-field input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--brand); flex: 0 0 auto; }
 .field-hint { margin: 0; font-size: var(--text-14); color: var(--muted); text-align: right; }
-.career-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.career-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .form-note { margin: 0; max-width: 56ch; color: var(--muted); font-size: var(--text-14); line-height: 1.5; }
 .form-note a { color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .career-result { display: grid; gap: var(--space-3); }
@@ -1294,9 +1267,6 @@ html[data-theme="dark"] .hero { background: var(--surface); box-shadow: none; }
 .contact-extras a, .map-links a { min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .location-card { padding: var(--space-2); }
 .branch-map-panel { box-shadow: none; border-radius: var(--radius-panel); }
-.modal-card { background: var(--surface); border-radius: var(--radius-panel); backdrop-filter: none; -webkit-backdrop-filter: none; }
-.modal-topbar, .modal-body { padding: var(--space-3); }
-.modal-backdrop::backdrop { background: var(--overlay); backdrop-filter: none; -webkit-backdrop-filter: none; }
 .career-head { margin-bottom: var(--space-3); }
 .career-form, .career-result { padding: var(--space-3); background: var(--surface); border-color: var(--border); border-radius: var(--radius-panel); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .career-form { gap: var(--space-3); }
@@ -1307,7 +1277,6 @@ html[data-theme="dark"] .hero { background: var(--surface); box-shadow: none; }
 .career-home { margin-top: 0; }
 html[data-theme] footer { padding-block: var(--space-3); background: var(--surface); backdrop-filter: none; }
 .footer-main { gap: var(--space-2); }
-.contact-fab { display: none; }
 @media (max-width: 1050px) {
   #navigation { top: calc(var(--header-height) + 8px); right: 16px; bottom: auto; width: min(calc(100% - 32px), 360px); max-height: calc(100dvh - var(--header-height) - 24px); padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
   #navigation a { min-height: 48px; border-radius: 8px; }
@@ -1602,7 +1571,7 @@ img[src$="stanford-icon.svg"] { object-fit: contain; }
 .carousel-arrow:hover:not(:disabled) { border-color: var(--brand); }
 .carousel-arrow:disabled { opacity: .4; cursor: default; }
 .carousel-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; min-width: 0; }
-.carousel-dot { display: grid; place-items: center; width: 22px; height: 24px; padding: 0; border: 0; background: none; }
+.carousel-dot { display: grid; place-items: center; padding: 0; border: 0; background: none; }
 .carousel-dot::before { content: ''; width: 8px; height: 8px; border-radius: 4px; background: var(--border-strong); transition: width var(--duration) var(--ease), background var(--duration) var(--ease); }
 .carousel-dot[aria-current="true"]::before { width: 20px; background: var(--brand); }
 
@@ -1671,6 +1640,7 @@ img[src$="stanford-icon.svg"] { object-fit: contain; }
 .lang-flag { flex: none; width: 20px; height: 14px; border-radius: 2px; background: url("assets/flags/ru.svg") center / cover no-repeat; }
 .lang-flag[data-flag="uz"] { background-image: url("assets/flags/uz.svg"); }
 .lang-flag[data-flag="kaa"] { background-image: url("assets/flags/kaa.svg"); }
+.lang-flag[data-flag="en"] { background-image: url("assets/flags/en.svg"); }
 .lang-menu-list { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; min-width: 200px; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
 .lang-menu-list[hidden] { display: none; }
 .lang-menu-list [role="option"] { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 10px; color: var(--ink); font-size: var(--text-14); cursor: pointer; }
@@ -1717,4 +1687,111 @@ img[src$="stanford-icon.svg"] { object-fit: contain; }
 @keyframes holiday-snow { to { background-position: 30px 560px, 70px 420px, 100px 630px; } }
 @media (prefers-reduced-motion: reduce) { .holiday-snow { animation: none; opacity: .3; } }
 @media (max-width: 767px) { .holiday-snow { opacity: .35; } :root[data-holiday-active="newyear"] .header::after { background-size: 90px 14px; height: 14px; bottom: -8px; } }
+
+/* Complaints page: two clear choices (official / anonymous) as cards with a radio button. */
+.feedback-kind { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.feedback-kind legend { margin-bottom: var(--space-1); padding: 0; font-weight: 700; }
+.feedback-kind-option { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px var(--space-1); align-items: start; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-hover); cursor: pointer; transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease); }
+.feedback-kind-option:hover { border-color: var(--brand-a40); }
+.feedback-kind-option:has(input:checked) { border-color: var(--brand); background: var(--tint); }
+.feedback-kind-option:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.feedback-kind-option input { grid-row: span 2; width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--brand); }
+.feedback-kind-title { font-weight: 700; color: var(--ink); }
+.feedback-kind-text { color: var(--muted); font-size: var(--text-14); }
+.feedback-anonymous-note { margin: 0; padding: var(--space-2); border-left: 3px solid var(--brand); border-radius: 8px; background: var(--surface-hover); color: var(--muted); font-size: var(--text-14); }
+@media (min-width: 768px) { .feedback-kind { grid-template-columns: repeat(2, minmax(0, 1fr)); } .feedback-kind legend { grid-column: 1 / -1; } }
+.field-hint-start { text-align: left; }
+
+/* The swinging badge next to the page title from 768px (tablets, small laptops), slightly smaller below 1024px. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .results-hero { display: grid; grid-template-columns: minmax(0, 1fr) 200px; align-items: start; gap: var(--space-3); }
+  .lanyard, .lanyard-yellow { display: flex; flex-direction: column; align-items: center; align-self: start; margin-top: -40px; transform-origin: 50% 0; transform: rotate(var(--swing, 0deg)); }
+  .lanyard-card { width: 190px; }
+}
+
+/* Phones: «Позвонить / Telegram» always within thumb reach; hidden while the menu is open and from 768px. */
+.call-bar { display: none; }
+@media (max-width: 767px) {
+  .call-bar { position: fixed; z-index: 40; inset-inline: var(--space-1); bottom: calc(var(--space-1) + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--space-1); padding: 6px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+  .call-bar a { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 12px; font-weight: 700; text-decoration: none; }
+  .call-bar-call { background: var(--brand); color: var(--on-brand); }
+  .call-bar-telegram { border: 1px solid var(--border-strong); color: var(--ink); }
+  .call-bar .icon { width: 20px; height: 20px; }
+  html:has(#navigation.open) .call-bar, html:has(dialog[open]) .call-bar { display: none; }
+  body:has(.call-bar) { padding-bottom: 88px; }
+  /* Focus and «scroll into view» never land under the bar. */
+  html:has(.call-bar) { scroll-padding-bottom: 96px; }
+}
+/* Back of a course card: call to sign up first, then back to the price. */
+.course-back-actions { display: grid; gap: var(--space-1); margin-top: auto; }
+.course-back-actions .course-call { justify-content: center; gap: 8px; min-height: 48px; }
+.course-back-actions .course-call .icon { width: 20px; height: 20px; }
+.course-back-actions .course-flip-back { margin-top: 0; }
+
+/* Phones: shorter page — «Почему Stanford» as a 2×2 grid, tighter steps. */
+@media (max-width: 767px) {
+  .why-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
+  .why-list li { flex-direction: column; gap: var(--space-1); padding: var(--space-2); }
+  .why-list li h3 { font-size: var(--text-16); line-height: 1.3; }
+  .why-list li p { font-size: var(--text-14); line-height: 1.45; }
+  .study-steps > li { padding: var(--space-2); gap: var(--space-1); }
+}
+
+/* Contacts: phones and Telegram are the main buttons; email, Instagram, careers and complaints are quieter links. */
+.contact-extras a { border-color: var(--transparent); background: none; padding-inline: 8px; }
+.contact-extras a:hover { border-color: var(--border); }
+@media (max-width: 767px) {
+  .contact-extras { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 0 var(--space-1); }
+  .contact-extras a { min-width: 0; padding-inline: 0; }
+  .contact-extras a span { min-width: 0; overflow-wrap: anywhere; }
+  .contact-extras a[href^="mailto:"] { grid-column: 1 / -1; }
+  /* Footer: two even columns of links instead of a ragged wrap. */
+  .footer-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 0 var(--space-2); }
+}
+/* Carousel dots: a larger touch area around the same small dot. */
+.carousel-dot { width: 28px; height: 32px; }
+.carousel-count { min-width: 64px; color: var(--muted); font-size: var(--text-14); font-variant-numeric: tabular-nums; text-align: center; }
+
+/* Phones: no 3D turn and no fixed height. The card shows one side at a time at its natural height,
+   so the price side is short and the programme opens in place («Подробнее» / «Назад» work the same). */
+@media (max-width: 767px) {
+  .course-card.is-flip-ready .course-flip-inner,
+  .course-card.is-flip-ready.is-flipped .course-flip-inner { display: block; transform: none; transition: none; }
+  .course-card.is-flip-ready .course-face { min-height: 0; }
+  .course-card.is-flip-ready .course-back { display: none; transform: none; }
+  .course-card.is-flip-ready.is-flipped .course-back { display: flex; }
+  .course-card.is-flip-ready.is-flipped .course-front { display: none; }
+  /* Tighter price side: same content, less empty space. */
+  .course-card .course-front { gap: var(--space-2); padding: var(--space-2) var(--space-3) var(--space-3); }
+  .course-card .course-head { gap: var(--space-1); }
+  .course-card .course-head h3 { margin-top: var(--space-1); font-size: var(--text-24); }
+  .course-card .course-head .course-price { margin-top: 0; }
+}
+
+/* Galleries: arrows at the edges and a small counter float over the photo — no dark band under it.
+   The overlay lets clicks through, so a video's own controls keep working. */
+.media-gallery { position: relative; }
+.media-gallery-controls { position: absolute; inset: 0; z-index: 1; min-height: 0; padding: var(--space-1); background: none; pointer-events: none; }
+.media-gallery-controls button { pointer-events: auto; flex-basis: 40px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--overlay); color: var(--on-dark); }
+.media-gallery-controls button:hover { background: var(--on-dark); color: var(--dark-panel); }
+.media-gallery-controls [role="status"] { position: absolute; top: var(--space-1); right: var(--space-1); padding: 2px 10px; border-radius: 999px; background: var(--overlay); color: var(--on-dark); font-size: var(--text-14); line-height: 1.5; }
+
+/* Teacher portraits: an upright frame on the teachers page, square on the home page, and the crop keeps
+   the upper part of the photo, where the face usually is, instead of cutting the head. */
+.profile-card-teacher.is-flip-ready .profile-cover--gallery .media-gallery-track { aspect-ratio: 4 / 5; }
+.team-grid .teacher-card > .teacher-photo, .teacher-card > .media-gallery .media-gallery-track { aspect-ratio: 1 / 1; }
+:is(.teacher-card, .profile-card-teacher) :is(.media-gallery-slide > img, .teacher-photo, .profile-photo) { object-position: 50% 22%; }
+/* Cards without a photo keep exactly the photo frame, so a row of teachers stays even. */
+.team-grid .teacher-card > .brand-cover { aspect-ratio: 1 / 1; }
+.profile-card-teacher.is-flip-ready .profile-cover:not(.profile-cover--gallery) { aspect-ratio: 4 / 5; }
+
+/* One frame for every person card, so switching «Преподаватели / Результаты учеников» keeps the same shape:
+   upright 4:5 on these two pages, square on the home page — with or without a photo. */
+.profile-card.is-flip-ready .profile-cover--gallery .media-gallery-track,
+.profile-card.is-flip-ready .profile-cover:not(.profile-cover--gallery) { aspect-ratio: 4 / 5; }
+.profile-card-result.is-flip-ready .profile-cover:not(.profile-cover--gallery) { padding: 0; }
+.results-grid .result-card > .media-gallery .media-gallery-track,
+.results-grid .result-card > .brand-cover { aspect-ratio: 1 / 1; }
+.profile-card :is(.media-gallery-slide > img, .profile-photo),
+.result-card .media-gallery-slide > img { object-position: 50% 22%; }
 
