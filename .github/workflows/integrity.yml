@@ -75,7 +75,8 @@ jobs:
 
   browser:
     name: Browser tests (phone and desktop)
-    runs-on: ubuntu-latest
+    # Playwright 1.56 installs its Chromium only on Ubuntu releases it supports; ubuntu-latest moved to 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
