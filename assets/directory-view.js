@@ -18,6 +18,13 @@
     return first;
   };
   reveal();
+  // «Подробнее» on the home page links to one student (#student-12): show enough cards to reach it.
+  const hash = globalThis.location?.hash || '';
+  const linked = hash.length > 1 && document.getElementById?.(decodeURIComponent(hash.slice(1)));
+  if (linked && cards.includes(linked)) {
+    while (linked.hidden && shown < cards.length) reveal();
+    linked.scrollIntoView();
+  }
   button.addEventListener('click', () => {
     const first = reveal();
     // Keyboard users continue from the first new card instead of jumping back to the top.

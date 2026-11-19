@@ -44,6 +44,7 @@
   --border: #00000014; --border-strong: #00000030; --focus: #070707;
   --tint: #ffb7030f; --marker: #ffb70359; --transparent: #00000000; --snow: #bdbdbd;
   --dark-panel: #070707; --on-dark: #fafafa; --on-dark-muted: #bdbdbd;
+  --scrim-soft: #00000033; --scrim: #000000b3; --glass-light: #ffffff26; --glass-line: #ffffff40;
   --header-glass: #fafafab8; --menu-glass: #ffffffd1; --overlay-glass: #00000066; --overlay: #00000099; --shadow-color: #0000000a; --shadow-modal-color: #00000026;
   --font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --text-14: 14px; --text-16: 16px; --text-20: 20px; --text-24: 24px;
@@ -1693,12 +1694,24 @@ img[src$="stanford-icon.svg"] { object-fit: contain; }
 .holiday-close:focus-visible { outline: 3px solid var(--on-brand); outline-offset: -3px; }
 .holiday-close .icon { width: 18px; height: 18px; }
 :root[data-holiday-active] .brand-mark { position: relative; }
+/* Each holiday brings its own garland under the header and a small picture on the logo. */
+:root[data-holiday-active="newyear"] { --holiday-garland: url("assets/holiday/garland.svg"); }
+:root[data-holiday-active="march8"] { --holiday-garland: url("assets/holiday/garland-march8.svg"); --holiday-badge: url("assets/holiday/march8.svg"); --holiday-petals: url("assets/holiday/petals-march8.svg"); }
+:root[data-holiday-active="navruz"] { --holiday-garland: url("assets/holiday/garland-navruz.svg"); --holiday-badge: url("assets/holiday/navruz.svg"); --holiday-petals: url("assets/holiday/petals-navruz.svg"); }
+:root[data-holiday-active="independence"] { --holiday-garland: url("assets/holiday/garland-independence.svg"); --holiday-badge: url("assets/flags/uz.svg"); }
+:root[data-holiday-active="teachers"] { --holiday-garland: url("assets/holiday/garland-teachers.svg"); --holiday-badge: url("assets/holiday/cap.svg"); }
 :root[data-holiday-active="newyear"] .brand-mark::after { content: ''; position: absolute; top: -13px; left: -8px; width: 34px; height: 26px; background: url("assets/holiday/hat.svg") center / contain no-repeat; transform: rotate(-14deg); pointer-events: none; }
-:root[data-holiday-active="newyear"] .header::after { content: ''; position: absolute; left: 0; right: 0; bottom: -10px; height: 18px; background: url("assets/holiday/garland.svg") left top / 120px 18px repeat-x; pointer-events: none; }
+:root[data-holiday-active]:not([data-holiday-active="newyear"]) .brand-mark::after { content: ''; position: absolute; top: -10px; right: -10px; width: 22px; height: 22px; background: var(--holiday-badge) center / contain no-repeat; transform: rotate(12deg); pointer-events: none; }
+:root[data-holiday-active="independence"] .brand-mark::after { height: 15px; top: -6px; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
+:root[data-holiday-active="teachers"] .brand-mark::after { top: -12px; right: -12px; width: 28px; height: 21px; }
+:root[data-holiday-active] .header::after { content: ''; position: absolute; left: 0; right: 0; bottom: -10px; height: 18px; background: var(--holiday-garland) left top / 120px 18px repeat-x; pointer-events: none; }
 .holiday-snow { position: fixed; inset: 0; z-index: 5; pointer-events: none; background-image: radial-gradient(circle, var(--snow) 0 1.5px, var(--transparent) 2px), radial-gradient(circle, var(--snow) 0 1px, var(--transparent) 1.5px), radial-gradient(circle, var(--snow) 0 2px, var(--transparent) 2.5px); background-size: 140px 140px, 90px 90px, 210px 210px; background-position: 0 0, 40px 60px, 120px 30px; opacity: .55; animation: holiday-snow 20s linear 3 forwards; }
 @keyframes holiday-snow { to { background-position: 30px 560px, 70px 420px, 100px 630px; } }
-@media (prefers-reduced-motion: reduce) { .holiday-snow { animation: none; opacity: .3; } }
-@media (max-width: 767px) { .holiday-snow { opacity: .35; } :root[data-holiday-active="newyear"] .header::after { background-size: 90px 14px; height: 14px; bottom: -8px; } }
+/* Petals for 8 March and Navruz: the same quiet fall as the snow, three rounds and then still. */
+.holiday-petals { position: fixed; inset: 0; z-index: 5; pointer-events: none; background-image: var(--holiday-petals), var(--holiday-petals); background-size: 180px 180px, 260px 260px; background-position: 0 0, 70px 40px; opacity: .7; animation: holiday-petals 24s linear 3 forwards; }
+@keyframes holiday-petals { to { background-position: 60px 540px, 150px 780px; } }
+@media (prefers-reduced-motion: reduce) { .holiday-snow { animation: none; opacity: .3; } .holiday-petals { animation: none; opacity: .4; } }
+@media (max-width: 767px) { .holiday-snow { opacity: .35; } .holiday-petals { opacity: .5; } :root[data-holiday-active] .header::after { background-size: 90px 14px; height: 14px; bottom: -8px; } }
 
 /* Complaints page: two clear choices (official / anonymous) as cards with a radio button. */
 .feedback-kind { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
@@ -1724,15 +1737,17 @@ img[src$="stanford-icon.svg"] { object-fit: contain; }
 /* Phones: «Позвонить / Telegram» always within thumb reach; hidden while the menu is open and from 768px. */
 .call-bar { display: none; }
 @media (max-width: 767px) {
-  .call-bar { position: fixed; z-index: 40; inset-inline: var(--space-1); bottom: calc(var(--space-1) + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--space-1); padding: 6px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
-  .call-bar a { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 12px; font-weight: 700; text-decoration: none; }
+  .call-bar { position: fixed; z-index: 40; inset-inline: max(var(--space-1), calc((100% - 440px) / 2)); bottom: calc(var(--space-1) + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); transition: transform 260ms var(--ease), opacity 200ms var(--ease); }
+  .call-bar a { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border-radius: 10px; font-size: var(--text-14); font-weight: 700; text-decoration: none; }
+  /* Scrolling down to read: the bar slides away; scrolling up brings it back (assets/call-bar.js). */
+  .call-bar.is-tucked { transform: translateY(calc(100% + var(--space-2) + env(safe-area-inset-bottom, 0px))); opacity: 0; pointer-events: none; }
   .call-bar-call { background: var(--brand); color: var(--on-brand); }
   .call-bar-telegram { border: 1px solid var(--border-strong); color: var(--ink); }
-  .call-bar .icon { width: 20px; height: 20px; }
+  .call-bar .icon { width: 18px; height: 18px; }
   html:has(#navigation.open) .call-bar, html:has(dialog[open]) .call-bar { display: none; }
-  body:has(.call-bar) { padding-bottom: 88px; }
+  body:has(.call-bar) { padding-bottom: 72px; }
   /* Focus and «scroll into view» never land under the bar. */
-  html:has(.call-bar) { scroll-padding-bottom: 96px; }
+  html:has(.call-bar) { scroll-padding-bottom: 80px; }
 }
 /* Back of a course card: call to sign up first, then back to the price. */
 .course-back-actions { display: grid; gap: var(--space-1); margin-top: auto; }
@@ -1828,7 +1843,8 @@ img[src$="stanford-icon.svg"] { object-fit: contain; }
 html[data-theme="dark"] .course-page-price { background: linear-gradient(135deg, var(--surface-raised) 0%, var(--surface) 100%); border: 1px solid var(--brand-a30); color: var(--ink); }
 .course-page-price-title { font-size: var(--text-14); font-weight: 700; letter-spacing: 0; text-transform: uppercase; opacity: .8; }
 .course-page-price .course-price { margin: 0; }
-.course-page-price .course-special { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px var(--space-2); margin: 0; padding-top: var(--space-1); border-top: 1px solid currentColor; font-size: var(--text-14); }
+.course-page-price .course-special { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px var(--space-2); margin: 0; padding: 10px 16px; border: 1px solid var(--transparent); border-radius: 14px; font-size: var(--text-14); }
+html[data-theme="dark"] .course-page-price .course-special { border-color: var(--brand-a30); }
 .course-page-price .course-special strong { font-size: var(--text-16); font-variant-numeric: tabular-nums; }
 .course-page-note { font-size: var(--text-14); line-height: 1.5; opacity: .85; }
 .course-page-section h2 { margin-bottom: var(--space-3); font-size: var(--text-24); }
@@ -1864,3 +1880,76 @@ html[data-theme="dark"] .course-page-price { background: linear-gradient(135deg,
   .course-page-hero { grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: var(--space-6); align-items: start; }
   .course-page-intro h1 { font-size: var(--text-48); }
 }
+
+/* Teacher and student directory cards: the photo (or the photo gallery) fills a 4:5 frame; name, role or course
+   and the facts lie on a soft blurred shade at the bottom. While a video plays in the gallery the caption
+   steps aside so the player controls stay free. Swipes and taps go through the caption to the gallery. */
+.profile-card--static .course-face { min-height: 0; }
+.profile-card--static .teacher-chips { margin: 0; }
+.profile-caption { display: grid; gap: 12px; min-width: 0; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-face { padding: 8px; border-color: var(--border-strong); border-radius: 28px; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-face.course-back { padding: var(--space-3); }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .profile-cover { border-radius: 22px; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); gap: 0; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front > :is(.profile-cover, .profile-caption) { grid-area: 1 / 1; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .profile-caption { position: relative; z-index: 2; align-self: end; isolation: isolate; padding: var(--space-8) 20px 20px; border-radius: 0 0 22px 22px; overflow: hidden; color: var(--on-dark); pointer-events: none; text-shadow: 0 1px 3px var(--scrim-soft); transition: opacity var(--duration) var(--ease); }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .profile-caption::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(var(--transparent), var(--scrim-soft) 15%, var(--scrim) 55%); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-mask-image: linear-gradient(var(--transparent), var(--on-dark) 35%); mask-image: linear-gradient(var(--transparent), var(--on-dark) 35%); }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .profile-identity { padding: 0; background: none; border-radius: 0; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .profile-identity h3 { color: var(--on-dark); font-size: var(--text-24); font-weight: 600; letter-spacing: -.02em; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .profile-identity p { color: var(--on-dark-muted); font-size: var(--text-16); }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .teacher-chips li:not(.teacher-chip-key) { border-color: var(--glass-line); background: var(--glass-light); color: var(--on-dark); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front:has(.media-gallery-slide[aria-hidden="false"] video) .profile-caption { opacity: 0; visibility: hidden; }
+/* No photo yet: the caption sits on the yellow logo panel itself, dark text and no shade. */
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front:has(.profile-brand) .profile-caption { color: var(--on-brand); background: var(--brand); text-shadow: none; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front:has(.profile-brand) .profile-caption::before { display: none; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front:has(.profile-brand) .profile-identity h3 { color: var(--on-brand); }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front:has(.profile-brand) .profile-identity p { color: var(--on-brand-muted); }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front:has(.profile-brand) .teacher-chips .teacher-chip-key { border-color: var(--dark-panel); background: var(--dark-panel); color: var(--on-dark); }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front:has(.profile-brand) .teacher-chips li:not(.teacher-chip-key) { border-color: var(--on-brand); background: none; color: var(--on-brand); -webkit-backdrop-filter: none; backdrop-filter: none; }
+@media (prefers-reduced-transparency: reduce) {
+  .directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .profile-caption::before { -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask-image: none; mask-image: none; background: linear-gradient(var(--transparent), var(--scrim) 40%); }
+  .directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .teacher-chips li:not(.teacher-chip-key) { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--dark-panel); }
+}
+/* Student cards: the score chips and «Подробнее» share the bottom row, like a profile card with a follow button. */
+.profile-caption-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .profile-caption .profile-more { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: 0; padding: 8px 16px; border: 0; border-radius: 999px; background: var(--on-dark); color: var(--dark-panel); font-size: var(--text-14); font-weight: 600; text-decoration: none; pointer-events: auto; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .profile-caption .profile-more .icon { width: 16px; height: 16px; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front:has(.profile-brand) .profile-caption .profile-more { background: var(--dark-panel); color: var(--on-dark); }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .course-front .profile-caption .profile-more:focus-visible { outline: 2px solid var(--on-dark); outline-offset: 2px; }
+
+/* Home rows that drift (assets/marquee.js): no snapping while moving, a pause button instead of dots. */
+.carousel.is-marquee > .carousel-track { scroll-snap-type: none; scroll-behavior: auto; }
+.is-marquee .carousel-dots { display: none; }
+.carousel-toggle { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: var(--text-14); font-weight: 600; cursor: pointer; }
+.carousel-toggle[hidden], .carousel-toggle > span[hidden] { display: none; }
+.carousel-toggle > span { display: inline-flex; align-items: center; gap: 6px; }
+.carousel-toggle .icon { width: 16px; height: 16px; }
+.carousel-toggle:hover { border-color: var(--ink); }
+
+/* Rows of people (home, course pages) on phones and small tablets: cards keep a readable width instead of
+   stretching across the screen; the next card peeks in. Two and three per row from 768 and 1024 px as before. */
+@media (max-width: 767px) {
+  .carousel > .carousel-track.home-carousel:is(.team-grid, .results-grid) > * { flex-basis: min(82%, 320px); }
+}
+/* Small tablets: phone and Telegram groups side by side, the extra links in one flowing row. */
+@media (min-width: 560px) and (max-width: 767px) {
+  .contact-channels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); width: 100%; }
+  .contact-channels .contact-group { width: auto; }
+  .contact-extras { display: flex; flex-wrap: wrap; gap: 4px var(--space-3); }
+  .contact-extras a[href^="mailto:"] { grid-column: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .call-bar { transition: none; }
+}
+/* No photo yet: the logo sits in the upper part of the card, above the caption, so a long name or the
+   «Подробнее» row never covers it. */
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .profile-cover .profile-initials:has(.profile-brand) { place-items: start center; padding-top: 11%; }
+.directory-page :is(.profile-card-teacher.profile-card--static, .profile-card-result.is-flip-ready) .profile-cover .profile-brand { width: 80px; height: 80px; }
+/* Until assets/lang-menu.js swaps it for the flag button, the select already looks like that button: same flag,
+   code, chevron and width (padding 40/34 px = flag and chevron of the button), so nothing flashes or jumps. */
+html { --lang-flag: url("assets/flags/ru.svg"); --lang-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b5b5b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+html[data-theme="dark"] { --lang-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8a8a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+html[lang="uz"] { --lang-flag: url("assets/flags/uz.svg"); }
+html[lang="kaa"] { --lang-flag: url("assets/flags/kaa.svg"); }
+html[lang="en"] { --lang-flag: url("assets/flags/en.svg"); }
+[data-enhanced="true"] .lang-toggle:not(.is-replaced) { field-sizing: content; width: auto; height: 44px; padding: 0 34px 0 40px; border-radius: 12px; -webkit-appearance: none; appearance: none; letter-spacing: .04em; background: var(--lang-flag) 12px 50% / 20px 14px no-repeat, var(--lang-chevron) right 10px center / 16px 16px no-repeat, var(--surface); }

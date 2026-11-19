@@ -5,7 +5,7 @@
   const select = document.querySelector('#lang-toggle');
   if (!select || select.dataset.langMenu) return;
   select.dataset.langMenu = 'ready';
-  const names = { ru: 'Русский', uz: 'Oʻzbekcha', kaa: 'Qaraqalpaqsha', en: 'English' };
+  const names = { ru: 'Русский', uz: 'Özbekça', kaa: 'Qaraqalpaqsha', en: 'English' };
   const options = [...select.options].map(option => ({ value: option.value, code: option.textContent.trim() }));
 
   const root = document.createElement('div');

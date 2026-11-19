@@ -1,6 +1,8 @@
 // English. Edit translations in the admin: «Переводы» (the strings block is rebuilt on publication).
 window.stanfordEn = {
   strings: {
+    "Пауза": "Pause",
+    "Продолжить": "Play",
     "Проверка «я не робот» не пройдена. Обновите страницу и попробуйте ещё раз.": "The “I’m not a robot” check failed. Refresh the page and try again.",
     "Проверка «я не робот» временно недоступна. Попробуйте через несколько минут.": "The “I’m not a robot” check is temporarily unavailable. Try again in a few minutes.",
     "Подождите пару секунд: идёт проверка «я не робот».": "Please wait a couple of seconds: the “I’m not a robot” check is running.",
@@ -399,6 +401,7 @@ window.stanfordEn = {
     "Не удалось отправить анкету. Проверьте интернет и попробуйте снова.": "Could not send the application. Check your internet and try again."
   },
   patterns: [
+    [/^((?:IELTS|SAT) [\d.]+) · (.+)$/, (m, t) => `${m[1]} · ${t(m[2])}`],
     [/^Позвонить и записаться: (.+)$/, (m, t) => `Call to sign up: ${t(m[1])}`],
     [/^Всё о курсе: (.+)$/, (m, t) => `About the course: ${t(m[1])}`],
     [/^(.+) — курс в Нукусе \| Stanford$/, (m, t) => `${t(m[1])} — course in Nukus | Stanford`],

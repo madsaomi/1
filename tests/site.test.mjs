@@ -39,7 +39,10 @@ function dockerContextKeeps(path, rules) {
 }
 
 function walkFiles(directory, prefix) {
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+  // tests/media-gallery.test.mjs briefly creates and removes assets/uploads while the tests run in parallel.
+  let entries;
+  try { entries = fs.readdirSync(directory, { withFileTypes: true }); } catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+  return entries.flatMap(entry => {
     const relative = `${prefix}${entry.name}`;
     return entry.isDirectory() ? walkFiles(new URL(`${entry.name}/`, directory), `${relative}/`) : [relative];
   });
@@ -436,6 +439,8 @@ test('metadata is emitted only for a configured real HTTPS URL', () => {
   const output = generate(html, configured);
   assert(output.includes('<meta property="og:image" content="https://example.org/assets/og-image.png">'));
   assert(output.includes('<meta property="og:image:width" content="1200">'));
+  assert(output.includes('<meta property="og:site_name" content="Stanford Language Center">') && output.includes('<meta property="og:locale" content="ru_RU">'));
+  assert(output.includes('<meta property="og:locale:alternate" content="kaa_UZ">') && output.includes('<meta name="twitter:card" content="summary_large_image">'));
   // Search engines get a data card built only from the verified contacts; it can never close its own block.
   const card = JSON.parse(output.match(/<script type="application\/ld\+json">([^<]*)<\/script>/)[1]);
   assert.equal(card['@type'], 'EducationalOrganization');
@@ -485,6 +490,9 @@ test('theme initializes even when browser storage is blocked', () => {
   const moving = { document: { documentElement: { dataset: {} } }, localStorage: { getItem: () => null }, matchMedia: () => ({ matches: false }) };
   vm.runInNewContext(fs.readFileSync(new URL('../theme-init.js', import.meta.url), 'utf8'), moving);
   assert.equal(moving.document.documentElement.dataset.motion, 'on');
+  // The header gets its final form before the first paint: no flash of the no-script layout on reload.
+  assert.equal(moving.document.documentElement.dataset.enhanced, 'true');
+  assert.equal(context.document.documentElement.dataset.enhanced, 'true');
 });
 
 function runtime({ mapPresent = true, reducedMotion = false, viewportWidth = 1440, locations = data.contacts.locations } = {}) {
@@ -819,7 +827,9 @@ test('featured teachers and results: index shows only admin-configured tops, res
   assert(none.includes('href="teachers"'), 'The home section always offers the full teachers page');
   // Results: featured first on the home page, all cards on results.html.
   const resultTops = renderResults(data.results, live, { featuredOnly: true });
-  assert.equal((resultTops.match(/class="result-card"/g) || []).length, 2);
+  assert.equal((resultTops.match(/class="result-card result-card--compact"/g) || []).length, 2);
+  // The short home card leads to the same student on the results page (numbered in the published order).
+  assert(resultTops.includes(`href="results#student-${data.results.findIndex(result => result.student === 'Малика Т.') + 1}"`));
   assert([...resultTops.matchAll(/class="result-name">([^<·]+)/g)].map(match => match[1].trim()).indexOf('Малика Т.') === 0);
   const allResults = renderResults(data.results, live);
   assert.equal((allResults.match(/class="result-card"/g) || []).length, data.results.length);
@@ -827,11 +837,12 @@ test('featured teachers and results: index shows only admin-configured tops, res
   const indexHtml = generate(html, { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
   const teachersSection = indexHtml.slice(indexHtml.indexOf('<!-- TEACHERS_START -->'), indexHtml.indexOf('<!-- TEACHERS_END -->'));
   assert.equal((teachersSection.match(/class="teacher-card"/g) || []).length, 3, 'index keeps only featured teachers');  const resultsSection = indexHtml.slice(indexHtml.indexOf('<!-- RESULTS_START -->'), indexHtml.indexOf('<!-- RESULTS_END -->'));
-  assert.equal((resultsSection.match(/class="result-card"/g) || []).length, 2, 'index keeps only featured results');
+  assert.equal((resultsSection.match(/class="result-card result-card--compact"/g) || []).length, 2, 'index keeps only featured results');
   // The dedicated teachers page lists everyone (featured first) with its own canonical URL,
   // while results.html stays about students only.
   const teachersPage = generateTeachers(fs.readFileSync(new URL('../teachers.html', import.meta.url), 'utf8'), { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
-  assert.equal((teachersPage.match(/class="profile-card profile-card-teacher"/g) || []).length, data.teachers.length);
+  assert.equal((teachersPage.match(/class="profile-card profile-card-teacher profile-card--static is-flip-ready"/g) || []).length, data.teachers.length);
+  assert(!teachersPage.includes('data-flip-open'), 'Teacher cards show their facts without a «Подробнее» flip');
   assert(teachersPage.includes('rel="canonical" href="https://stanford.example/teachers"'));
   assert(!teachersPage.includes('result-card'), 'The teachers page does not mix in student results');
   const resultsPage = generateResults(fs.readFileSync(new URL('../results.html', import.meta.url), 'utf8'), { ...data, site: live, results: data.results.map(result => ({ ...result, consent: true })) });
@@ -1167,6 +1178,12 @@ test('holiday greetings: automatic by dates, one chosen holiday always on, or sw
   assert.equal(renderHoliday({ holiday: { mode: 'off' } }), '');
   assert.throws(() => validateContent({ ...data, site: { ...data.site, holiday: { mode: 'birthday' } } }), /holiday/);
   for (const name of Object.keys(HOLIDAYS)) assert(fs.existsSync(new URL(`../${name === 'independence' ? 'assets/flags/uz.svg' : `assets/holiday/${name}.svg`}`, import.meta.url)));
+  // Every holiday has its own garland, and every picture the stylesheet asks for exists.
+  const css = fs.readFileSync(new URL('../style.css', import.meta.url), 'utf8');
+  for (const name of Object.keys(HOLIDAYS)) assert(css.includes(`:root[data-holiday-active="${name}"] { --holiday-garland: url(`), `${name} garland`);
+  for (const [, file] of css.matchAll(/url\("(assets\/(?:holiday|flags)\/[\w-]+\.svg)"\)/g)) assert(fs.existsSync(new URL(`../${file}`, import.meta.url)), file);
+  // Falling decoration never loops forever.
+  assert.match(css, /\.holiday-petals \{[^}]*animation: holiday-petals 24s linear 3 forwards/);
 });
 
 test('the complaints page lists the branches from the contacts and is linked from contacts and every footer', () => {

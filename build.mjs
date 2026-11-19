@@ -23,7 +23,9 @@ export function svgIcon(name) {
     instagram: 'M17 2H7a5 5 0 0 0-5 5v10a5 5 0 0 0 5 5h10a5 5 0 0 0 5-5V7a5 5 0 0 0-5-5Zm-5 15a5 5 0 1 1 5-5 5 5 0 0 1-5 5Zm5.5-9.8a1.2 1.2 0 1 1 1.2-1.2 1.2 1.2 0 0 1-1.2 1.2Z',
     clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z M12 6v6l4 2',
     mail: 'M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z m18 2-10 6L2 7',
-    award: 'M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z M8.2 13.9 7 22l5-3 5 3-1.2-8.1'
+    award: 'M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z M8.2 13.9 7 22l5-3 5 3-1.2-8.1',
+    pause: 'M9 5v14 M15 5v14',
+    play: 'M8 5l11 7-11 7Z'
   };
   return `<svg class="icon icon-${name}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${paths[name]}"/></svg>`;
 }
@@ -298,6 +300,9 @@ export function pageAddress(site, page = '', lang = 'ru') {
   return new URL(`${lang}/${page}`, base).href;
 }
 
+// Open Graph wants language_TERRITORY; Karakalpak (kaa) is spoken in Uzbekistan.
+const OG_LOCALES = { ru: 'ru_RU', uz: 'uz_UZ', kaa: 'kaa_UZ', en: 'en_US' };
+
 export function renderMetadata(site, page = '', lang = 'ru') {
   if (!site?.url) return '';
   const base = site.url.endsWith('/') ? site.url : `${site.url}/`;
@@ -305,7 +310,8 @@ export function renderMetadata(site, page = '', lang = 'ru') {
   // Search engines learn that the three language versions are the same page.
   const alternates = [...['ru', ...LANGUAGES].map(code => [code, pageAddress(site, page, code)]), ['x-default', pageAddress(site, page)]]
     .map(([code, href]) => `<link rel="alternate" hreflang="${code}" href="${escapeHTML(href)}">`).join('\n');
-  return `<link rel="canonical" href="${escapeHTML(canonical)}">\n<meta property="og:url" content="${escapeHTML(canonical)}">\n<meta property="og:image" content="${escapeHTML(new URL('assets/og-image.png', base).href)}">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n${alternates}`;
+  const locales = ['ru', ...LANGUAGES].filter(code => code !== lang).map(code => `<meta property="og:locale:alternate" content="${OG_LOCALES[code]}">`).join('\n');
+  return `<link rel="canonical" href="${escapeHTML(canonical)}">\n<meta property="og:url" content="${escapeHTML(canonical)}">\n<meta property="og:site_name" content="Stanford Language Center">\n<meta property="og:locale" content="${OG_LOCALES[lang]}">\n${locales}\n<meta property="og:image" content="${escapeHTML(new URL('assets/og-image.png', base).href)}">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta name="twitter:card" content="summary_large_image">\n${alternates}`;
 }
 
 // ---------- Translated copies of the public pages (/uz/, /kaa/) ----------
@@ -402,6 +408,8 @@ export function generateLanguagePage(html, data, lang, page, pack = languagePack
   const scripts = [`assets/i18n/${lang}.js`, ...(page === 'privacy.html' ? [`assets/i18n/privacy-${lang}.js`] : [])]
     .map(src => `<script src="${src}"></script>\n  `).join('');
   html = html.replace(/<script src="assets\/i18n\/language\.js/, match => `${scripts}${match}`);
+  // The language switch shows this copy's language from the first paint, before any script runs.
+  html = html.replace(`<option value="${lang}" lang="${lang}">`, `<option value="${lang}" lang="${lang}" selected>`);
   html = versionContentAssets(html, data);
   // Translations need no Cyrillic font up front; Uzbek and Karakalpak preload their small letters font instead.
   const cyrillic = '<link rel="preload" href="assets/fonts/inter-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>';
@@ -514,7 +522,9 @@ function toggleEmptySection(html, id, visible) {
 }
 
 // Home page limit for teachers and results; «Все преподаватели» / «Все результаты» open the full lists.
-export const HOME_LIMIT = 6;
+export const HOME_LIMIT = 10;
+// A course page shows fewer results than the home rows.
+export const COURSE_RESULTS_LIMIT = 6;
 
 export function initials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
@@ -522,8 +532,19 @@ export function initials(name) {
 
 // Arrows and dots under a sideways row (assets/carousel.js); without JS the row still scrolls.
 const CAROUSEL_NAV = `<div class="carousel-nav" data-carousel-nav hidden><button type="button" class="carousel-arrow" data-carousel-prev aria-label="Предыдущий слайд">${svgIcon('arrow-left')}</button><div class="carousel-dots" data-carousel-dots></div><button type="button" class="carousel-arrow" data-carousel-next aria-label="Следующий слайд">${svgIcon('arrow-right')}</button></div>`;
-export function renderCarousel(trackClass, labelledBy, items) {
-  return `<div class="carousel" data-carousel><div class="${trackClass} carousel-track" data-carousel-track tabindex="0" role="region" aria-labelledby="${labelledBy}">${items}</div>${CAROUSEL_NAV}</div>`;
+// Home rows of people: the same nav plus a pause button for the slow endless drift (assets/marquee.js).
+const MARQUEE_NAV = `<div class="carousel-nav" data-carousel-nav hidden><button type="button" class="carousel-arrow" data-carousel-prev aria-label="Предыдущий слайд">${svgIcon('arrow-left')}</button><div class="carousel-dots" data-carousel-dots></div><button type="button" class="carousel-arrow" data-carousel-next aria-label="Следующий слайд">${svgIcon('arrow-right')}</button><button type="button" class="carousel-toggle" data-marquee-toggle aria-pressed="false" hidden><span data-marquee-playing>${svgIcon('pause')}<span>Пауза</span></span><span data-marquee-paused hidden>${svgIcon('play')}<span>Продолжить</span></span></button></div>`;
+export function renderCarousel(trackClass, labelledBy, items, { marquee = false } = {}) {
+  return `<div class="carousel"${marquee ? ' data-marquee' : ''} data-carousel><div class="${trackClass} carousel-track" data-carousel-track tabindex="0" role="region" aria-labelledby="${labelledBy}">${items}</div>${marquee ? MARQUEE_NAV : CAROUSEL_NAV}</div>`;
+}
+
+const CHIP_ICONS = {
+  qualification: '<svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="9" r="5"/><path d="M8.5 13.5 7 21l5-2.8L17 21l-1.5-7.5"/></svg>',
+  experience: '<svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+};
+// Qualification and experience as two small badges (home cards and the teacher directory).
+function teacherChips(teacher) {
+  return [teacher.qualification && `<li class="teacher-chip-key">${CHIP_ICONS.qualification}${escapeHTML(teacher.qualification)}</li>`, teacher.experience && `<li>${CHIP_ICONS.experience}${escapeHTML(teacher.experience)}</li>`].filter(Boolean).join('');
 }
 
 export function renderTeachers(teachers = [], site, { featuredOnly = false, heading = true, profile = false } = {}) {
@@ -542,23 +563,24 @@ export function renderTeachers(teachers = [], site, { featuredOnly = false, head
     const portrait = teacher.media?.length ? renderMediaGallery(teacher.media, teacher.name) : teacher.photo
       ? `<img class="teacher-photo" src="${escapeHTML(teacher.photo)}"${responsiveAttributes(teacher.photo)} alt="Фото: ${name}" width="600" height="750" loading="lazy" decoding="async">`
       : BRAND_COVER;
-    const chipIcons = {
-      qualification: '<svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="9" r="5"/><path d="M8.5 13.5 7 21l5-2.8L17 21l-1.5-7.5"/></svg>',
-      experience: '<svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
-    };
-    const chips = [teacher.qualification && `<li class="teacher-chip-key">${chipIcons.qualification}${escapeHTML(teacher.qualification)}</li>`, teacher.experience && `<li>${chipIcons.experience}${escapeHTML(teacher.experience)}</li>`].filter(Boolean).join('');
+    const chips = teacherChips(teacher);
     // The full list uses the tilt card of assets/ui.js; the home section keeps the plain card.
     return `<article class="teacher-card"${profile ? ' data-tilt' : ''}>${profile ? '<span class="result-shine" aria-hidden="true"></span>' : ''}${portrait}<div class="teacher-body"><h3>${name}</h3><p>${escapeHTML(teacher.role)}</p>${chips ? `<ul class="teacher-chips">${chips}</ul>` : ''}</div></article>`;
   }).join('');
   const more = featuredOnly ? `\n<a class="text-link results-more" href="teachers">Все преподаватели${svgIcon('arrow-right')}</a>` : '';
   // Home: one teacher at a time on phones, two or three side by side on wider screens.
-  const grid = featuredOnly && heading ? renderCarousel('team-grid home-carousel', 'teachers-title', cards) : `<div class="team-grid">${cards}</div>`;
+  const grid = featuredOnly && heading ? renderCarousel('team-grid home-carousel', 'teachers-title', cards, { marquee: true }) : `<div class="team-grid">${cards}</div>`;
   return `${head}${grid}${more}`;
 }
 
 // One card per published student result; reused by the home section and the full results page.
-export function renderResultCards(results = []) {
-  return results.map(result => `<article class="result-card">${result.media?.length ? renderMediaGallery(result.media, result.student) : BRAND_COVER}<div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></article>`).join('');
+// One card per published student result. Home and course pages use the short (compact) card: two lines of the
+// review and «Подробнее» to the same student on the results page, where the whole story is shown.
+export function renderResultCards(results = [], { compact = false, all = results } = {}) {
+  return results.map(result => {
+    const more = compact ? `<a class="text-link result-more" href="results#student-${all.indexOf(result) + 1}" aria-label="Подробнее: ${escapeHTML(result.student)}">Подробнее${svgIcon('arrow-right')}</a>` : '';
+    return `<article class="result-card${compact ? ' result-card--compact' : ''}">${result.media?.length ? renderMediaGallery(result.media, result.student) : BRAND_COVER}<div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p>${more}</article>`;
+  }).join('');
 }
 
 export function renderResults(results = [], site, { featuredOnly = false } = {}) {
@@ -573,10 +595,14 @@ export function renderResults(results = [], site, { featuredOnly = false } = {})
   }
   return `<section data-reveal class="section wrap results-section" id="results" aria-labelledby="results-title">
 <div class="section-top"><h2 id="results-title">Результаты студентов${demoTag(site)}</h2></div>
-${featuredOnly ? renderCarousel('results-grid home-carousel', 'results-title', renderResultCards(shown)) : `<div class="results-grid">${renderResultCards(shown)}</div>`}
+${featuredOnly ? renderCarousel('results-grid home-carousel', 'results-title', renderResultCards(shown, { compact: true, all: results }), { marquee: true }) : `<div class="results-grid">${renderResultCards(shown)}</div>`}
 <a class="text-link results-more" href="results">Все результаты${svgIcon('arrow-right')}</a>
 </section>`;
 }
+
+// Brand icons of the map services: the Google pin in its four colours (one gradient per branch) and the red Yandex tile.
+const mapPinIcon = id => `<svg class="icon icon-map-pin" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><defs><linearGradient id="map-pin-${escapeHTML(id)}" x1="0" y1="0" x2="1" y2="1"><stop class="map-brand-red" offset="0"/><stop class="map-brand-blue" offset=".35"/><stop class="map-brand-green" offset=".7"/><stop class="map-brand-yellow" offset="1"/></linearGradient></defs><path fill="url(#map-pin-${escapeHTML(id)})" fill-rule="evenodd" stroke="none" d="M12 2a8 8 0 0 0-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 0 0-8-8Zm0 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/></svg>`;
+const YANDEX_ICON = '<svg class="icon icon-yandex-maps" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="2" width="20" height="20" rx="6" fill="var(--map-red)" stroke="none"/><path fill="var(--on-dark)" fill-rule="evenodd" stroke="none" d="M16 5h-4c-3.3 0-5 1.6-5 4.2 0 2.1 1.2 3.4 2.8 4.1L6.5 19h3l3-5.2h1V19H16V5Zm-2.5 2.1v4.5H12c-1.6 0-2.4-.7-2.4-2.2s.8-2.3 2.4-2.3h1.5Z"/></svg>';
 
 export function renderLocations(contacts, { demo = false } = {}) {
   if (!contacts.verified || !contacts.locations?.length) return '';
@@ -587,8 +613,8 @@ export function renderLocations(contacts, { demo = false } = {}) {
     const name = escapeHTML(location.name);
     const address = escapeHTML(location.address);
     const select = location.googleEmbed ? `<button type="button" class="location-select" data-map-location="${escapeHTML(location.id)}" data-map-src="${escapeHTML(location.googleEmbed)}" data-map-title="Карта: ${name}" data-map-label="${name} — ${address}" aria-label="Показать на карте: ${name}" aria-pressed="${location === first}" aria-controls="branch-map"><span class="sr-only">Показать на карте: ${name}</span>${svgIcon('arrow-right')}</button>` : '';
-    const mapPin = `<svg class="icon icon-map-pin" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><defs><linearGradient id="map-pin-${escapeHTML(location.id)}" x1="0" y1="0" x2="1" y2="1"><stop class="map-brand-red" offset="0"/><stop class="map-brand-blue" offset=".35"/><stop class="map-brand-green" offset=".7"/><stop class="map-brand-yellow" offset="1"/></linearGradient></defs><path fill="url(#map-pin-${escapeHTML(location.id)})" fill-rule="evenodd" stroke="none" d="M12 2a8 8 0 0 0-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 0 0-8-8Zm0 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/></svg>`;
-    const yandexIcon = '<svg class="icon icon-yandex-maps" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="2" width="20" height="20" rx="6" fill="var(--map-red)" stroke="none"/><path fill="var(--on-dark)" fill-rule="evenodd" stroke="none" d="M16 5h-4c-3.3 0-5 1.6-5 4.2 0 2.1 1.2 3.4 2.8 4.1L6.5 19h3l3-5.2h1V19H16V5Zm-2.5 2.1v4.5H12c-1.6 0-2.4-.7-2.4-2.2s.8-2.3 2.4-2.3h1.5Z"/></svg>';
+    const mapPin = mapPinIcon(location.id);
+    const yandexIcon = YANDEX_ICON;
     const links = location.maps.map(map => `<a class="map-icon-link" href="${escapeHTML(map.url)}" target="_blank" rel="noopener noreferrer" aria-label="${providers[map.provider]}: ${name}, ${address}">${map.provider === 'google' ? mapPin : yandexIcon}</a>`).join('');
     // Until the owner sends entrance photos, each branch shows a tagged placeholder.
     const photo = location.photo
@@ -684,7 +710,7 @@ export function renderContactFab(contacts) {
   if (!phone && !telegram) return '';
   const call = phone ? `<a class="call-bar-call" href="tel:${escapeHTML(phone)}">${svgIcon('phone')}<span>Позвонить</span></a>` : '';
   const write = telegram ? `<a class="call-bar-telegram" href="${escapeHTML(telegram)}" target="_blank" rel="noopener noreferrer">${svgIcon('telegram')}<span>Telegram</span></a>` : '';
-  return `<nav class="call-bar" aria-label="Быстрая связь">${call}${write}</nav>`;
+  return `<nav class="call-bar" aria-label="Быстрая связь">${call}${write}</nav>\n<script src="assets/call-bar.js?v=1"></script>`;
 }
 
 export function renderCTA(contacts) {
@@ -821,30 +847,35 @@ export function renderResultProfiles(results = []) {
   return results.map(result => `<article class="result-card" data-tilt><span class="result-shine" aria-hidden="true"></span>${renderMediaGallery(result.media, result.student)}<div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><div class="result-person"><span class="result-avatar" aria-hidden="true"><img src="assets/stanford-icon.svg" alt="" width="20" height="20"></span><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p></div></article>`).join('');
 }
 
-function directoryCard({ id, name, subtitle = '', cover, details, type, media = false }) {
-  const label = escapeHTML(name);
-  return `<article class="profile-card profile-card-${type}" data-course-flip><div class="course-flip-inner"><div class="course-face course-front"><div class="profile-cover${media ? ' profile-cover--gallery' : ''}">${cover}</div><div class="profile-identity"><h3>${label}</h3>${subtitle ? `<p>${escapeHTML(subtitle)}</p>` : ''}</div><a class="button profile-more" href="#${id}" data-flip-open aria-controls="${id}" aria-expanded="false" aria-label="Подробнее: ${label}">Подробнее${svgIcon('arrow-right')}</a></div><div class="course-face course-back" id="${id}"><h3 class="course-back-title" tabindex="-1">${label}</h3><div class="profile-details">${details}</div><button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${label}">Назад${svgIcon('arrow-right')}</button></div></div></article>`;
+// Student card of the results page: the photo (or gallery) fills a 4:5 frame, the name, course and score lie on a
+// soft shade at the bottom, «Подробнее» turns the card over to the review.
+function resultDirectoryCard(result, index) {
+  const label = escapeHTML(result.student);
+  const id = `student-details-${index + 1}`;
+  const media = Boolean(result.media?.length);
+  const cover = media ? renderMediaGallery(result.media, result.student) : '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>';
+  const chips = `<li class="teacher-chip-key">${CHIP_ICONS.qualification}${escapeHTML(result.score)} · ${escapeHTML(result.exam)}</li>${result.level ? `<li>${escapeHTML(result.level)}</li>` : ''}`;
+  const details = `<div class="profile-result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}${result.level ? ` · ${escapeHTML(result.level)}` : ''}</span></div><blockquote>«${escapeHTML(result.quote)}»</blockquote>`;
+  return `<article id="student-${index + 1}" class="profile-card profile-card-result" data-course-flip><div class="course-flip-inner"><div class="course-face course-front"><div class="profile-cover${media ? ' profile-cover--gallery' : ''}">${cover}</div><div class="profile-caption"><div class="profile-identity"><h3>${label}</h3>${result.course ? `<p>${escapeHTML(result.course)}</p>` : ''}</div><div class="profile-caption-row"><ul class="teacher-chips">${chips}</ul><a class="profile-more" href="#${id}" data-flip-open aria-controls="${id}" aria-expanded="false" aria-label="Подробнее: ${label}">Подробнее${svgIcon('arrow-right')}</a></div></div></div><div class="course-face course-back" id="${id}"><h3 class="course-back-title" tabindex="-1">${label}</h3><div class="profile-details">${details}</div><button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${label}">Назад${svgIcon('arrow-right')}</button></div></div></article>`;
 }
 
 export function renderDirectoryTeachers(teachers = []) {
   if (!teachers.length) return '<p class="directory-empty" data-text="teachers.empty">Информация о преподавателях пока не опубликована.</p>';
   const sorted = [...teachers].sort((a, b) => (b.featured === true) - (a.featured === true));
-  return `<div class="team-grid">${sorted.map((teacher, index) => directoryCard({
-    id: `teacher-details-${index + 1}`, name: teacher.name, subtitle: teacher.role, type: 'teacher',
-    cover: teacher.media?.length ? renderMediaGallery(teacher.media, teacher.name) : teacher.photo ? `<img class="profile-photo" src="${escapeHTML(teacher.photo)}"${responsiveAttributes(teacher.photo)} alt="Фото: ${escapeHTML(teacher.name)}" width="600" height="750" loading="lazy" decoding="async">` : '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>',
-    media: Boolean(teacher.media?.length),
-    details: `<p class="profile-back-role">${escapeHTML(teacher.role)}</p><dl class="profile-facts">${teacher.qualification ? `<div><dt>Квалификация</dt><dd>${escapeHTML(teacher.qualification)}</dd></div>` : ''}${teacher.experience ? `<div><dt>Опыт</dt><dd>${escapeHTML(teacher.experience)}</dd></div>` : ''}</dl>`
-  })).join('')}</div>`;
+  // Only two short facts, so they sit under the name: no «Подробнее» and no back face. The card keeps the
+  // settled look of the flip cards (is-flip-ready) so teachers and students share one frame.
+  return `<div class="team-grid">${sorted.map(teacher => {
+    const name = escapeHTML(teacher.name);
+    const media = Boolean(teacher.media?.length);
+    const cover = media ? renderMediaGallery(teacher.media, teacher.name) : teacher.photo ? `<img class="profile-photo" src="${escapeHTML(teacher.photo)}"${responsiveAttributes(teacher.photo)} alt="Фото: ${name}" width="600" height="750" loading="lazy" decoding="async">` : '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>';
+    const chips = teacherChips(teacher);
+    return `<article class="profile-card profile-card-teacher profile-card--static is-flip-ready"><div class="course-flip-inner"><div class="course-face course-front"><div class="profile-cover${media ? ' profile-cover--gallery' : ''}">${cover}</div><div class="profile-caption"><div class="profile-identity"><h3>${name}</h3>${teacher.role ? `<p>${escapeHTML(teacher.role)}</p>` : ''}</div>${chips ? `<ul class="teacher-chips">${chips}</ul>` : ''}</div></div></div></article>`;
+  }).join('')}</div>`;
 }
 
 export function renderDirectoryResults(results = []) {
   if (!results.length) return '<p class="directory-empty" data-text="results.empty">Результаты пока не опубликованы.</p>';
-  return results.map((result, index) => directoryCard({
-    id: `student-details-${index + 1}`, name: result.student, subtitle: result.course, type: 'result',
-    cover: result.media?.length ? renderMediaGallery(result.media, result.student) : '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>',
-    media: Boolean(result.media?.length),
-    details: `<div class="profile-result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}${result.level ? ` · ${escapeHTML(result.level)}` : ''}</span></div><blockquote>«${escapeHTML(result.quote)}»</blockquote>`
-  })).join('');
+  return results.map(resultDirectoryCard).join('');
 }
 
 // Decorative line of scores that take turns (assets/ui.js); the cards below carry the same facts for everyone.
@@ -997,7 +1028,13 @@ export function renderCourseData(course, site) {
     provider: { '@type': 'EducationalOrganization', name: 'Stanford Language Center', url: site.url },
     offers: { '@type': 'Offer', category: 'Paid', price: course.price, priceCurrency: 'UZS' }
   };
-  return `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`;
+  const trail = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [['Stanford Language Center', pageAddress(site)], ['Курсы и цены', `${pageAddress(site).replace(/\/?$/, '/')}#courses`], [courseTitle(course), data.url]]
+      .map(([name, item], index) => ({ '@type': 'ListItem', position: index + 1, name, item }))
+  };
+  return [data, trail].map(item => `<script type="application/ld+json">${JSON.stringify(item).replace(/</g, '\\u003c')}</script>`).join('\n');
 }
 
 const featuredFirst = list => [...list].sort((a, b) => (b.featured === true) - (a.featured === true));
@@ -1009,7 +1046,7 @@ export function renderCoursePage(course, data) {
   const phone = contacts.verified ? contacts.phones?.[0] : '';
   const telegram = contacts.verified ? contacts.telegrams?.[0] : '';
   const own = courseResults(course, data.results);
-  const results = featuredFirst(own.length ? own : data.results || []).slice(0, HOME_LIMIT);
+  const results = featuredFirst(own.length ? own : data.results || []).slice(0, COURSE_RESULTS_LIMIT);
   const teachers = courseTeachers(course, data.teachers);
   const others = data.courses.filter(other => other.id !== course.id);
   const discount = course.specialPrice ? data.texts?.['courses.discount'] : '';
@@ -1024,13 +1061,13 @@ export function renderCoursePage(course, data) {
 </section>`;
   const program = `<section class="section wrap course-page-section" aria-labelledby="course-program-title"><h2 id="course-program-title">Что входит в курс</h2><ul class="course-details course-page-details">${course.skills.map(skill => `<li>${svgIcon('check')}<span>${escapeHTML(skill)}</span></li>`).join('')}</ul></section>`;
   const resultsSection = results.length ? `<section class="section wrap course-page-section results-section" aria-labelledby="course-results-title"><div class="section-top"><h2 id="course-results-title">Результаты учеников${demoTag(site)}</h2></div>
-${renderCarousel('results-grid home-carousel', 'course-results-title', renderResultCards(results))}
+${renderCarousel('results-grid home-carousel', 'course-results-title', renderResultCards(results, { compact: true, all: data.results }))}
 <a class="text-link results-more" href="results">Все результаты${svgIcon('arrow-right')}</a></section>` : '';
   const teachersSection = teachers.length ? `<section class="section wrap course-page-section" aria-labelledby="course-teachers-title"><div class="section-top"><h2 id="course-teachers-title">Преподаватели${demoTag(site)}</h2></div>
 ${renderTeachers(teachers, site, { heading: false })}
 <a class="text-link results-more" href="teachers">Все преподаватели${svgIcon('arrow-right')}</a></section>` : '';
   const providers = { google: 'Google Maps', yandex: 'Яндекс Карты' };
-  const branches = contacts.verified && contacts.locations?.length ? `<section class="section wrap course-page-section" aria-labelledby="course-branches-title"><h2 id="course-branches-title">Филиалы и график работы</h2><div class="course-page-branches">${contacts.locations.map(location => `<article class="course-branch"><h3>${escapeHTML(location.name)}</h3><p>${escapeHTML(location.address)}</p>${location.hours ? `<p class="location-hours">${svgIcon('clock')}<span>${escapeHTML(location.hours)}</span></p>` : ''}${location.maps?.length ? `<p class="course-branch-maps">${location.maps.map(map => `<a class="text-link" href="${escapeHTML(map.url)}" target="_blank" rel="noopener noreferrer">${svgIcon('map-pin')}<span>${providers[map.provider] || 'Карта'}</span></a>`).join('')}</p>` : ''}</article>`).join('')}</div></section>` : '';
+  const branches = contacts.verified && contacts.locations?.length ? `<section class="section wrap course-page-section" aria-labelledby="course-branches-title"><h2 id="course-branches-title">Филиалы и график работы</h2><div class="course-page-branches">${contacts.locations.map(location => `<article class="course-branch"><h3>${escapeHTML(location.name)}</h3><p>${escapeHTML(location.address)}</p>${location.hours ? `<p class="location-hours">${svgIcon('clock')}<span>${escapeHTML(location.hours)}</span></p>` : ''}${location.maps?.length ? `<p class="course-branch-maps">${location.maps.map(map => `<a class="text-link" href="${escapeHTML(map.url)}" target="_blank" rel="noopener noreferrer">${map.provider === 'google' ? mapPinIcon(location.id) : map.provider === 'yandex' ? YANDEX_ICON : svgIcon('map-pin')}<span>${providers[map.provider] || 'Карта'}</span></a>`).join('')}</p>` : ''}</article>`).join('')}</div></section>` : '';
   const more = others.length ? `<section class="section wrap course-page-section" aria-labelledby="course-more-title"><h2 id="course-more-title">Другие курсы</h2><ul class="course-page-others">${others.map(other => `<li><a href="courses/${escapeHTML(other.id)}"><span class="course-other-name">${escapeHTML(other.name)}${other.subtitle ? ` <span class="course-subtitle">${escapeHTML(other.subtitle)}</span>` : ''}</span><span class="course-other-price"><strong>${money(other.price)}</strong> <span>сум / месяц</span></span>${svgIcon('arrow-right')}</a></li>`).join('')}</ul></section>` : '';
   return `<div class="course-page-main" data-course-page="${id}">${hero}\n${program}\n${resultsSection}\n${teachersSection}\n${branches}\n${more}</div>`;
 }

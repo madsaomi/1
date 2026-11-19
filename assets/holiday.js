@@ -1,5 +1,6 @@
 // Holiday decoration: shows the greeting whose dates include today (Nukus time) and marks <html> so CSS
-// can add the garland, the hat on the logo and snow. Purely decorative: the page works the same without it.
+// can add the holiday's garland and the little picture on the logo; snow for the new year, falling petals for
+// 8 March and Navruz (three rounds, then still). Purely decorative: the page works the same without it.
 (() => {
   if (typeof document === 'undefined') return;
   const banners = [...document.querySelectorAll('[data-holiday]')];
@@ -21,10 +22,11 @@
     banner.hidden = true;
     try { localStorage.setItem(key, 'closed'); } catch { /* Hidden for this visit only. */ }
   });
-  if (name === 'newyear') {
-    const snow = document.createElement('div');
-    snow.className = 'holiday-snow';
-    snow.setAttribute('aria-hidden', 'true');
-    document.body.append(snow);
+  const falling = { newyear: 'holiday-snow', march8: 'holiday-petals', navruz: 'holiday-petals' }[name];
+  if (falling) {
+    const layer = document.createElement('div');
+    layer.className = falling;
+    layer.setAttribute('aria-hidden', 'true');
+    document.body.append(layer);
   }
 })();

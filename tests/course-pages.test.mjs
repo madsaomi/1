@@ -42,9 +42,10 @@ test('a course shows results of its own students, and the best results of the ce
   assert.deepEqual(courseResults({ ...course, id: 'general-english', name: 'General English' }, results).map(result => result.student), ['C']);
   const data = { site: {}, contacts: { verified: false }, courses: [course, { ...course, id: 'math', name: 'Математика' }], results, teachers: fixture.teachers, texts: {} };
   const own = renderCoursePage(course, data);
-  assert.equal((own.match(/class="result-card"/g) || []).length, 1, 'Only IELTS results on the IELTS page');
+  assert.equal((own.match(/class="result-card result-card--compact"/g) || []).length, 1, 'Only IELTS results on the IELTS page');
+  assert(own.includes('href="results#student-1"'), '«Подробнее» leads to this student on the results page');
   const fallback = renderCoursePage(data.courses[1], data);
-  assert.equal((fallback.match(/class="result-card"/g) || []).length, 3, 'A course without own results shows the centre results');
+  assert.equal((fallback.match(/class="result-card result-card--compact"/g) || []).length, 3, 'A course without own results shows the centre results');
   assert(fallback.indexOf('<strong>B2</strong>') < fallback.indexOf('<strong>8.0</strong>'), 'Featured results come first');
   assert(!renderCoursePage(course, { ...data, results: [] }).includes('course-results-title'), 'No results — no empty section');
   assert.deepEqual(courseTeachers(course, fixture.teachers).map(teacher => teacher.name), fixture.teachers.filter(teacher => /IELTS/.test(teacher.role)).map(teacher => teacher.name));
@@ -56,7 +57,9 @@ test('a course page uses only published facts and escapes everything from the ad
   assert(html.includes('&lt;IELTS&gt;') && !html.includes('<IELTS>'));
   assert(!html.includes('tel:') && !html.includes('t.me'), 'Unverified contacts give no call or Telegram buttons');
   assert(!html.includes('Семья или 2 курса'), 'A course without a family price shows only the monthly price');
-  const ld = JSON.parse(renderCourseData(course, data.site).replace(/^<script type="application\/ld\+json">|<\/script>$/g, ''));
+  const [ld, trail] = renderCourseData(course, data.site).split('\n').map(block => JSON.parse(block.replace(/^<script type="application\/ld\+json">|<\/script>$/g, '')));
+  assert.equal(trail['@type'], 'BreadcrumbList');
+  assert.deepEqual(trail.itemListElement.map(item => item.item), ['https://school.example', 'https://school.example/#courses', 'https://school.example/courses/ielts']);
   assert.equal(ld['@type'], 'Course');
   assert.equal(ld.url, 'https://school.example/courses/ielts');
   assert.deepEqual(ld.offers, { '@type': 'Offer', category: 'Paid', price: 800000, priceCurrency: 'UZS' });

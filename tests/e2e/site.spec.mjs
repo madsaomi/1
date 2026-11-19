@@ -84,6 +84,11 @@ test('the call bar is on phones only and dials the centre', async ({ page }, tes
   if (phone(testInfo)) {
     await expect(bar).toBeVisible();
     await expect(bar.locator('a').first()).toHaveAttribute('href', /^tel:\+998/);
+    // Reading down the page tucks the bar away; scrolling back up brings it back.
+    await page.mouse.wheel(0, 900);
+    await expect(bar).toHaveClass(/is-tucked/);
+    await page.mouse.wheel(0, -300);
+    await expect(bar).not.toHaveClass(/is-tucked/);
   } else {
     await expect(bar).toBeHidden();
   }
@@ -213,6 +218,7 @@ test('a course has its own page with price, results and other courses, in every 
   await expect(page.locator('.course-page-price .course-price strong')).toHaveText('800 000');
   await expect(page.locator('#course-results-title')).toBeVisible();
   await expect(page.locator('.course-page-main .result-card').first()).toContainText('IELTS');
+  await page.waitForLoadState('load');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   // The language menu opens the same course in Uzbek; links stay inside the language.
@@ -225,6 +231,33 @@ test('a course has its own page with price, results and other courses, in every 
   await page.locator('.breadcrumbs a').first().click();
   await expect(page).toHaveURL(/\/uz\/$/);
   expect(errors).toEqual([]);
+});
+
+test('home rows of people drift slowly, stop under the mouse and with the pause button, and never move for reduced motion', async ({ page }, testInfo) => {
+  test.skip(!phone(testInfo), 'On the phone the demo rows are wider than the screen');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const root = page.locator('#teachers [data-marquee]');
+  const track = root.locator('[data-carousel-track]');
+  await track.scrollIntoViewIfNeeded();
+  const position = () => track.evaluate(element => element.scrollLeft);
+  const start = await position();
+  await page.waitForTimeout(1200);
+  expect(await position()).toBeGreaterThan(start + 10);
+  // The copies that close the loop are hidden from screen readers and the keyboard.
+  await expect(track.locator('.is-marquee-copy').first()).toHaveAttribute('aria-hidden', 'true');
+  const toggle = root.locator('[data-marquee-toggle]');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('h1').first().focus();
+  const stopped = await position();
+  await page.waitForTimeout(800);
+  expect(await position()).toBe(stopped);
+  // Reduced motion: a plain carousel, nothing is copied and nothing moves.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await expect(page.locator('#teachers .is-marquee-copy')).toHaveCount(0);
+  await expect(page.locator('#teachers [data-marquee-toggle]')).toBeHidden();
 });
 
 test('a missing address shows the branded 404 in the language of its folder', async ({ page }) => {

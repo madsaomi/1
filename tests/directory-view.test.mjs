@@ -5,13 +5,14 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../assets/directory-view.js', import.meta.url), 'utf8');
 
-function pager({ count, missingButton = false } = {}) {
+function pager({ count, missingButton = false, hash = '' } = {}) {
   let focused;
   const node = () => ({ hidden: false, handlers: {}, addEventListener(name, handler) { this.handlers[name] = handler; } });
   const button = node();
   const more = { hidden: true, querySelector: () => button };
   const cards = Array.from({ length: count }, () => {
     const card = node();
+    card.scrollIntoView = () => { card.scrolled = true; };
     const trigger = { focus() { focused = card; } };
     card.querySelector = () => trigger;
     return card;
@@ -20,8 +21,9 @@ function pager({ count, missingButton = false } = {}) {
     body: { classList: { contains: name => name === 'directory-page' } },
     querySelector: () => missingButton ? null : more,
     querySelectorAll: () => cards,
+    getElementById: id => cards[Number(id.replace('student-', '')) - 1] || null,
   };
-  vm.runInContext(source, vm.createContext({ document }));
+  vm.runInContext(source, vm.createContext({ document, location: { hash } }));
   return { cards, more, click: () => button.handlers.click?.(), focused: () => focused };
 }
 
@@ -43,6 +45,13 @@ test('long directories open in portions of nine and move focus to the first new 
   ui.click();
   assert.equal(visible(ui.cards), 20);
   assert.equal(ui.more.hidden, true);
+});
+
+test('a link to one student (#student-14) opens the portion that holds the card and scrolls to it', () => {
+  const ui = pager({ count: 20, hash: '#student-14' });
+  assert.equal(visible(ui.cards), 18);
+  assert.equal(ui.cards[13].hidden, false);
+  assert.equal(ui.cards[13].scrolled, true);
 });
 
 test('without the button markup every card stays visible', () => {
