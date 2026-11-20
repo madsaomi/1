@@ -33,6 +33,8 @@ data.results = fixture.results.map((result, index) => ({ ...result, consent: tru
   ...(index === 0 ? { media: [{ type: 'image', src: photo, alt: 'Пример: сертификат' }] } : {}) }));
 data.events = Array.from({ length: 8 }, (_, index) => ({
   title: `Пример: событие ${index + 1}`, startsAt: `${day(index + 2)}T18:00:00+05:00`, description: 'Пример события для проверки.' }));
+// One event that is already over: the page removes it by itself (assets/ui.js).
+data.events.unshift({ title: 'Пример: прошедшее событие', startsAt: `${day(-5)}T18:00:00+05:00`, description: 'Уже прошло.' });
 fs.writeFileSync(path.join(site, 'content.js'), `window.schoolContent = ${JSON.stringify(data, null, 2)};\n`);
 const build = spawnSync(process.execPath, ['build.mjs'], { cwd: site, encoding: 'utf8' });
 if (build.status !== 0) {

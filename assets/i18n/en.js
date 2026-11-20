@@ -1,6 +1,11 @@
 // English. Edit translations in the admin: «Переводы» (the strings block is rebuilt on publication).
 window.stanfordEn = {
   strings: {
+    "Заполнение анкеты": "Form progress",
+    "Скопировано": "Copied",
+    "Отправлено": "Sent",
+    "или перетащите фото сюда": "or drag a photo here",
+    "заполнено": "done",
     "Пауза": "Pause",
     "Продолжить": "Play",
     "Проверка «я не робот» не пройдена. Обновите страницу и попробуйте ещё раз.": "The “I’m not a robot” check failed. Refresh the page and try again.",
@@ -401,6 +406,7 @@ window.stanfordEn = {
     "Не удалось отправить анкету. Проверьте интернет и попробуйте снова.": "Could not send the application. Check your internet and try again."
   },
   patterns: [
+    [/^Скопировать: (.+)$/, m => `Copy: ${m[1]}`],
     [/^((?:IELTS|SAT) [\d.]+) · (.+)$/, (m, t) => `${m[1]} · ${t(m[2])}`],
     [/^Позвонить и записаться: (.+)$/, (m, t) => `Call to sign up: ${t(m[1])}`],
     [/^Всё о курсе: (.+)$/, (m, t) => `About the course: ${t(m[1])}`],

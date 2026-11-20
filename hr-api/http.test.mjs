@@ -223,9 +223,18 @@ test('with the Turnstile secret every form needs a valid token of its own form; 
   assert.equal((await post(base, '/feedback', complaint('anything'))).status, 200);
 });
 
-test('complaint text for Telegram is plain and the anonymous one says no contacts were given', async () => {
+test('Telegram complaints escape input and show contacts only for official messages', async () => {
   const { formatFeedback } = await import('./feedback.mjs');
-  const text = formatFeedback({ kind: 'anonymous', topic: 'Другое', branch: '', message: '<b>Текст</b>' }, '18.11.2026, 10:00');
-  assert(text.startsWith('🕶 Анонимная жалоба') && text.includes('Филиал: не указан') && text.includes('<b>Текст</b>'));
-  assert(!/Имя|Телефон/.test(text));
+  const details = { topic: 'Другое', branch: 'Филиал А & Б', message: '</blockquote><b>Текст & детали</b>' };
+  const date = '18.11.2026, 10:00';
+  const contact = { name: 'Анна', phone: '+998901234567', telegram: '@test_contact' };
+  const anonymous = formatFeedback({ kind: 'anonymous', ...details, ...contact }, date);
+  assert.match(anonymous, /<b>📩 Другое<\/b>\n<i>Анонимное обращение · 18\.11\.2026, 10:00<\/i>/);
+  assert.match(anonymous, /Филиал А &amp; Б/);
+  assert.ok(anonymous.includes('<blockquote>&lt;/blockquote&gt;&lt;b&gt;Текст &amp; детали&lt;/b&gt;</blockquote>'));
+  assert.doesNotMatch(anonymous, /Контакты|Анна|998901234567|@test_contact/);
+
+  const official = formatFeedback({ kind: 'official', ...details, ...contact }, date);
+  assert.match(official, /<i>Официальное обращение ·/);
+  assert.ok(official.endsWith('<b>Контакты</b>\nАнна\n+998901234567 · @test_contact'));
 });

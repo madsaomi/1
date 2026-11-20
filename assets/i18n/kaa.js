@@ -2,6 +2,11 @@
 // Owner translations published by the CMS may override these defaults.
 window.stanfordKaa = {
   strings: {
+    "Заполнение анкеты": "Anketanı toltırıw barısı",
+    "Скопировано": "Kóshirip alındı",
+    "Отправлено": "Jiberildi",
+    "или перетащите фото сюда": "yamasa fotonı usı jerge súyrep ákeliń",
+    "заполнено": "toltırıldı",
     "Пауза": "Pauza",
     "Продолжить": "Dawam ettiriw",
     "Проверка «я не робот» не пройдена. Обновите страницу и попробуйте ещё раз.": "«Men robot emespen» tekseriwinen ótpedi. Betti jańalap, qaytadan urınıp kóriń.",
@@ -399,6 +404,7 @@ window.stanfordKaa = {
     "Готово": "Tayar"
   },
   patterns: [
+    [/^Скопировать: (.+)$/, m => `Kóshirip alıw: ${m[1]}`],
     [/^((?:IELTS|SAT) [\d.]+) · (.+)$/, (m, t) => `${m[1]} · ${t(m[2])}`],
     [/^Позвонить и записаться: (.+)$/, (m, t) => `Qońıraw etip jazılıw: ${t(m[1])}`],
     [/^Всё о курсе: (.+)$/, (m, t) => `Kurs haqqında tolıq: ${t(m[1])}`],

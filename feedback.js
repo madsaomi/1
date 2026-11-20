@@ -13,6 +13,10 @@
   const result = document.querySelector('#fb-result');
   const contactFields = [...contacts.querySelectorAll('input')];
   const kind = () => form.querySelector('input[name="kind"]:checked')?.value || 'official';
+  // Submit button: a spinner while sending, a check that draws itself once the message is delivered.
+  submit.insertAdjacentHTML('beforeend', '<span class="btn-state" aria-hidden="true"><svg class="btn-spinner" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="36 60"/></svg><svg class="btn-check" viewBox="0 0 24 24" width="20" height="20"><path d="m5 12.5 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>');
+  const submitLabel = submit.querySelector('span');
+  const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const show = text => { status.textContent = text; };
   const markInvalid = (field, text) => {
@@ -96,6 +100,10 @@
       if (!body.turnstileToken) return show('Подождите пару секунд: идёт проверка «я не робот».');
     }
     submit.disabled = true;
+    const label = submitLabel?.textContent || '';
+    let delivered = false;
+    submit.dataset.state = 'loading';
+    if (submitLabel) submitLabel.textContent = 'Отправляем…';
     show('Отправляем…');
     try {
       const response = await fetch(endpoint, {
@@ -106,6 +114,12 @@
       });
       const payload = await response.json().catch(() => ({}));
       if (response.ok && payload.ok) {
+        delivered = true;
+        submit.dataset.state = 'done';
+        if (submitLabel) submitLabel.textContent = 'Отправлено';
+        show('');
+        // Let the check finish drawing before the thank-you message replaces the form.
+        await new Promise(resolve => setTimeout(resolve, calm() ? 0 : 700));
         form.hidden = true;
         result.querySelector('#fb-success-official').hidden = body.kind !== 'official';
         result.querySelector('#fb-success-anonymous').hidden = body.kind === 'official';
@@ -124,6 +138,10 @@
     } finally {
       submit.disabled = false;
       resetGuard();
+      if (!delivered) {
+        delete submit.dataset.state;
+        if (submitLabel) submitLabel.textContent = label;
+      }
     }
   });
   updateKind();

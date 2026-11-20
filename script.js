@@ -31,8 +31,8 @@ const filterLabel = category => {
   const button = filters.find(item => item.dataset.filter === category);
   return button ? button.dataset.filterLabel || button.textContent.trim() : 'Все программы';
 };
-// With JS the catalogue opens on the first tab; without JS every course stays listed.
-const defaultCategory = filters.find(button => button.dataset.filter !== 'all')?.dataset.filter || 'all';
+// The catalogue opens with every course (IELTS and SAT included, as the first screen promises); the tabs narrow it.
+const defaultCategory = 'all';
 
 const menu = document.querySelector('.menu');
 const navigation = document.querySelector('#navigation');

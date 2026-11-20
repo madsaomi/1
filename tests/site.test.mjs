@@ -706,10 +706,9 @@ test('filter counts match actual categories and are hidden from duplicate screen
 
 test('reset reveals every course and restores focus to the all-programs filter', () => {
   const { context, nodes, cards, filters } = runtime();
-  // The catalogue opens on the first tab, so «Все курсы» is offered right away.
-  const firstTab = data.courses.filter(course => course.category === 'languages').length;
-  assert.equal(cards.filter(card => !card.hidden).length, firstTab);
-  assert.equal(nodes['#reset-filter'].hidden, false);
+  // The catalogue opens with every course, so there is nothing to reset yet.
+  assert.equal(cards.filter(card => !card.hidden).length, data.courses.length);
+  assert.equal(nodes['#reset-filter'].hidden, true);
   context.filterCourses('kids', 'Для детей');
   assert.equal(nodes['#reset-filter'].hidden, false);
   assert.equal(cards.filter(card => !card.hidden).length, 1);

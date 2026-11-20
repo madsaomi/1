@@ -119,6 +119,7 @@ migrate, import_content, createsuperuser и enable_2fa. Пример для Powe
 |---|---|
 | DJANGO_SECRET_KEY | Длинный случайный секрет |
 | ADMIN_PATH | Секретный путь от 12 символов, с / в конце; не admin/ |
+| DJANGO_TRUST_PROXY_HOPS | Сколько доверенных прокси перед админкой; на Railway `1`. Тогда блокировка после 5 неверных паролей идёт по адресу посетителя, и посторонний, знающий логин, не может заблокировать вход владельцу. По умолчанию `0`: блокировка по логину |
 | DJANGO_ALLOWED_HOSTS | Домен админки без протокола |
 | DJANGO_CSRF_TRUSTED_ORIGINS | https://домен-админки |
 | POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST | Подключение к Postgres |

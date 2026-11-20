@@ -4,7 +4,7 @@ import { isIP } from 'node:net';
 import { ValidationError, validateApplication } from './validation.mjs';
 import { sanitizePhoto } from './photo.mjs';
 import { buildResume } from './pdf.mjs';
-import { sendResume, sendText } from './telegram.mjs';
+import { pollFeedbackStatus, sendFeedback, sendResume } from './telegram.mjs';
 import { formatFeedback, validateFeedback } from './feedback.mjs';
 
 const PORT = Number(process.env.PORT || 8787);
@@ -275,7 +275,11 @@ async function handleFeedback(request, response, started) {
     if (!(await passesTurnstile(body, 'feedback', response))) return;
     const feedback = validateFeedback(body);
     const date = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', dateStyle: 'short', timeStyle: 'short' }).format(new Date());
-    if (!DRY_RUN) await sendText({ token: FEEDBACK_BOT_TOKEN, chatIds: FEEDBACK_CHATS, text: formatFeedback(feedback, date) });
+    if (!DRY_RUN) await sendFeedback({
+      token: FEEDBACK_BOT_TOKEN,
+      chatIds: FEEDBACK_CHATS,
+      text: formatFeedback(feedback, date)
+    });
     console.log(`[feedback] 200 ${feedback.kind} ${Date.now() - started}ms${DRY_RUN ? ' (dry run)' : ''}`);
     send(response, 200, { ok: true });
   } catch (error) {
@@ -291,6 +295,9 @@ async function handleFeedback(request, response, started) {
 
 server.listen(PORT, HOST, () => {
   console.log(`hr-api listening on ${server.address().port}`);
+  if (FEEDBACK_CONFIGURED && !DRY_RUN) {
+    void pollFeedbackStatus({ token: FEEDBACK_BOT_TOKEN, chatIds: FEEDBACK_CHATS });
+  }
 });
 
 function shutdown() {

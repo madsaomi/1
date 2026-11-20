@@ -126,6 +126,8 @@ test('event carousel moves one card at a time and counts slides', async ({ page 
   const carousel = page.locator('#events [data-carousel]');
   const counter = carousel.locator('.carousel-count');
   await expect(counter).toHaveText(/^1 \/ 8$/);
+  // The event that is already over has left the page by itself.
+  await expect(page.locator('#events .event-card', { hasText: 'прошедшее событие' })).toHaveCount(0);
   await carousel.locator('[data-carousel-next]').click();
   await expect(counter).toHaveText(/^2 \/ 8$/);
   await carousel.locator('[data-carousel-prev]').click();
@@ -258,6 +260,55 @@ test('home rows of people drift slowly, stop under the mouse and with the pause 
   await page.reload();
   await expect(page.locator('#teachers .is-marquee-copy')).toHaveCount(0);
   await expect(page.locator('#teachers [data-marquee-toggle]')).toBeHidden();
+});
+
+test('the yellow pill glides to the chosen course filter, and contacts copy with one click', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/#courses');
+  const kids = page.locator('.filters button[data-filter="kids"]');
+  await kids.click();
+  const pill = page.locator('.filters .pill-indicator');
+  await expect(async () => {
+    const [a, b] = await Promise.all([pill.boundingBox(), kids.boundingBox()]);
+    expect(Math.abs(a.x - b.x)).toBeLessThan(3);
+    expect(Math.abs(a.width - b.width)).toBeLessThan(3);
+  }).toPass();
+  const copy = page.locator('#enroll .contact-copy').first();
+  await copy.scrollIntoViewIfNeeded();
+  await copy.click();
+  await expect(copy).toHaveClass(/is-copied/);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\+998 \d{2} \d{3} \d{2} \d{2}$/);
+});
+
+test('the HR form shows its progress, accepts the photo and confirms sending with a check', async ({ page }) => {
+  await page.goto('/career');
+  const steps = page.locator('[data-career-progress] [data-progress-step]');
+  await expect(steps).toHaveCount(4);
+  await expect(steps.first()).toHaveAttribute('aria-current', 'step');
+  await page.locator('#cf-photo').setInputFiles('assets/og-image.png');
+  await expect(steps.first()).toHaveClass(/is-done/);
+  await expect(steps.nth(1)).toHaveAttribute('aria-current', 'step');
+  // Fill everything and send; the service answer is replaced by a delayed success.
+  await page.locator('#cf-name').fill('Тест Тестов');
+  await page.locator('#cf-phone').fill('901234567');
+  await page.evaluate(() => {
+    const form = document.querySelector('#career-form');
+    for (const select of form.querySelectorAll('select')) { select.selectedIndex = 1; select.dispatchEvent(new Event('change', { bubbles: true })); }
+    form.elements.education.value = 'НГПИ, английский язык';
+    form.elements.about.value = 'Люблю преподавать и готовить учеников к экзаменам.';
+    form.elements.consent.checked = true;
+    form.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.locator('[data-career-progress] .is-done')).toHaveCount(4);
+  await page.route('**/career', async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await new Promise(resolve => setTimeout(resolve, 600));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+  });
+  const submit = page.locator('#career-submit');
+  await submit.click();
+  await expect(submit).toHaveAttribute('data-state', 'loading');
+  await expect(page.locator('#career-result')).toBeVisible();
 });
 
 test('a missing address shows the branded 404 in the language of its folder', async ({ page }) => {

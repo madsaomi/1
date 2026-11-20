@@ -82,10 +82,14 @@ AUTHENTICATION_BACKENDS = [
     'axes.backends.AxesStandaloneBackend',  # must be first
     'django.contrib.auth.backends.ModelBackend',
 ]
-# Brute-force protection: behind Railway's proxy REMOTE_ADDR is shared, so lock by username, not IP.
+# Brute-force protection. Behind Railway's proxy REMOTE_ADDR is shared, so by default the lock is by username.
+# With DJANGO_TRUST_PROXY_HOPS=1 (Railway) the real visitor address is known: then five wrong passwords lock that
+# address, and a username only together with the address, so a stranger who knows the login cannot lock the owner out.
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = timedelta(minutes=15)
-AXES_LOCKOUT_PARAMETERS = ['username']
+from config.client_ip import client_ip, trusted_proxy_hops  # noqa: E402
+AXES_CLIENT_IP_CALLABLE = client_ip
+AXES_LOCKOUT_PARAMETERS = ['ip_address', ['username', 'ip_address']] if trusted_proxy_hops() else ['username']
 AXES_RESET_ON_SUCCESS = True
 AXES_LOCKOUT_TEMPLATE = 'lockout.html'
 # W006 warns that User-Agent/cookie rotation evades IP-less lockouts; a username lockout is not evaded that way,

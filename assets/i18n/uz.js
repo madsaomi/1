@@ -4,6 +4,11 @@
 // stays in Russian, so new content from the admin never breaks the page.
 window.stanfordUz = {
   strings: {
+    "Заполнение анкеты": "Anketani töldiriş jarayoni",
+    "Скопировано": "Nusxa olindi",
+    "Отправлено": "Yuborildi",
+    "или перетащите фото сюда": "yoki fotoni şu yerga sudrab taşlang",
+    "заполнено": "töldirildi",
     "Пауза": "Pauza",
     "Продолжить": "Davom ettiriş",
     "Проверка «я не робот» не пройдена. Обновите страницу и попробуйте ещё раз.": "«Men robot emasman» tekşiruvidan ötilmadi. Sahifani yangilang va qaytadan urinib köring.",
@@ -383,6 +388,7 @@ window.stanfordUz = {
   // Texts with numbers, names or two translatable halves. Each entry: [regular expression, builder];
   // the builder gets the match and the translate function for the parts.
   patterns: [
+    [/^Скопировать: (.+)$/, m => `Nusxa oliş: ${m[1]}`],
     [/^((?:IELTS|SAT) [\d.]+) · (.+)$/, (m, t) => `${m[1]} · ${t(m[2])}`],
     [/^Позвонить и записаться: (.+)$/, (m, t) => `Qönğiroq qiliş va yoziliş: ${t(m[1])}`],
     [/^Всё о курсе: (.+)$/, (m, t) => `Kurs haqida batafsil: ${t(m[1])}`],

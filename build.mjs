@@ -25,6 +25,7 @@ export function svgIcon(name) {
     mail: 'M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z m18 2-10 6L2 7',
     award: 'M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z M8.2 13.9 7 22l5-3 5 3-1.2-8.1',
     pause: 'M9 5v14 M15 5v14',
+    copy: 'M9 9h10v10H9z M5 15V5h10',
     play: 'M8 5l11 7-11 7Z'
   };
   return `<svg class="icon icon-${name}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${paths[name]}"/></svg>`;
@@ -196,14 +197,17 @@ function displayPhone(phone) {
   return parts ? `+998 ${parts[1]} ${parts[2]} ${parts[3]} ${parts[4]}` : phone;
 }
 
+// «Copy» next to a contact (assets/copy.js shows it where the browser can copy; hidden without JS).
+const copyButton = value => `<button type="button" class="contact-copy" data-copy="${escapeHTML(value)}" aria-label="Скопировать: ${escapeHTML(value)}" hidden>${svgIcon('copy')}${svgIcon('check')}</button>`;
+
 export function renderContacts(contacts, { compact = false } = {}) {
   if (!contacts.verified) return '<p class="contact-unavailable"><strong>Контакты уточняются.</strong><br>Запись временно недоступна. Подтвержденные телефон и Telegram появятся здесь.</p>';
   const heading = compact ? 'p' : 'h3';
   const groups = [];
-  if (contacts.phones?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Позвонить</${heading}><ul class="contact-list">${contacts.phones.map(phone => `<li><a class="contact-channel" href="tel:${escapeHTML(phone)}" aria-label="Позвонить: ${escapeHTML(displayPhone(phone))}">${svgIcon('phone')}<span>${escapeHTML(displayPhone(phone))}</span></a></li>`).join('')}</ul></div>`);
-  if (!compact && contacts.telegrams?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Написать в Telegram</${heading}><ul class="contact-list">${contacts.telegrams.map(url => `<li><a class="contact-channel" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Написать в Telegram: @${escapeHTML(url.split('/').pop())}">${svgIcon('telegram')}<span>@${escapeHTML(url.split('/').pop())}</span>${svgIcon('external')}</a></li>`).join('')}</ul></div>`);
+  if (contacts.phones?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Позвонить</${heading}><ul class="contact-list">${contacts.phones.map(phone => `<li><a class="contact-channel" href="tel:${escapeHTML(phone)}" aria-label="Позвонить: ${escapeHTML(displayPhone(phone))}">${svgIcon('phone')}<span>${escapeHTML(displayPhone(phone))}</span></a>${copyButton(displayPhone(phone))}</li>`).join('')}</ul></div>`);
+  if (!compact && contacts.telegrams?.length) groups.push(`<div class="contact-group"><${heading} class="contact-label">Написать в Telegram</${heading}><ul class="contact-list">${contacts.telegrams.map(url => `<li><a class="contact-channel" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Написать в Telegram: @${escapeHTML(url.split('/').pop())}">${svgIcon('telegram')}<span>@${escapeHTML(url.split('/').pop())}</span>${svgIcon('external')}</a>${copyButton(`@${url.split('/').pop()}`)}</li>`).join('')}</ul></div>`);
   const extras = [];
-  if (!compact && contacts.email) extras.push(`<a href="mailto:${escapeHTML(contacts.email)}">${svgIcon('mail')}<span>${escapeHTML(contacts.email)}</span></a>`);
+  if (!compact && contacts.email) extras.push(`<span class="contact-extras-copy"><a href="mailto:${escapeHTML(contacts.email)}">${svgIcon('mail')}<span>${escapeHTML(contacts.email)}</span></a>${copyButton(contacts.email)}</span>`);
   if (!compact && contacts.instagram) extras.push(`<a href="${escapeHTML(contacts.instagram)}" target="_blank" rel="noopener noreferrer">${svgIcon('instagram')}<span>Instagram</span>${svgIcon('external')}</a>`);
   // HR no longer gets messages directly from this block: candidates fill the career form instead.
   if (!compact) extras.push(`<a class="contact-extras-link" href="career">${svgIcon('check')}<span>Заполнить анкету</span>${svgIcon('arrow-right')}</a>`);
@@ -491,7 +495,7 @@ export function renderMediaGallery(items = [], label = 'Stanford', { eager = fal
     const alt = escapeHTML(item.alt || label);
     const medium = item.type === 'video'
       ? `<video controls playsinline preload="none"${item.poster ? ` poster="${escapeHTML(item.poster)}"` : ''} aria-label="${alt}" width="1280" height="720" src="${source}"><a href="${source}">Открыть видео</a></video>`
-      : `<img src="${source}"${responsiveAttributes(item.src, eager ? IMAGE_SIZES.wide : IMAGE_SIZES.card)} alt="${alt}" width="1280" height="800" loading="${eager && index === 0 ? 'eager' : 'lazy'}" decoding="async">`;
+      : `<img src="${source}"${responsiveAttributes(item.src, eager ? IMAGE_SIZES.wide : IMAGE_SIZES.card)} alt="${alt}" width="1280" height="800" loading="${eager && index === 0 ? 'eager' : 'lazy'}"${eager && index === 0 ? ' fetchpriority="high"' : ''} decoding="async">`;
     return `<figure class="media-gallery-slide" data-gallery-slide>${medium}</figure>`;
   }).join('');
   return `<div class="media-gallery" data-media-gallery role="region" aria-label="Фото и видео: ${escapeHTML(label)}"><div class="media-gallery-track" data-gallery-track tabindex="0" aria-label="Фото и видео">${slides}</div><div class="media-gallery-controls" data-gallery-controls hidden><button type="button" data-gallery-prev aria-label="Предыдущий слайд">${svgIcon('arrow-left')}</button><span data-gallery-status role="status" aria-live="polite" aria-atomic="true">1 / ${items.length}</span><button type="button" data-gallery-next aria-label="Следующий слайд">${svgIcon('arrow-right')}</button></div></div>`;
@@ -674,7 +678,7 @@ ${cards}
   }).join('\n');
   return `<div class="cashback-container">
 <div class="cashback-toolbar">
-  <div class="cashback-tabs" role="tablist" aria-label="Направления кэшбэка">
+  <div class="cashback-tabs" role="tablist" aria-label="Направления кэшбэка" data-pill=".cashback-tab">
 ${tabs}
   </div>
 </div>

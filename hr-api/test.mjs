@@ -87,3 +87,71 @@ test('every HR chat gets the resume; one failing chat does not lose the applicat
     console.error = quiet;
   }
 });
+
+test('separate Telegram status buttons update both complaint copies and ignore stale clicks', async t => {
+  const { formatFeedback } = await import('./feedback.mjs');
+  const { createFeedbackStatusHandler, sendFeedback } = await import('./telegram.mjs');
+  const text = formatFeedback({
+    kind: 'anonymous', topic: 'Предложение', branch: '', message: 'Добавьте вечернюю группу.'
+  }, '19.11.2026, 14:08');
+  const sends = [];
+  const keyboards = new Map();
+  const answers = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const body = JSON.parse(options.body);
+    const method = new URL(url).pathname.split('/').at(-1);
+    if (method === 'sendMessage') {
+      sends.push(body);
+      return Response.json({ ok: true, result: { message_id: Number(body.chat_id) + 1 } });
+    }
+    if (method === 'editMessageReplyMarkup') {
+      assert.equal(body.message_id, Number(body.chat_id) + 1);
+      keyboards.set(body.chat_id, body.reply_markup);
+    } else if (method === 'answerCallbackQuery') {
+      answers.push(body.text);
+    } else {
+      assert.fail(`Unexpected Telegram API method: ${method}`);
+    }
+    return Response.json({ ok: true, result: true });
+  });
+
+  const config = { token: 'test-token', chatIds: ['111', '222'] };
+  await sendFeedback({ ...config, text });
+  assert.deepEqual(sends.map(message => message.chat_id), config.chatIds);
+  for (const message of sends) {
+    assert.equal(message.parse_mode, 'HTML');
+    assert.equal(message.text, text);
+    assert.equal(message.disable_web_page_preview, true);
+  }
+  const button = (chat, status) => keyboards.get(chat).inline_keyboard[status][0];
+  const labels = chat => keyboards.get(chat).inline_keyboard.map(([item]) => item.text);
+  const callback = (chat, status, data = button(chat, status).callback_data, actor = Number(chat)) => ({
+    id: 'test-callback',
+    data,
+    from: { id: actor },
+    message: { chat: { id: Number(chat), type: 'private' }, message_id: Number(chat) + 1, reply_markup: keyboards.get(chat) }
+  });
+  assert.deepEqual(labels('111'), ['✓ Новая', 'В работе', 'Решено']);
+  const old = callback('111', 1);
+  const handle = createFeedbackStatusHandler(config);
+  await handle(callback('111', 1, 'f2:0:0:1:112:223:0000000000000000'));
+  await handle(callback('111', 1, undefined, 333));
+  assert.equal(answers.length, 0);
+  await handle(callback('222', 2));
+  assert.equal(button('111', 2).text, '✓ Решено');
+  assert.equal(button('111', 2).style, 'success');
+  assert.deepEqual(keyboards.get('111'), keyboards.get('222'));
+  await handle(old);
+  assert.equal(button('111', 2).text, '✓ Решено');
+
+  const restarted = createFeedbackStatusHandler(config);
+  const reopen = callback('222', 0);
+  await restarted(reopen);
+  assert.deepEqual(labels('111'), ['✓ Новая', 'В работе', 'Решено']);
+  await restarted(old);
+  assert.equal(button('222', 0).text, '✓ Новая');
+  await restarted(callback('111', 1));
+  assert.equal(button('222', 1).style, 'primary');
+  assert.deepEqual(labels('222'), ['Новая', '✓ В работе', 'Решено']);
+  assert.equal(answers.at(-1), 'Текущий статус: В работе');
+});

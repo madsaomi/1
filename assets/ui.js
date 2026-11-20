@@ -24,6 +24,17 @@
     } catch { run(); }
   };
 
+  // An event leaves the page three hours after its start, without waiting for the next publication; this runs
+  // before assets/carousel.js, so the counter only counts the events still ahead. No events left: no section.
+  const EVENT_GRACE = 3 * 60 * 60 * 1000;
+  document.querySelectorAll('.event-card').forEach(card => {
+    const start = Date.parse(card.querySelector('[data-countdown]')?.getAttribute('data-countdown') || '');
+    if (Number.isFinite(start) && Date.now() > start + EVENT_GRACE) card.remove();
+  });
+  document.querySelectorAll('.planned-events').forEach(section => {
+    if (!section.querySelector('.event-card')) section.hidden = true;
+  });
+
   // Events keep their published date visible without JavaScript. Only changed values animate,
   // and timers sleep while the document or event is out of view.
   each('[data-countdown]', element => {

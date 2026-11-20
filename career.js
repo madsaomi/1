@@ -36,6 +36,10 @@
 
   let photoData = '';
   let sending = false;
+  // Submit button: a spinner while sending, a check that draws itself once the application is delivered.
+  submit?.insertAdjacentHTML('beforeend', '<span class="btn-state" aria-hidden="true"><svg class="btn-spinner" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="36 60"/></svg><svg class="btn-check" viewBox="0 0 24 24" width="20" height="20"><path d="m5 12.5 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>');
+  const submitLabel = submit?.querySelector('span');
+  const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const value = name => {
     const field = form.elements[name];
@@ -56,6 +60,7 @@
     }
     if (photoEmpty) photoEmpty.hidden = false;
     if (photoRemove) photoRemove.hidden = true;
+    document.dispatchEvent(new Event('career-photo-cleared'));
     if (photoInput) {
       photoInput.value = '';
       photoInput.setCustomValidity('');
@@ -117,6 +122,7 @@
       if (photoRemove) photoRemove.hidden = false;
       photoInput.setCustomValidity('');
       setStatus('');
+      updateProgress();
     } catch (error) {
       clearPhoto();
       photoInput.setCustomValidity('Не удалось прочитать фото. Выберите JPG, PNG или WebP до 10 МБ.');
@@ -125,6 +131,75 @@
     }
   });
   photoRemove?.addEventListener('click', clearPhoto);
+
+  // Drag a photo onto the photo card (computers): it goes through the same checks as «Выбрать фото».
+  const dropZone = form.querySelector('.career-photo-card');
+  if (dropZone && photoInput && typeof DataTransfer === 'function') {
+    let depth = 0;
+    const carriesFiles = event => [...(event.dataTransfer?.types || [])].includes('Files');
+    const leave = () => { depth = 0; dropZone.classList.remove('is-dragging'); };
+    dropZone.classList.add('is-droppable');
+    dropZone.addEventListener('dragenter', event => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      depth += 1;
+      dropZone.classList.add('is-dragging');
+    });
+    dropZone.addEventListener('dragover', event => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    });
+    dropZone.addEventListener('dragleave', () => { depth -= 1; if (depth <= 0) leave(); });
+    dropZone.addEventListener('drop', event => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      leave();
+      const file = event.dataTransfer.files?.[0];
+      if (!file) return;
+      try {
+        const files = new DataTransfer();
+        files.items.add(file);
+        photoInput.files = files.files;
+      } catch { return; }
+      photoInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    // A photo dropped next to the card must not open in the tab and lose the filled form.
+    window.addEventListener('dragover', event => { if (carriesFiles(event)) event.preventDefault(); });
+    window.addEventListener('drop', event => { if (carriesFiles(event) && !dropZone.contains(event.target)) event.preventDefault(); });
+  }
+
+  // Progress of the form: photo, contacts, experience, about. A step is done when its required fields are valid.
+  const progress = document.querySelector('[data-career-progress]');
+  const blocks = [...form.querySelectorAll('fieldset.career-block')];
+  const updateProgress = () => {
+    if (!progress) return;
+    const steps = [...progress.querySelectorAll('[data-progress-step]')];
+    const done = steps.map(step => {
+      const key = step.dataset.progressStep;
+      if (key === 'photo') return Boolean(photoData);
+      const block = blocks[Number(key)];
+      if (!block) return false;
+      const fields = [...block.querySelectorAll('input, select, textarea')].filter(field => field.name !== 'company');
+      return fields.every(field => field.checkValidity());
+    });
+    const current = done.indexOf(false);
+    steps.forEach((step, index) => {
+      step.classList.toggle('is-done', done[index]);
+      if (index === current) step.setAttribute('aria-current', 'step');
+      else step.removeAttribute('aria-current');
+      const state = step.querySelector('.career-progress-state');
+      if (state) state.textContent = done[index] ? 'заполнено' : '';
+    });
+    progress.style.setProperty('--progress', String(done.filter(Boolean).length / steps.length));
+  };
+  document.addEventListener('career-photo-cleared', () => setTimeout(updateProgress));
+  if (progress) {
+    progress.hidden = false;
+    form.addEventListener('input', updateProgress);
+    form.addEventListener('change', () => setTimeout(updateProgress));
+    updateProgress();
+  }
 
   const wordLimits = { name: 6, education: 12, certificates: 12, about: 60 };
   form.elements.phone?.addEventListener('paste', event => {
@@ -208,8 +283,10 @@
     }
     sending = true;
     submit?.setAttribute('disabled', '');
-    const label = submit?.innerHTML || '';
-    if (submit) submit.textContent = 'Отправляем…';
+    const label = submitLabel?.textContent || '';
+    let delivered = false;
+    if (submit) submit.dataset.state = 'loading';
+    if (submitLabel) submitLabel.textContent = 'Отправляем…';
     setStatus('Отправляем анкету…');
     try {
       const endpoint = (endpointMeta?.content || '/career').trim();
@@ -229,6 +306,11 @@
         throw new Error('delivery');
       }
       setStatus('');
+      delivered = true;
+      if (submit) submit.dataset.state = 'done';
+      if (submitLabel) submitLabel.textContent = 'Отправлено';
+      // Let the check finish drawing before the thank-you screen replaces the form.
+      await new Promise(resolve => setTimeout(resolve, calm() ? 0 : 700));
       showResult();
     } catch (error) {
       const message = {
@@ -244,7 +326,10 @@
       sending = false;
       resetGuard();
       submit?.removeAttribute('disabled');
-      if (submit) submit.innerHTML = label;
+      if (submit && !delivered) {
+        delete submit.dataset.state;
+        if (submitLabel) submitLabel.textContent = label;
+      }
     }
   });
 })();

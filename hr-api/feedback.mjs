@@ -1,5 +1,5 @@
 // Complaints and suggestions: an official one (with name and phone) or an anonymous one (no personal data).
-// The text goes to the complaints bot as a plain message; nothing is stored on the server.
+// The text goes to the complaints bot; nothing is stored on the server.
 import { ValidationError, cleanText, normalizePhone, normalizeTelegram } from './validation.mjs';
 
 export const FEEDBACK_TOPICS = [
@@ -37,13 +37,23 @@ export function validateFeedback(body) {
   return result;
 }
 
-// Plain text (no Markdown/HTML parsing in Telegram), so nothing the visitor typed can change the formatting.
+function escapeTelegramHtml(value) {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
 export function formatFeedback(feedback, date) {
-  const lines = feedback.kind === 'official'
-    ? ['📝 Официальная жалоба', `Дата: ${date}`, `Тема: ${feedback.topic}`, `Филиал: ${feedback.branch || 'не указан'}`,
-      `Имя: ${feedback.name}`, `Телефон: ${feedback.phone}`, ...(feedback.telegram ? [`Telegram: ${feedback.telegram}`] : [])]
-    : ['🕶 Анонимная жалоба', `Дата: ${date}`, `Тема: ${feedback.topic}`, `Филиал: ${feedback.branch || 'не указан'}`];
-  lines.push('', feedback.message);
-  if (feedback.kind === 'anonymous') lines.push('', 'Отправитель не указывал имя и контакты; адрес и устройство не передаются.');
-  return lines.join('\n');
+  const official = feedback.kind === 'official';
+  const type = official ? 'Официальное обращение' : 'Анонимное обращение';
+  const branch = feedback.branch || 'Филиал не указан';
+  const sections = [
+    `<b>📩 ${escapeTelegramHtml(feedback.topic)}</b>\n<i>${type} · ${escapeTelegramHtml(date)}</i>\n📍 ${escapeTelegramHtml(branch)}`,
+    `<blockquote>${escapeTelegramHtml(feedback.message)}</blockquote>`
+  ];
+
+  if (official) {
+    const channels = [feedback.phone, feedback.telegram].filter(Boolean).map(escapeTelegramHtml).join(' · ');
+    sections.push(`<b>Контакты</b>\n${escapeTelegramHtml(feedback.name)}\n${channels}`);
+  }
+
+  return sections.join('\n\n');
 }

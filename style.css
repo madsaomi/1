@@ -1585,7 +1585,7 @@ img[src$="stanford-icon.svg"] { object-fit: contain; }
 .carousel-arrow:disabled { opacity: .4; cursor: default; }
 .carousel-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; min-width: 0; }
 .carousel-dot { display: grid; place-items: center; padding: 0; border: 0; background: none; }
-.carousel-dot::before { content: ''; width: 8px; height: 8px; border-radius: 4px; background: var(--border-strong); transition: width var(--duration) var(--ease), background var(--duration) var(--ease); }
+.carousel-dot::before { content: ''; width: 8px; height: 8px; border-radius: 4px; background: var(--border-strong); transition: width 360ms var(--spring), background var(--duration) var(--ease); }
 .carousel-dot[aria-current="true"]::before { width: 20px; background: var(--brand); }
 
 /* Branch entrance photo: a tile the size of the map buttons, in the same row; a click opens it large. */
@@ -1953,3 +1953,89 @@ html[lang="uz"] { --lang-flag: url("assets/flags/uz.svg"); }
 html[lang="kaa"] { --lang-flag: url("assets/flags/kaa.svg"); }
 html[lang="en"] { --lang-flag: url("assets/flags/en.svg"); }
 [data-enhanced="true"] .lang-toggle:not(.is-replaced) { field-sizing: content; width: auto; height: 44px; padding: 0 34px 0 40px; border-radius: 12px; -webkit-appearance: none; appearance: none; letter-spacing: .04em; background: var(--lang-flag) 12px 50% / 20px 14px no-repeat, var(--lang-chevron) right 10px center / 16px 16px no-repeat, var(--surface); }
+
+/* ---------- Motion details: submit states, photo drop, form progress, sliding tab pill, copy buttons ---------- */
+/* Submit buttons of the HR and complaints forms: spinner while sending, a self-drawing check when delivered. */
+.btn-state { display: none; }
+.button[data-state] .btn-state { display: inline-grid; place-items: center; }
+.button[data-state] > .icon { display: none; }
+.btn-state svg { grid-area: 1 / 1; width: 20px; height: 20px; }
+.button[data-state="loading"] .btn-check, .button[data-state="done"] .btn-spinner { display: none; }
+.button[data-state="loading"] { cursor: progress; }
+.button[data-state]:disabled { opacity: 1; }
+.btn-spinner { transform-origin: 50% 50%; animation: btn-spin 800ms linear 40; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+.btn-check path { stroke-dasharray: 24; stroke-dashoffset: 24; }
+.button[data-state="done"] .btn-check path { animation: btn-check 420ms var(--ease) forwards; }
+@keyframes btn-check { to { stroke-dashoffset: 0; } }
+
+/* Photo of the HR form: drop a file onto the card on a computer. */
+.career-drop-hint { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .career-photo-card.is-droppable .career-drop-hint { display: block; }
+}
+.career-photo-card { transition: background var(--duration) var(--ease), outline-color var(--duration) var(--ease), transform 260ms var(--spring); }
+.career-photo-card.is-dragging { outline: 2px dashed var(--brand); outline-offset: 4px; background: var(--tint); transform: scale(1.01); }
+.career-photo-frame img:not([hidden]) { animation: photo-pop 360ms var(--spring); }
+@keyframes photo-pop { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Form progress: four steps that fill in as the visitor completes them; stays in view while scrolling. */
+.career-progress { --progress: 0; position: sticky; top: calc(var(--header-height) + var(--space-1)); z-index: 3; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 var(--space-3); padding: 12px var(--space-2); list-style: none; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); isolation: isolate; }
+.career-progress[hidden] { display: none; }
+.career-progress::before, .career-progress::after { content: ''; position: absolute; top: 24px; left: calc(var(--space-2) + 12.5% - 2px); height: 2px; border-radius: 1px; z-index: -1; }
+.career-progress::before { right: calc(var(--space-2) + 12.5% - 2px); background: var(--border-strong); }
+.career-progress::after { width: calc((100% - 2 * var(--space-2) - 25%) * min(var(--progress) * 4 / 3, 1)); background: var(--brand); transition: width 420ms var(--ease); }
+.career-progress li { display: grid; justify-items: center; gap: 4px; min-width: 0; text-align: center; color: var(--muted); font-size: var(--text-14); font-weight: 600; counter-increment: career-step; }
+.career-progress-mark { display: grid; place-items: center; width: 26px; height: 26px; border: 2px solid var(--border-strong); border-radius: 50%; background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 700; transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease), transform 260ms var(--spring); }
+.career-progress-mark::before { content: counter(career-step); }
+.career-progress li[aria-current="step"] { color: var(--ink); }
+.career-progress li[aria-current="step"] .career-progress-mark { border-color: var(--brand); color: var(--ink); }
+.career-progress li.is-done { color: var(--ink); }
+.career-progress li.is-done .career-progress-mark { border-color: var(--brand); background: var(--brand); color: var(--on-brand); transform: scale(1.06); }
+.career-progress li.is-done .career-progress-mark::before { content: '✓'; }
+.career-progress-label { max-width: 100%; overflow-wrap: anywhere; }
+
+/* One pill glides behind the chosen filter or cashback tab (assets/pill.js). */
+.has-pill { position: relative; isolation: isolate; }
+.pill-indicator { position: absolute; top: 0; left: 0; z-index: -1; border-radius: 12px; background: var(--brand); pointer-events: none; transition: transform 380ms var(--spring), width 380ms var(--spring), height 380ms var(--spring), opacity var(--duration) var(--ease); }
+.pill-indicator.is-instant { transition: none; }
+.pill-indicator.is-empty { opacity: 0; }
+.has-pill > button.active, .has-pill > button.active:hover { background: var(--transparent); }
+.cashback-tabs.has-pill .pill-indicator { border-radius: calc(var(--radius-control) - 4px); background: var(--surface); box-shadow: var(--shadow); }
+.cashback-tabs.has-pill > .cashback-tab.active { box-shadow: none; }
+
+/* Copy a phone, Telegram or e-mail with one click (assets/copy.js). */
+.contact-list li { display: flex; align-items: stretch; gap: 6px; }
+.contact-list li > .contact-channel { flex: 1 1 auto; }
+.contact-copy { display: grid; place-items: center; flex: none; width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--muted); cursor: pointer; transition: color var(--duration) var(--ease), border-color var(--duration) var(--ease), background var(--duration) var(--ease); }
+.contact-copy[hidden] { display: none; }
+.contact-copy:hover { border-color: var(--brand); color: var(--ink); }
+.contact-copy .icon { grid-area: 1 / 1; width: 18px; height: 18px; transition: transform 260ms var(--spring), opacity var(--duration) var(--ease); }
+.contact-copy .icon-check { opacity: 0; transform: scale(.4); color: var(--accent-text); }
+.contact-copy.is-copied { border-color: var(--brand); background: var(--tint); }
+.contact-copy.is-copied .icon-copy { opacity: 0; transform: scale(.4); }
+.contact-copy.is-copied .icon-check { opacity: 1; transform: none; }
+.contact-extras-copy { display: inline-flex; align-items: center; gap: 4px; }
+.contact-extras-copy .contact-copy { width: 36px; min-height: 36px; border-color: var(--transparent); background: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner { animation: none; }
+  .btn-check path, .button[data-state="done"] .btn-check path { animation: none; stroke-dashoffset: 0; }
+  .career-photo-frame img:not([hidden]) { animation: none; }
+  .career-photo-card, .career-progress::after, .career-progress-mark, .pill-indicator, .contact-copy .icon { transition: none; }
+  .career-photo-card.is-dragging, .career-progress li.is-done .career-progress-mark { transform: none; }
+}
+/* The copy button is joined to its contact: one bordered piece [ number | copy ], so it is clear what it copies. */
+.contact-list li:has(> .contact-copy:not([hidden])) { gap: 0; }
+.contact-list li:has(> .contact-copy:not([hidden])) > .contact-channel { border-start-end-radius: 0; border-end-end-radius: 0; }
+.contact-list li > .contact-copy { border-inline-start-width: 0; border-start-start-radius: 0; border-end-start-radius: 0; }
+.contact-extras-copy { grid-column: 1 / -1; }
+
+/* Pages fade into each other on same-site navigation (Chrome, Edge, Safari); other browsers switch instantly as
+   before. Nothing moves for visitors who ask for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 220ms; }
+}
+/* The new year garland thread stays visible on the dark background. */
+html[data-theme="dark"][data-holiday-active] .header::after { filter: brightness(2); }
