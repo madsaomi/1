@@ -72,6 +72,7 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/no-such-page)" = "404"
           curl -fsSI http://localhost:8080/ -o /tmp/stanford-headers.txt
           grep -qi '^content-security-policy:' /tmp/stanford-headers.txt
+          grep -qi '^cross-origin-opener-policy: same-origin' /tmp/stanford-headers.txt
 
   browser:
     name: Browser tests (phone and desktop)

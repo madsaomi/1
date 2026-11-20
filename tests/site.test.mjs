@@ -422,6 +422,9 @@ test('CSP permits same-origin HR requests and approved map frames while keeping 
   assert.deepEqual(directives.get('object-src'), ["'none'"]);
   assert.deepEqual(directives.get('frame-ancestors'), ["'none'"]);
   assert.deepEqual(directives.get('script-src'), ["'self'", 'https://static.cloudflareinsights.com', 'https://challenges.cloudflare.com']);
+  assert(caddy.includes('header Cross-Origin-Opener-Policy "same-origin"'), 'Opened pages cannot reach back into the site');
+  // The server image is an exact Caddy release, so a rebuild cannot change it by surprise.
+  assert.match(fs.readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8'), /^FROM caddy:\d+\.\d+\.\d+-alpine$/m);
 });
 
 test('rendered content escapes markup instead of injecting it', () => {

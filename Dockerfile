@@ -1,4 +1,5 @@
-FROM caddy:2-alpine
+# An exact Caddy release: a rebuild never changes the server by surprise. Update the number on purpose.
+FROM caddy:2.11.9-alpine
 
 WORKDIR /srv
 

@@ -13,6 +13,8 @@
 	# Cloudflare Turnstile («not a robot» in the forms): its script and frame from challenges.cloudflare.com.
 	header Content-Security-Policy "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-src https://yandex.ru https://www.google.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 	header Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	# Pages opened from the site (Telegram, maps) cannot reach back into it, and it cannot reach into them.
+	header Cross-Origin-Opener-Policy "same-origin"
 	# Railway serves the site over HTTPS only; browsers remember that for a year (no preload, no subdomains).
 	header Strict-Transport-Security "max-age=31536000"
 }
