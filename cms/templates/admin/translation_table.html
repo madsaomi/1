@@ -1,0 +1,83 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% comment %}All translations of the site in one editable table (content.translation_table, config.sites.translations_view).{% endcomment %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'content/translation_table.css' %}?v=1">
+{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+<li><a href="{% url 'admin:index' %}">Начало</a></li>
+<li aria-current="page">Таблица переводов</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div id="content-main" class="translation-table-page">
+  <p class="tt-intro">Все русские тексты сайта и их переводы в одной таблице. Пишите или вставляйте перевод прямо в ячейку и нажмите «Сохранить».
+    Можно скопировать сразу несколько ячеек из Excel или Google Таблиц и вставить в первую ячейку: строки и столбцы разложатся сами.
+    Узбекский автоматически переводится на алфавит 2026 года (ö, ğ, ş, ç). Пустая ячейка — на сайте останется русский текст.</p>
+
+  <form method="get" class="tt-filters">
+    <input type="search" name="q" value="{{ query }}" placeholder="Поиск по тексту или переводу" aria-label="Поиск">
+    <select name="section" aria-label="Раздел">
+      <option value="">Все разделы</option>
+      {% for name in sections %}<option value="{{ name }}"{% if name == section %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+    <select name="missing" aria-label="Показать">
+      <option value="">Все строки</option>
+      <option value="any"{% if missing == 'any' %} selected{% endif %}>Без какого-нибудь перевода</option>
+      <option value="uz"{% if missing == 'uz' %} selected{% endif %}>Без узбекского ({{ counts.uz }})</option>
+      <option value="kaa"{% if missing == 'kaa' %} selected{% endif %}>Без каракалпакского ({{ counts.kaa }})</option>
+      <option value="en"{% if missing == 'en' %} selected{% endif %}>Без английского ({{ counts.en }})</option>
+    </select>
+    <button type="submit" class="button">Показать</button>
+    <span class="tt-total">Строк: {{ page_obj.paginator.count }}</span>
+  </form>
+
+  <form method="post" id="translation-form">
+    {% csrf_token %}
+    <div class="tt-tools">
+      <button type="button" class="button" data-copy-column="source">Скопировать русский столбец этой страницы</button>
+      <span class="help">Удобно, чтобы перевести целиком в Google Таблицах и вставить обратно в столбец UZ, QQ или EN.</span>
+    </div>
+    <table class="tt-table">
+      <thead><tr><th class="tt-col-ru">По-русски (на сайте)</th><th>UZ — узбекский</th><th>QQ — каракалпакский</th><th>EN — английский</th></tr></thead>
+      <tbody>
+        {% for row in page_obj %}
+        <tr data-row="{{ row.key }}">
+          <td class="tt-source">
+            <input type="hidden" name="row" value="{{ row.key }}">
+            <div class="tt-meta">{{ row.section }}{% if row.place %} · {{ row.place }}{% endif %}</div>
+            <div class="tt-text">{{ row.source }}</div>
+          </td>
+          {% for value, language in row.cells %}
+          <td><textarea name="{{ row.key }}-{{ language }}" data-col="{{ forloop.counter0 }}" data-needs="{{ row.needs_translation|yesno:'true,false' }}" maxlength="{{ row.limit }}" rows="2"
+            class="{% if not value and row.needs_translation %}tt-empty{% endif %}" aria-label="{{ language|upper }}: {{ row.source|truncatechars:60 }}">{{ value }}</textarea></td>
+          {% endfor %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="tt-none">Ничего не найдено. Измените фильтр.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="tt-save">
+      <span class="tt-changed" aria-live="polite"></span>
+      <button type="submit" class="default">Сохранить</button>
+    </div>
+  </form>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="tt-pages" aria-label="Страницы таблицы">
+    {% for number in page_obj.paginator.page_range %}
+      {% if number == page_obj.number %}<span aria-current="page">{{ number }}</span>
+      {% else %}<a href="?{{ base_query }}page={{ number }}">{{ number }}</a>{% endif %}
+    {% endfor %}
+  </nav>
+  {% endif %}
+  <p class="help">Сохранение меняет черновик. На сайте переводы появятся после «Опубликовать на сайт» (можно сначала открыть «Предпросмотр»).</p>
+</div>
+<script src="{% static 'content/translation_table.js' %}?v=2"></script>
+{% endblock %}

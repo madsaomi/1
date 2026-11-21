@@ -214,7 +214,8 @@
       "quote": "За четыре месяца Writing вырос с 6.0 до 7.5: каждое эссе разбирали с преподавателем.",
       "student": "Малика Т.",
       "course": "IELTS, 4 месяца",
-      "featured": true
+      "featured": true,
+      "teacher": "Азиз Каримов"
     },
     {
       "score": "7.5",
@@ -222,7 +223,8 @@
       "level": "C1",
       "quote": "Speaking Club помог перестать бояться говорить. На экзамене было спокойно.",
       "student": "Бекзод А.",
-      "course": "General English и IELTS, 6 месяцев"
+      "course": "General English и IELTS, 6 месяцев",
+      "teacher": "Азиз Каримов"
     },
     {
       "score": "1450",
@@ -231,7 +233,8 @@
       "quote": "Math подтянул с Supporter, Reading — на пробных тестах каждую неделю.",
       "student": "Нурлан К.",
       "course": "SAT, 5 месяцев",
-      "featured": true
+      "featured": true,
+      "teacher": "Рустем Жумабаев"
     }
   ],
   "contacts": {

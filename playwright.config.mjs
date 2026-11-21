@@ -17,8 +17,12 @@ export default defineConfig({
     trace: 'retain-on-failure'
   },
   projects: [
-    { name: 'phone', use: { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true } },
-    { name: 'desktop', use: { viewport: { width: 1280, height: 900 } } }
+    { name: 'phone', testIgnore: /(?:speed|visual)\.spec/, use: { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true } },
+    { name: 'desktop', testIgnore: /(?:speed|visual)\.spec/, use: { viewport: { width: 1280, height: 900 } } },
+    // Pictures of the key screens compared with approved ones (local only, see visual.spec.mjs).
+    { name: 'visual', testMatch: /visual\.spec/ },
+    // Speed budget runs alone after the other tests, so the processor is not shared while measuring.
+    { name: 'speed', testMatch: /speed\.spec/, dependencies: ['phone', 'desktop'] }
   ],
   webServer: {
     command: 'node tests/e2e/serve.mjs',

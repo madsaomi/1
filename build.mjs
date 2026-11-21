@@ -26,6 +26,7 @@ export function svgIcon(name) {
     award: 'M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z M8.2 13.9 7 22l5-3 5 3-1.2-8.1',
     pause: 'M9 5v14 M15 5v14',
     copy: 'M9 9h10v10H9z M5 15V5h10',
+    user: 'M20 21a8 8 0 0 0-16 0 M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z',
     play: 'M8 5l11 7-11 7Z'
   };
   return `<svg class="icon icon-${name}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${paths[name]}"/></svg>`;
@@ -161,7 +162,7 @@ export function validateContent(data) {
     validateMediaGallery(teacher.media, 'Teacher gallery');
   }
   for (const result of results) {
-    if (!text(result.score, 8) || !text(result.exam, 20) || !optionalText(result.level, 20) || !text(result.quote, 240) || !text(result.student, 40) || !optionalText(result.course, 60)) throw new Error('Result needs a score, exam, quote and student');
+    if (!text(result.score, 8) || !text(result.exam, 20) || !optionalText(result.level, 20) || !text(result.quote, 240) || !text(result.student, 40) || !optionalText(result.course, 60) || !optionalText(result.teacher, 60)) throw new Error('Result needs a score, exam, quote and student');
     if (result.featured !== undefined && typeof result.featured !== 'boolean') throw new Error('Result featured must be true or false');
     validateMediaGallery(result.media, 'Student gallery');
     // Real student results are published only with the student's consent; demo samples are announced as examples instead.
@@ -421,11 +422,25 @@ export function generateLanguagePage(html, data, lang, page, pack = languagePack
 `, lang === 'en' ? '' : `  ${cyrillic.replace('inter-cyrillic-wght-normal', 'inter-uz-kaa-wght-normal')}
 `);
   const translated = translatePage(html, lang, pack);
-  return replaceBlock(translated, 'SEO', renderMetadata(data.site, page === 'index.html' ? '' : page, lang));
+  // The home copies keep the centre card and list their own language's course pages.
+  const extra = page === 'index.html' ? [renderStructuredData(data.site, data.contacts), renderCourseList(data.site, data.courses, lang)] : [];
+  return replaceBlock(translated, 'SEO', [renderMetadata(data.site, page === 'index.html' ? '' : page, lang), ...extra].filter(Boolean).join('\n'));
 }
 
 // Machine-readable card of the centre for search engines, built only from the published, verified contacts.
 // It is a data block (never executed), so the strict script-src policy is not involved.
+// The catalogue as a list for search engines: each course links to its own page, which carries the Course details
+// (Google's summary-page pattern for course lists). Addresses follow the language of the page.
+export function renderCourseList(site, courses = [], lang = 'ru') {
+  if (!site?.url || courses.length < 3) return '';
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    itemListElement: courses.map((course, index) => ({ '@type': 'ListItem', position: index + 1, url: pageAddress(site, `courses/${course.id}`, lang) }))
+  };
+  return `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`;
+}
+
 export function renderStructuredData(site, contacts) {
   if (!site?.url || !contacts?.verified) return '';
   const base = site.url.endsWith('/') ? site.url : `${site.url}/`;
@@ -578,16 +593,42 @@ export function renderTeachers(teachers = [], site, { featuredOnly = false, head
 }
 
 // One card per published student result; reused by the home section and the full results page.
+// Teacher cards carry a stable address made from the name, so a student's card can link to its teacher.
+export const teacherAnchor = name => `teacher-${createHash('sha256').update(String(name)).digest('hex').slice(0, 8)}`;
+// The student's teacher under the result: a small chip with the teacher's photo (or initial), the name and the
+// role; a link to the teacher's card when that teacher is published on the teachers page.
+export function renderResultTeacher(result, teachers = [], { mini = false } = {}) {
+  if (!result.teacher) return '';
+  const teacher = teachers.find(item => item.name === result.teacher);
+  const name = escapeHTML(result.teacher);
+  const avatar = teacher?.photo
+    ? `<img class="result-mentor-photo" src="${escapeHTML(teacher.photo)}" alt="" width="40" height="40" loading="lazy" decoding="async">`
+    : `<span class="result-mentor-photo result-mentor-initial" aria-hidden="true">${escapeHTML([...result.teacher.trim()][0] || '')}</span>`;
+  if (mini) {
+    const inner = `${avatar}<span class="sr-only">Преподаватель:</span><span class="result-mentor-name">${name}</span>`;
+    return teacher ? `<a class="result-mentor result-mentor--mini" href="teachers#${teacherAnchor(result.teacher)}">${inner}</a>` : `<span class="result-mentor result-mentor--mini">${inner}</span>`;
+  }
+  const body = `${avatar}<span class="result-mentor-text"><span class="result-mentor-label">Преподаватель</span><span class="result-mentor-name">${name}</span></span>`;
+  return teacher
+    ? `<a class="result-mentor" href="teachers#${teacherAnchor(result.teacher)}">${body}${svgIcon('arrow-right')}</a>`
+    : `<p class="result-mentor">${body}</p>`;
+}
+
 // One card per published student result. Home and course pages use the short (compact) card: two lines of the
 // review and «Подробнее» to the same student on the results page, where the whole story is shown.
-export function renderResultCards(results = [], { compact = false, all = results } = {}) {
+export function renderResultCards(results = [], { compact = false, all = results, teachers = [] } = {}) {
   return results.map(result => {
-    const more = compact ? `<a class="text-link result-more" href="results#student-${all.indexOf(result) + 1}" aria-label="Подробнее: ${escapeHTML(result.student)}">Подробнее${svgIcon('arrow-right')}</a>` : '';
-    return `<article class="result-card${compact ? ' result-card--compact' : ''}">${result.media?.length ? renderMediaGallery(result.media, result.student) : BRAND_COVER}<div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p>${more}</article>`;
+    const cover = result.media?.length ? renderMediaGallery(result.media, result.student) : BRAND_COVER;
+    const score = `<div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div>`;
+    if (compact) {
+      const more = `<a class="result-more" href="results#student-${all.indexOf(result) + 1}" aria-label="Подробнее: ${escapeHTML(result.student)}">Подробнее${svgIcon('arrow-right')}</a>`;
+      return `<article class="result-card result-card--compact"><div class="result-cover">${cover}${score}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><div class="result-foot"><p class="result-name">${escapeHTML(result.student)}</p>${more}${result.course ? `<p class="result-course">${escapeHTML(result.course)}</p>` : ''}${renderResultTeacher(result, teachers, { mini: true })}</div></article>`;
+    }
+    return `<article class="result-card">${result.media?.length ? renderMediaGallery(result.media, result.student) : BRAND_COVER}<div class="result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}</span>${result.level ? `<small>${escapeHTML(result.level)}</small>` : ''}</div><blockquote>«${escapeHTML(result.quote)}»</blockquote><p class="result-name">${escapeHTML([result.student, result.course].filter(Boolean).join(' · '))}</p>${renderResultTeacher(result, teachers)}</article>`;
   }).join('');
 }
 
-export function renderResults(results = [], site, { featuredOnly = false } = {}) {
+export function renderResults(results = [], site, { featuredOnly = false, teachers = [] } = {}) {
   if (!results.length) return '';
   // Featured (admin-configured tops) come first; the original order is kept inside each group.
   const sorted = [...results].sort((a, b) => (b.featured === true) - (a.featured === true));
@@ -599,7 +640,7 @@ export function renderResults(results = [], site, { featuredOnly = false } = {})
   }
   return `<section data-reveal class="section wrap results-section" id="results" aria-labelledby="results-title">
 <div class="section-top"><h2 id="results-title">Результаты студентов${demoTag(site)}</h2></div>
-${featuredOnly ? renderCarousel('results-grid home-carousel', 'results-title', renderResultCards(shown, { compact: true, all: results }), { marquee: true }) : `<div class="results-grid">${renderResultCards(shown)}</div>`}
+${featuredOnly ? renderCarousel('results-grid home-carousel', 'results-title', renderResultCards(shown, { compact: true, all: results, teachers }), { marquee: true }) : `<div class="results-grid">${renderResultCards(shown, { teachers })}</div>`}
 <a class="text-link results-more" href="results">Все результаты${svgIcon('arrow-right')}</a>
 </section>`;
 }
@@ -646,8 +687,7 @@ export function renderCourses(courses, contacts = {}) {
 <a class="course-enroll-btn course-flip-toggle" href="#course-details-${id}" data-flip-open aria-controls="course-details-${id}" aria-expanded="false" aria-label="Подробнее: ${name}">Подробнее${svgIcon('arrow-right')}</a></div>
 <div class="course-face course-back" id="course-details-${id}"><h4 class="course-back-title" tabindex="-1">${name}</h4><p class="course-description">${escapeHTML(course.description)}</p>
 <ul class="course-details" aria-label="В программе">${course.skills.map(skill => `<li>${svgIcon('check')}<span>${escapeHTML(skill)}</span></li>`).join('')}</ul>
-<a class="text-link course-page-link" href="courses/${id}" aria-label="Всё о курсе: ${name}">Всё о курсе${svgIcon('arrow-right')}</a>
-<div class="course-back-actions">${phone ? `<a class="button course-call" href="tel:${escapeHTML(phone)}" aria-label="Позвонить и записаться: ${name}">${svgIcon('phone')}<span>Позвонить и записаться</span></a>` : ''}<button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${name}">Назад${svgIcon('arrow-right')}</button></div></div>
+<div class="course-back-actions"><a class="course-page-link" href="courses/${id}" aria-label="Всё о курсе: ${name}">Всё о курсе${svgIcon('arrow-right')}</a>${phone ? `<a class="button course-call" href="tel:${escapeHTML(phone)}" aria-label="Позвонить и записаться: ${name}">${svgIcon('phone')}<span>Позвонить и записаться</span></a>` : ''}<button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${name}">Назад${svgIcon('arrow-right')}</button></div></div>
 </div>
 </article>`;
   }).join('\n');
@@ -807,7 +847,7 @@ export function generate(html, data) {
   html = replaceBlock(html, 'BANNER', renderDemoBanner(data.site));
   html = replaceBlock(html, 'STATS', renderStats(data.stats, data.site));
   html = replaceBlock(html, 'TEACHERS', renderTeachers(data.teachers, data.site, { featuredOnly: true }));
-  html = replaceBlock(html, 'RESULTS', renderResults(data.results, data.site, { featuredOnly: true }));
+  html = replaceBlock(html, 'RESULTS', renderResults(data.results, data.site, { featuredOnly: true, teachers: data.teachers }));
   html = replaceBlock(html, 'CASHBACK', renderCashback(data.cashback));
   html = replaceBlock(html, 'HERO_MEDIA', renderMediaGallery(data.site?.heroMedia, 'Stanford', { eager: true }));
   html = replaceBlock(html, 'REWARD', renderHeroReward(data.cashback));
@@ -823,7 +863,7 @@ export function generate(html, data) {
     return data.teachers?.length ? clean : clean.replace(/>$/, ' hidden>');
   });
   html = applyTexts(html, data.texts);
-  html = replaceBlock(html, 'SEO', [renderMetadata(data.site), renderStructuredData(data.site, data.contacts)].filter(Boolean).join('\n'));
+  html = replaceBlock(html, 'SEO', [renderMetadata(data.site), renderStructuredData(data.site, data.contacts), renderCourseList(data.site, data.courses)].filter(Boolean).join('\n'));
   html = html.replace(/<!-- CONTACT_START:([a-z]+) -->[\s\S]*?<!-- CONTACT_END:\1 -->/g, (_, key) => `<!-- CONTACT_START:${key} -->\n${renderContacts(data.contacts, { compact: key === 'dialog' })}\n<!-- CONTACT_END:${key} -->`);
   // Dictionaries are loaded only by the translated copies (/uz/, /kaa/, /en/), each its own one.
   // Everything from content.js is already in the HTML; the page does not download the data file.
@@ -853,13 +893,13 @@ export function renderResultProfiles(results = []) {
 
 // Student card of the results page: the photo (or gallery) fills a 4:5 frame, the name, course and score lie on a
 // soft shade at the bottom, «Подробнее» turns the card over to the review.
-function resultDirectoryCard(result, index) {
+function resultDirectoryCard(result, index, teachers = []) {
   const label = escapeHTML(result.student);
   const id = `student-details-${index + 1}`;
   const media = Boolean(result.media?.length);
   const cover = media ? renderMediaGallery(result.media, result.student) : '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>';
   const chips = `<li class="teacher-chip-key">${CHIP_ICONS.qualification}${escapeHTML(result.score)} · ${escapeHTML(result.exam)}</li>${result.level ? `<li>${escapeHTML(result.level)}</li>` : ''}`;
-  const details = `<div class="profile-result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}${result.level ? ` · ${escapeHTML(result.level)}` : ''}</span></div><blockquote>«${escapeHTML(result.quote)}»</blockquote>`;
+  const details = `<div class="profile-result-score"><strong>${escapeHTML(result.score)}</strong><span>${escapeHTML(result.exam)}${result.level ? ` · ${escapeHTML(result.level)}` : ''}</span></div><blockquote>«${escapeHTML(result.quote)}»</blockquote>${renderResultTeacher(result, teachers)}`;
   return `<article id="student-${index + 1}" class="profile-card profile-card-result" data-course-flip><div class="course-flip-inner"><div class="course-face course-front"><div class="profile-cover${media ? ' profile-cover--gallery' : ''}">${cover}</div><div class="profile-caption"><div class="profile-identity"><h3>${label}</h3>${result.course ? `<p>${escapeHTML(result.course)}</p>` : ''}</div><div class="profile-caption-row"><ul class="teacher-chips">${chips}</ul><a class="profile-more" href="#${id}" data-flip-open aria-controls="${id}" aria-expanded="false" aria-label="Подробнее: ${label}">Подробнее${svgIcon('arrow-right')}</a></div></div></div><div class="course-face course-back" id="${id}"><h3 class="course-back-title" tabindex="-1">${label}</h3><div class="profile-details">${details}</div><button class="button-outline course-flip-back" type="button" data-flip-close aria-label="Назад: ${label}">Назад${svgIcon('arrow-right')}</button></div></div></article>`;
 }
 
@@ -873,13 +913,13 @@ export function renderDirectoryTeachers(teachers = []) {
     const media = Boolean(teacher.media?.length);
     const cover = media ? renderMediaGallery(teacher.media, teacher.name) : teacher.photo ? `<img class="profile-photo" src="${escapeHTML(teacher.photo)}"${responsiveAttributes(teacher.photo)} alt="Фото: ${name}" width="600" height="750" loading="lazy" decoding="async">` : '<span class="profile-initials" aria-hidden="true"><img class="profile-brand" src="assets/stanford-icon.svg" alt="" width="88" height="88"></span>';
     const chips = teacherChips(teacher);
-    return `<article class="profile-card profile-card-teacher profile-card--static is-flip-ready"><div class="course-flip-inner"><div class="course-face course-front"><div class="profile-cover${media ? ' profile-cover--gallery' : ''}">${cover}</div><div class="profile-caption"><div class="profile-identity"><h3>${name}</h3>${teacher.role ? `<p>${escapeHTML(teacher.role)}</p>` : ''}</div>${chips ? `<ul class="teacher-chips">${chips}</ul>` : ''}</div></div></div></article>`;
+    return `<article id="${teacherAnchor(teacher.name)}" class="profile-card profile-card-teacher profile-card--static is-flip-ready"><div class="course-flip-inner"><div class="course-face course-front"><div class="profile-cover${media ? ' profile-cover--gallery' : ''}">${cover}</div><div class="profile-caption"><div class="profile-identity"><h3>${name}</h3>${teacher.role ? `<p>${escapeHTML(teacher.role)}</p>` : ''}</div>${chips ? `<ul class="teacher-chips">${chips}</ul>` : ''}</div></div></div></article>`;
   }).join('')}</div>`;
 }
 
-export function renderDirectoryResults(results = []) {
+export function renderDirectoryResults(results = [], teachers = []) {
   if (!results.length) return '<p class="directory-empty" data-text="results.empty">Результаты пока не опубликованы.</p>';
-  return results.map(resultDirectoryCard).join('');
+  return results.map((result, index) => resultDirectoryCard(result, index, teachers)).join('');
 }
 
 // Decorative line of scores that take turns (assets/ui.js); the cards below carry the same facts for everyone.
@@ -933,7 +973,7 @@ export function renderTeacherBand(teachers = []) {
 export function generateResults(html, data) {
   html = html.replace(/\r\n/g, '\n');
   validateContent(data);
-  html = replaceBlock(html, 'RESULTS_LIST', renderDirectoryResults(data.results));
+  html = replaceBlock(html, 'RESULTS_LIST', renderDirectoryResults(data.results, data.teachers));
   html = replaceBlock(html, 'LOOP', '');
   html = replaceBlock(html, 'SUMMARY', renderResultSummary(data.results));
   html = replaceBlock(html, 'BADGE', data.results?.length ? renderLanyard() : '');
@@ -1065,7 +1105,7 @@ export function renderCoursePage(course, data) {
 </section>`;
   const program = `<section class="section wrap course-page-section" aria-labelledby="course-program-title"><h2 id="course-program-title">Что входит в курс</h2><ul class="course-details course-page-details">${course.skills.map(skill => `<li>${svgIcon('check')}<span>${escapeHTML(skill)}</span></li>`).join('')}</ul></section>`;
   const resultsSection = results.length ? `<section class="section wrap course-page-section results-section" aria-labelledby="course-results-title"><div class="section-top"><h2 id="course-results-title">Результаты учеников${demoTag(site)}</h2></div>
-${renderCarousel('results-grid home-carousel', 'course-results-title', renderResultCards(results, { compact: true, all: data.results }))}
+${renderCarousel('results-grid home-carousel', 'course-results-title', renderResultCards(results, { compact: true, all: data.results, teachers: data.teachers }))}
 <a class="text-link results-more" href="results">Все результаты${svgIcon('arrow-right')}</a></section>` : '';
   const teachersSection = teachers.length ? `<section class="section wrap course-page-section" aria-labelledby="course-teachers-title"><div class="section-top"><h2 id="course-teachers-title">Преподаватели${demoTag(site)}</h2></div>
 ${renderTeachers(teachers, site, { heading: false })}

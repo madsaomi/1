@@ -351,14 +351,42 @@ class TeacherAdmin(DraftTemplateAdmin):
 @admin.register(StudentResult)
 class StudentResultAdmin(DraftTemplateAdmin):
     inlines = [ResultMediaInline]
-    list_display = ['score', 'exam', 'level', 'student', 'featured', 'consent', 'is_published', 'order']
-    list_editable = ['featured', 'is_published', 'order']
-    list_filter = ['exam', 'featured', 'consent', 'is_published']
+    list_display = ['score', 'exam', 'level', 'student', 'teacher', 'featured', 'consent', 'is_published', 'order']
+    list_editable = ['teacher', 'featured', 'is_published', 'order']
+    empty_value_display = 'не указан'
+    list_filter = ['exam', 'teacher', 'featured', 'consent', 'is_published']
     fieldsets = [
+        ('Ученик и преподаватель', {'fields': [('student', 'course'), 'teacher'],
+                                    'description': 'Преподавателя выберите из списка — имя, фото и ссылка на его карточку '
+                                                   'подставятся на сайте сами. Нет нужного? Нажмите «+» рядом со списком.'}),
         ('Результат', {'fields': [('score', 'exam', 'level')]}),
-        ('Отзыв', {'fields': ['quote', ('student', 'course')]}),
+        ('Отзыв', {'fields': ['quote']}),
         ('Публикация', {'fields': ['featured', 'consent', 'is_published', 'order']}),
     ]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        # The list of teachers: name and what they teach, hidden ones marked, empty choice says «не указан».
+        field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == 'teacher':
+            field.queryset = Teacher.objects.order_by('-is_published', 'order', 'name')
+            field.label_from_instance = lambda teacher: ' — '.join(filter(None, [teacher.name, teacher.role])) + (
+                '' if teacher.is_published else ' (скрыт на сайте)')
+            field.empty_label = '— не указан —'
+        return field
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        # Next to the list keep only «изменить» and «+ добавить преподавателя»; deleting a teacher belongs to its own page.
+        form = super().get_form(request, obj, change=change, **kwargs)
+        widget = form.base_fields['teacher'].widget
+        widget.can_delete_related = widget.can_view_related = False
+        return form
+
+    def get_changelist_form(self, request, **kwargs):
+        # In the list of results the teacher is a plain drop-down, without the extra icons.
+        form = super().get_changelist_form(request, **kwargs)
+        field = form.base_fields['teacher']
+        field.widget = getattr(field.widget, 'widget', field.widget)
+        return form
 
 
 @admin.register(Practice)

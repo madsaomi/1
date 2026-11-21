@@ -144,7 +144,8 @@ class Command(BaseCommand):
             result = self._save(StudentResult(order=order, score=item['score'], exam=item['exam'],
                                                level=item.get('level') or '', quote=item['quote'], student=item['student'],
                                                course=item.get('course') or '', featured=bool(item.get('featured')),
-                                               consent=item.get('consent', False)))
+                                               consent=item.get('consent', False),
+                                               teacher=Teacher.objects.filter(name=item.get('teacher') or '').first()))
             self._gallery(result, item.get('media', []), 'result')
 
         for order, item in enumerate(data.get('events') or []):

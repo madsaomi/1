@@ -4,10 +4,11 @@
 
 {% block extrastyle %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'content/dashboard.css' %}?v=1">
+<link rel="stylesheet" href="{% static 'content/dashboard.css' %}?v=3">
 {% endblock %}
 
 {% block content %}
+<p id="help-link">Впервые здесь или забыли, где что? <a href="{% url 'admin:help' %}">Справка: как добавить курс, учителя, результат, событие — и где это появится на сайте →</a><br>Разделы ниже сгруппированы по темам; под каждым написано, где он виден на сайте.</p>
 <div class="module" id="quick-edit">
   <h2>Быстрое добавление и шаблоны</h2>
   <p>Заполните поля реальными данными, сохраните запись, затем включите «Показывать на сайте».
@@ -18,8 +19,8 @@
     {% if perms.content.add_studentresult %}<li><a href="{% url 'admin:content_studentresult_add' %}">Добавить результат ученика</a><span>Ученик → экзамен и балл → отзыв → согласие на публикацию.</span></li>{% endif %}
     {% if perms.content.add_practice %}<li><a href="{% url 'admin:content_practice_add' %}">Добавить занятие и фото</a><span>Название → краткое описание → фото → описание фотографии.</span></li>{% endif %}
     {% if perms.content.add_event %}<li><a href="{% url 'admin:content_event_add' %}">Добавить событие с таймером</a><span>Название → дата и время Нукуса → условия → ссылка, если нужна.</span></li>{% endif %}
-    {% if perms.content.view_pagetext %}<li><a href="{% url 'admin:content_pagetext_changelist' %}">Изменить тексты страниц</a><span>Русский текст и переводы UZ / QQ редактируются рядом.</span></li>{% endif %}
-    {% if perms.content.view_translation %}<li><a href="{% url 'admin:content_translation_changelist' %}">Переводы карточек и кнопок</a><span>Вставьте точную русскую надпись и её переводы.</span></li>{% endif %}
+    {% if perms.content.change_translation %}<li><a href="{% url 'admin:translations' %}">Таблица переводов</a><span>Все тексты сайта и переводы UZ / QQ / EN в одной таблице; можно вставить столбец из Excel.</span></li>{% endif %}
+    {% if perms.content.view_pagetext %}<li><a href="{% url 'admin:content_pagetext_changelist' %}">Изменить тексты страниц</a><span>Русский текст каждого места на страницах.</span></li>{% endif %}
   </ul>
   <p class="help">Сохранение обновляет черновик в админке. Изменения становятся видны на сайте после кнопки «Опубликовать на сайт».</p>
 </div>
@@ -34,8 +35,11 @@
   {% endif %}
   <div class="submit-row">
     <input type="submit" class="default" value="Опубликовать на сайт">
+    <button type="submit" form="preview-form" formtarget="_blank">Предпросмотр</button>
   </div>
+  <p class="help">«Предпросмотр» собирает сайт из текущих черновиков и открывает его в новой вкладке. На сайт ничего не отправляется.</p>
 </form>
+<form method="post" action="{% url 'admin:preview_build' %}" id="preview-form" target="_blank">{% csrf_token %}</form>
 {% elif request.user.is_superuser %}
 <div class="module"><h2>Публикация не настроена</h2><p>Сохранять записи уже можно. Для публикации на сервере настройте подключение к репозиторию по инструкции cms/README.md.</p></div>
 {% endif %}

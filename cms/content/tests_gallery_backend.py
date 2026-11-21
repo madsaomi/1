@@ -181,7 +181,7 @@ class VideoBoundaryTests(SimpleTestCase):
                 mock.patch('content.media_video.VIDEO_MAX_BYTES', 8):
             with self.assertRaisesMessage(ValidationError, 'больше 8 МБ'):
                 normalize_video(b'source', 'source.mp4')
-        with mock.patch('content.media_video._probe', side_effect=[90, 80]), \
+        with mock.patch('content.media_video._probe', side_effect=[45, 40]), \
                 mock.patch('content.media_video._run', side_effect=output):
             with self.assertRaisesMessage(ValidationError, 'целиком'):
                 normalize_video(b'source', 'source.mp4')

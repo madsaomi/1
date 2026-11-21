@@ -35,7 +35,130 @@ class StanfordAdminSite(AdminSite):
     index_template = 'admin/stanford_index.html'
 
     def get_urls(self):
-        return [path('publish/', self.admin_view(require_POST(self.publish_view)), name='publish')] + super().get_urls()
+        return [path('publish/', self.admin_view(require_POST(self.publish_view)), name='publish'),
+                path('translations/', self.admin_view(self.translations_view), name='translations'),
+                path('help/', self.admin_view(self.help_view), name='help'),
+                path('preview/build/', self.admin_view(require_POST(self.preview_build_view)), name='preview_build'),
+                path('preview/', self.admin_view(self.preview_view), {'path': ''}, name='preview'),
+                path('preview/<path:path>', self.admin_view(self.preview_view), name='preview_file')] + super().get_urls()
+
+    def translations_view(self, request):
+        """Every Russian text of the site with its UZ / QQ / EN translations in one editable table."""
+        from urllib.parse import urlencode
+        from django.core.exceptions import PermissionDenied
+        from django.core.paginator import Paginator
+        from django.template.response import TemplateResponse
+        from content.translation_table import PAGE_SIZE, filter_rows, missing_counts, save_rows, sections, table_rows
+        needed = ('content.change_pagetext', 'content.change_faq', 'content.add_translation', 'content.change_translation',
+                  'content.delete_translation')
+        if not request.user.has_perms(needed):
+            raise PermissionDenied
+        rows = table_rows()
+        if request.method == 'POST':
+            saved, errors = save_rows(request.POST, rows)
+            for error in errors:
+                messages.error(request, error)
+            if saved:
+                messages.success(request, f'Сохранено строк: {saved}. На сайте переводы появятся после публикации.')
+            elif not errors:
+                messages.info(request, 'Изменений не было.')
+            return redirect(request.get_full_path())
+        query, section, missing = request.GET.get('q', ''), request.GET.get('section', ''), request.GET.get('missing', '')
+        filtered = filter_rows(rows, query=query, missing=missing, section=section)
+        page_obj = Paginator(filtered, PAGE_SIZE).get_page(request.GET.get('page'))
+        base = urlencode({key: value for key, value in (('q', query), ('section', section), ('missing', missing)) if value})
+        context = {**self.each_context(request), 'title': 'Таблица переводов', 'page_obj': page_obj, 'query': query,
+                   'section': section, 'missing': missing, 'sections': sections(rows), 'counts': missing_counts(rows),
+                   'base_query': f'{base}&' if base else ''}
+        return TemplateResponse(request, 'admin/translation_table.html', context)
+
+    def preview_build_view(self, request):
+        """Build the preview from the current drafts and open it."""
+        from content.publish import PublishError
+        from content.preview import build_preview
+        if not request.user.is_superuser:
+            messages.error(request, 'Предпросмотр доступен только владельцу (суперпользователю).')
+            return redirect('admin:index')
+        try:
+            build_preview()
+        except PublishError as error:
+            messages.error(request, str(error))
+            return redirect('admin:index')
+        return redirect('admin:preview')
+
+    def preview_view(self, request, path=''):
+        """Pages and files of the last preview, only for the signed-in owner."""
+        from django.http import FileResponse, Http404, HttpResponse
+        from content.preview import content_type, fallback, mark_page, resolve
+        if not request.user.is_superuser:
+            raise Http404
+        file = resolve(path) or fallback(path)
+        if file is None:
+            # On the server the admin has no copy of the shared files (styles, scripts, pictures): take them
+            # from the published site. Pages, texts and new photos always come from the preview itself.
+            from content.models import SiteSettings
+            site_url = (SiteSettings.load().site_url or '').rstrip('/')
+            if not site_url or path.endswith('.html') or not path:
+                raise Http404
+            from django.http import HttpResponseRedirect
+            query = request.META.get('QUERY_STRING')
+            return HttpResponseRedirect(f"{site_url}/{path}{'?' + query if query else ''}")
+        if file.suffix == '.html':
+            page = mark_page(file.read_text(encoding='utf-8'), path if not path.endswith('/') else path + 'index.html')
+            response = HttpResponse(page, content_type='text/html; charset=utf-8')
+        else:
+            response = FileResponse(file.open('rb'), content_type=content_type(file))
+        response['Cache-Control'] = 'no-store'
+        response['X-Robots-Tag'] = 'noindex'
+        return response
+
+    def get_app_list(self, request, app_label=None):
+        """Side menu and home page: the site's content in plain sections («Курсы, цены и кэшбэк», …), access last.
+        Each section of content carries a one-line «где на сайте» for the home page (content.admin_guide)."""
+        from content.admin_guide import ACCESS_APPS, ACCESS_MODELS, GROUPS, GUIDE
+        apps = super().get_app_list(request, app_label)
+        if app_label:
+            return apps
+        models = {model['object_name']: model for app in apps if app['app_label'] == 'content' for model in app['models']}
+        for name, model in models.items():
+            model['hint'] = GUIDE.get(name, {}).get('where', '')
+        grouped, used = [], set()
+        for slug, title, names in GROUPS:
+            items = [models[name] for name in names if name in models]
+            used.update(name for name in names if name in models)
+            if items:
+                grouped.append({'name': title, 'app_label': f'group-{slug}', 'app_url': f'#group-{slug}',
+                                'has_module_perms': True, 'models': items})
+        rest = [model for name, model in models.items() if name not in used]
+        if rest:
+            grouped.append({'name': 'Прочее', 'app_label': 'group-other', 'app_url': '#group-other',
+                            'has_module_perms': True, 'models': rest})
+        access = [app for app in apps if app['app_label'] != 'content']
+        order = list(ACCESS_APPS)
+        access.sort(key=lambda app: order.index(app['app_label']) if app['app_label'] in order else len(order))
+        for app in access:
+            app['name'] = ACCESS_APPS.get(app['app_label'], app['name'])
+            for model in app['models']:
+                model['name'] = ACCESS_MODELS.get(model['object_name'], model['name'])
+        return grouped + access
+
+    def help_view(self, request):
+        """«Как сделать…»: what to fill in for typical tasks and where the result shows on the site."""
+        from django.template.response import TemplateResponse
+        from django.urls import NoReverseMatch, reverse
+        from content.admin_guide import HELP
+        topics = []
+        for index, topic in enumerate(HELP, start=1):
+            item = {**topic, 'id': f'help-{index}'}
+            if topic.get('link'):
+                try:
+                    item['url'] = reverse(topic['link'][0], current_app=self.name)
+                    item['label'] = topic['link'][1]
+                except NoReverseMatch:
+                    item['url'] = None
+            topics.append(item)
+        context = {**self.each_context(request), 'title': 'Справка: как добавить и где это на сайте', 'topics': topics}
+        return TemplateResponse(request, 'admin/stanford_help.html', context)
 
     def each_context(self, request):
         from content.publish import site_available, publish_target

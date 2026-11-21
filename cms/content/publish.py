@@ -239,6 +239,38 @@ def publish_local(files):
     return {'changed': bool(written)}
 
 
+def stage_sources(stage, data, photos, translations, paths, client=None):
+    """Put the site sources, this release's photos, content.js and dictionaries into `stage`."""
+    snapshot = client.snapshot(stage, paths) if client else None
+    if not client:
+        copy_local_sources(stage, paths)
+    previous = read_content(stage / 'content.js')
+    for path, content in photos.items():
+        destination = stage / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+    write_content(data, stage / 'content.js')
+    for language, strings in translations.items():
+        dictionary = stage / f'assets/i18n/{language}.js'
+        # Translations shipped with the code (404 page, policy, new labels) stay until the admin
+        # has its own; anything edited in the admin wins.
+        write_translation_strings(dictionary, {**read_translation_strings(dictionary), **strings})
+    return snapshot, previous
+
+
+def run_site_build(node, stage):
+    """Run build.mjs in `stage`; a refusal becomes a readable PublishError."""
+    result = subprocess.run([node, 'build.mjs'], cwd=stage, capture_output=True, text=True,
+                            encoding='utf-8', errors='replace', timeout=120,
+                            env={**{key: value for key, value in os.environ.items()
+                                    if key.upper() in ('PATH', 'SYSTEMROOT', 'WINDIR', 'TMP', 'TEMP')},
+                                 'ELECTRON_RUN_AS_NODE': '1'})
+    if result.returncode:
+        lines = (result.stderr or result.stdout or '').splitlines()
+        reason = next((line.strip() for line in lines if 'Error' in line), 'проверьте содержимое в админке')
+        raise PublishError(f'Сайт не принял данные: {reason[:300]}')
+
+
 def publish_site():
     if not site_available():
         raise PublishError('Публикация не настроена. Для сервера задайте SITE_PUBLISH_TARGET=github, '
@@ -265,32 +297,11 @@ def publish_site():
             with tempfile.TemporaryDirectory(prefix='stanford-release-') as temporary:
                 stage = Path(temporary)
                 client = github_client() if target == 'github' else None
-                snapshot = client.snapshot(stage, paths) if client else None
-                if not client:
-                    copy_local_sources(stage, paths)
-                previous = read_content(stage / 'content.js')
+                snapshot, previous = stage_sources(stage, data, photos, translations, paths, client)
                 retained_photos = with_small_variants(media_paths(previous) | media_paths(data))
-                for path, content in photos.items():
-                    destination = stage / path
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    destination.write_bytes(content)
-                write_content(data, stage / 'content.js')
-                for language, strings in translations.items():
-                    dictionary = stage / f'assets/i18n/{language}.js'
-                    # Translations shipped with the code (404 page, policy, new labels) stay until the admin
-                    # has its own; anything edited in the admin wins.
-                    write_translation_strings(dictionary, {**read_translation_strings(dictionary), **strings})
                 validate_release_media_size(stage, data)
                 variants = write_small_variants(stage, data)
-                result = subprocess.run([node, 'build.mjs'], cwd=stage, capture_output=True, text=True,
-                                        encoding='utf-8', errors='replace', timeout=120,
-                                        env={**{key: value for key, value in os.environ.items()
-                                                if key.upper() in ('PATH', 'SYSTEMROOT', 'WINDIR', 'TMP', 'TEMP')},
-                                             'ELECTRON_RUN_AS_NODE': '1'})
-                if result.returncode:
-                    lines = (result.stderr or result.stdout or '').splitlines()
-                    reason = next((line.strip() for line in lines if 'Error' in line), 'проверьте содержимое в админке')
-                    raise PublishError(f'Сайт не принял данные: {reason[:300]}')
+                run_site_build(node, stage)
                 files = {path: (stage / path).read_bytes() for path in sorted(OUTPUT_FILES)}
                 files.update(course_pages(stage))
                 files.update(photos)

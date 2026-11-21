@@ -2,6 +2,7 @@
 // Owner translations published by the CMS may override these defaults.
 window.stanfordKaa = {
   strings: {
+    "Преподаватель": "Oqıtıwshı",
     "Заполнение анкеты": "Anketanı toltırıw barısı",
     "Скопировано": "Kóshirip alındı",
     "Отправлено": "Jiberildi",
@@ -438,6 +439,7 @@ window.stanfordKaa = {
       const months = { 'января': 'yanvar', 'февраля': 'fevral', 'марта': 'mart', 'апреля': 'aprel', 'мая': 'may', 'июня': 'iyun', 'июля': 'iyul', 'августа': 'avgust', 'сентября': 'sentyabr', 'октября': 'oktyabr', 'ноября': 'noyabr', 'декабря': 'dekabr' };
       return `${m[1]}-${months[m[2]]} ${m[3]}-jıl, ${m[4]} · Nókis`;
     }],
+    [/^(.+), (\d+) (?:месяц|месяца|месяцев)$/, (m, t) => `${t(m[1])}, ${m[2]} ay`],
     [/^(.+): (\d+)$/, (m, t) => `${t(m[1])}: ${m[2]}`]
   ]
 };

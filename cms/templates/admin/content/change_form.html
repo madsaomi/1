@@ -1,0 +1,5 @@
+{% extends "admin/change_form.html" %}
+{% load static admin_guide %}
+{% comment %}Stock edit form of a content record with the «Что это и где на сайте» box on top.{% endcomment %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'content/guide.css' %}?v=1">{% endblock %}
+{% block content %}{% site_guide opts %}{{ block.super }}{% endblock %}

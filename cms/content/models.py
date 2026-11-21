@@ -435,6 +435,9 @@ class StudentResult(Ordered):
     quote = models.TextField('Отзыв', max_length=240)
     student = models.CharField('Студент', max_length=40, help_text='Имя и первая буква фамилии')
     course = models.CharField('Курс и срок', max_length=60, blank=True, help_text='Например: IELTS, 4 месяца')
+    teacher = models.ForeignKey('Teacher', verbose_name='Преподаватель', null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name='results',
+                                help_text='Чей это ученик. На сайте под результатом: «Преподаватель: …» со ссылкой на его карточку.')
     consent = models.BooleanField('Есть согласие студента', default=False,
                                   help_text='Без согласия реальный отзыв не публикуется (вне демо-режима).')
     featured = models.BooleanField('Топ', default=False,
@@ -464,7 +467,7 @@ class MediaItem(Ordered):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='media_items', null=True, blank=True)
     photo = models.ImageField('Фото', upload_to='gallery/photos/', blank=True, validators=PHOTO_VALIDATORS)
     video = models.FileField('Видео', upload_to='gallery/videos/', blank=True, validators=VIDEO_VALIDATORS,
-                             help_text='MP4, MOV или WebM до 30 МБ и 90 секунд. Сжимается до MP4, максимум 8 МБ.')
+                             help_text='MP4, MOV или WebM до 30 МБ и 45 секунд. Сжимается до MP4 хорошего качества, максимум 8 МБ.')
     poster = models.ImageField('Обложка видео', upload_to='gallery/posters/', blank=True, editable=False)
     alt = models.CharField('Описание фото или видео', max_length=160, blank=True)
     is_published = models.BooleanField('Показывать слайд', default=True)

@@ -1,6 +1,7 @@
 // English. Edit translations in the admin: «Переводы» (the strings block is rebuilt on publication).
 window.stanfordEn = {
   strings: {
+    "Преподаватель": "Teacher",
     "Заполнение анкеты": "Form progress",
     "Скопировано": "Copied",
     "Отправлено": "Sent",
@@ -440,6 +441,7 @@ window.stanfordEn = {
       const months = { 'января': 'January', 'февраля': 'February', 'марта': 'March', 'апреля': 'April', 'мая': 'May', 'июня': 'June', 'июля': 'July', 'августа': 'August', 'сентября': 'September', 'октября': 'October', 'ноября': 'November', 'декабря': 'December' };
       return `${m[1]} ${months[m[2]]} ${m[3]}, ${m[4]} · Nukus`;
     }],
+    [/^(.+), (\d+) (?:месяц|месяца|месяцев)$/, (m, t) => `${t(m[1])}, ${m[2]} ${m[2] === '1' ? 'month' : 'months'}`],
     [/^(.+): (\d+)$/, (m, t) => `${t(m[1])}: ${m[2]}`]
   ]
 };

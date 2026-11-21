@@ -299,6 +299,8 @@ def _results_data(photo_files=None):
         item.update({'quote': result.quote, 'student': result.student})
         if result.course:
             item['course'] = result.course
+        if result.teacher_id and result.teacher.is_published:
+            item['teacher'] = result.teacher.name
         if result.consent:
             item['consent'] = True
         if result.featured:

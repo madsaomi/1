@@ -46,6 +46,9 @@ menu.addEventListener('click', event => {
   if (menu.getAttribute('aria-expanded') === 'true') return closeMenu();
   menu.setAttribute('aria-expanded', 'true');
   menu.setAttribute('aria-label', 'Закрыть меню');
+  // A greeting or demo bar above the header moves it down: the drawer opens under its real bottom edge.
+  const headerBottom = document.querySelector('.header')?.getBoundingClientRect?.().bottom;
+  if (Number.isFinite(headerBottom)) document.documentElement.style?.setProperty('--menu-top', `${Math.round(headerBottom + 8)}px`);
   navigation.classList.add('open');
   if (event.detail === 0) navigation.querySelector('a')?.focus();
 });

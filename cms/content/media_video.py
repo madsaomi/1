@@ -9,10 +9,13 @@ from django.core.exceptions import ValidationError
 
 VIDEO_MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 VIDEO_MAX_BYTES = 8 * 1024 * 1024
-VIDEO_MAX_SECONDS = 90
+# 45 seconds at up to 1.2 Mbit/s video + 64 kbit/s sound is about 7 MB, inside the 8 MB ceiling: short clips
+# look clear even with movement (a lesson, an event), instead of long ones squeezed until they blur.
+VIDEO_MAX_SECONDS = 45
+VIDEO_MAX_RATE = '1200k'
 VIDEO_EXTENSIONS = {'.mp4', '.mov', '.webm'}
 VIDEO_ERROR = ('Не удалось прочитать видео. Выберите обычный MP4, MOV или WebM до 30 МБ '
-               'и длительностью до 90 секунд.')
+               'и длительностью до 45 секунд.')
 
 
 def _run(arguments, *, timeout):
@@ -75,8 +78,8 @@ def normalize_video(raw, filename='upload.mp4'):
         args += ['-i', str(source), '-map', '0:v:0', '-map', '0:a:0?', '-sn', '-dn',
                  '-map_metadata', '-1', '-map_chapters', '-1', '-t', str(VIDEO_MAX_SECONDS),
                  '-vf', "scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,fps=24",
-                 '-filter_threads', '1', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '29',
-                 '-maxrate', '600k', '-bufsize', '1200k', '-pix_fmt', 'yuv420p', '-threads', '1',
+                 '-filter_threads', '1', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26',
+                 '-maxrate', VIDEO_MAX_RATE, '-bufsize', '2400k', '-pix_fmt', 'yuv420p', '-threads', '1',
                  '-c:a', 'aac', '-b:a', '64k', '-ac', '2', '-ar', '44100',
                  '-movflags', '+faststart', '-f', 'mp4', '-fs', str(VIDEO_MAX_BYTES), str(output)]
         _run(args, timeout=120)

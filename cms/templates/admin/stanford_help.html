@@ -1,0 +1,29 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% comment %}«Как сделать…»: typical tasks, what to fill in and where it shows on the site (content.admin_guide.HELP).{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'content/guide.css' %}?v=1">{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+<li><a href="{% url 'admin:index' %}">Начало</a></li>
+<li aria-current="page">Справка</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div id="content-main" class="help-page">
+  <p>Здесь коротко: что заполнить для обычных задач и где это появится на сайте. В каждом разделе админки сверху тоже есть подсказка «Что это и где на сайте».</p>
+  <ol class="help-toc">
+    {% for topic in topics %}<li><a href="#{{ topic.id }}">{{ topic.title }}</a></li>{% endfor %}
+  </ol>
+  {% for topic in topics %}
+  <section class="help-topic" id="{{ topic.id }}">
+    <h2>{{ topic.title }}</h2>
+    <ol>{% for step in topic.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+    {% if topic.result %}<p class="help-result"><strong>Где появится на сайте:</strong> {{ topic.result }}</p>{% endif %}
+    {% if topic.url %}<a class="help-open" href="{{ topic.url }}">Открыть: {{ topic.label }} →</a>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

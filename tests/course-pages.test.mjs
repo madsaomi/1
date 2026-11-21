@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { LANGUAGES, buildCoursePages, courseResults, courseTeachers, deeperPaths, readContent, renderCourseData, renderCoursePage, renderSitemap } from '../build.mjs';
+import { LANGUAGES, buildCoursePages, renderCourseList, courseResults, courseTeachers, deeperPaths, readContent, renderCourseData, renderCoursePage, renderSitemap } from '../build.mjs';
 
 const read = name => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 const fixture = JSON.parse(read('tests/fixtures/content.json'));
@@ -70,4 +70,16 @@ test('the sitemap lists every course page in all four languages', () => {
   const map = renderSitemap({ url: 'https://school.example' }, [course]);
   assert.equal((map.match(/<loc>/g) || []).length, 20);
   assert(map.includes('<loc>https://school.example/courses/ielts</loc>') && map.includes('<loc>https://school.example/kaa/courses/ielts</loc>'));
+});
+
+test('the home pages list every course page for search engines, each in its own language', () => {
+  const data = readContent();
+  if (!data.site.url) return;
+  const list = html => JSON.parse(html.match(/<script type="application\/ld\+json">(\{"@context":"https:\/\/schema\.org","@type":"ItemList"[^<]*)<\/script>/)[1]);
+  const ru = list(read('index.html'));
+  assert.equal(ru.itemListElement.length, data.courses.length);
+  assert(ru.itemListElement[0].url.endsWith(`/courses/${data.courses[0].id}`));
+  assert(list(read('uz/index.html')).itemListElement.every(item => item.url.includes('/uz/courses/')));
+  assert(read('kaa/index.html').includes('"@type":"EducationalOrganization"'), 'Translated home pages keep the centre card');
+  assert.equal(renderCourseList({ url: 'https://school.example' }, data.courses.slice(0, 2)), '', 'Google asks for at least three courses');
 });

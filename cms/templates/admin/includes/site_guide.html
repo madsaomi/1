@@ -1,0 +1,8 @@
+{% if guide %}
+<aside class="site-guide" aria-label="Что это и где на сайте">
+  <p><strong>Что это:</strong> {{ guide.what }}</p>
+  <p><strong>Где на сайте:</strong> {{ guide.where }}</p>
+  {% if guide.tip %}<p><strong>Совет:</strong> {{ guide.tip }}</p>{% endif %}
+  <p class="site-guide-more"><a href="{% url 'admin:help' %}">Справка: как добавить и где это на сайте →</a> · Изменения видны на сайте после «Опубликовать на сайт».</p>
+</aside>
+{% endif %}

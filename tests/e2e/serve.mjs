@@ -5,6 +5,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -69,7 +70,14 @@ http.createServer((request, response) => {
     fs.createReadStream(path.join(site, 'assets/errors/404.html')).pipe(response);
     return;
   }
-  response.writeHead(200, { ...headers, 'Content-Type': types[path.extname(found)] || 'application/octet-stream' });
+  // Text files are compressed like Caddy's «encode zstd gzip», so speed measurements match the real site.
+  const type = types[path.extname(found)] || 'application/octet-stream';
+  if (/^(?:text\/|application\/json|image\/svg)/.test(type) && /\bgzip\b/.test(request.headers['accept-encoding'] || '')) {
+    response.writeHead(200, { ...headers, 'Content-Type': type, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' });
+    fs.createReadStream(found).pipe(zlib.createGzip()).pipe(response);
+    return;
+  }
+  response.writeHead(200, { ...headers, 'Content-Type': type });
   fs.createReadStream(found).pipe(response);
 }).listen(port, '127.0.0.1', () => console.log(`e2e site on http://127.0.0.1:${port} (${site})`));
 
